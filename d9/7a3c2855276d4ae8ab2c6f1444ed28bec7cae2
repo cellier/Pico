@@ -1,0 +1,201 @@
+.gitignore
+  s_b14f272eb161b5::t_bb5ec938d47476 1-15
+Backend/capabilities.py
+  s_b14f272eb161b5::t_640e465aa41c00 1-270
+Backend/dictation.py
+  s_b14f272eb161b5::t_32517916a46f22 1-69
+Backend/dictation_polish.py
+  s_b14f272eb161b5::t_0cc168ae5735e4 1-61
+Backend/feed_editorial.py
+  s_b14f272eb161b5::t_a7c190bdbf5903 1-45
+Backend/feed_policy.py
+  s_b14f272eb161b5::t_c79a2fd10bb994 1-41
+Backend/feeds.py
+  s_8a8f16ebc66605::t_bb7f9d2fabe7b5 1-149
+Backend/mac_bridge.py
+  s_b14f272eb161b5::t_f906e83a34fe04 1-284
+Backend/meeting_speech.py
+  s_b14f272eb161b5::t_d6788057756c8a 1-22
+Backend/meeting_understanding.py
+  s_b14f272eb161b5::t_ada08fc7e0ea46 1-88
+Backend/register_capabilities.py
+  s_8a8f16ebc66605::t_ea5dec9b481c73 1-29
+Backend/requirements.txt
+  s_b14f272eb161b5::t_9bce341a8a917b 1-7
+Backend/task_creation.py
+  s_b14f272eb161b5::t_e270fe476210d6 1-21
+Backend/worker.py
+  s_8a8f16ebc66605::t_610147988e0cee 1-233
+README.md
+  s_8a8f16ebc66605::t_b8450656de324c 1-133
+Resources/OFL.txt
+  s_b14f272eb161b5::t_7a8c5780e3989f 1-93
+Sources/CalendarSchedule.swift
+  s_b14f272eb161b5::t_ad70c1b898093a 1-54
+Sources/CalendarStore.swift
+  s_b14f272eb161b5::t_eb4e2a5877fdce 1-116
+Sources/CalendarViews.swift
+  s_b14f272eb161b5::t_b42e9268352feb 1-48
+Sources/CompletionSections.swift
+  s_b14f272eb161b5::t_771e0db15bb2f5 1-36
+Sources/DictationController.swift
+  s_b14f272eb161b5::t_15345af428d0c9 1-320
+Sources/DictationEngine.swift
+  s_b14f272eb161b5::t_13a57b169fd559 1-65
+Sources/DictationInsertion.swift
+  s_b14f272eb161b5::t_dbea1906b6ec2f 1-15
+Sources/FeedSchedule.swift
+  s_8a8f16ebc66605::t_4ba0d22d9e3510 1-16
+Sources/FeedStore.swift
+  s_8a8f16ebc66605::t_d901a7a59858fe 1-100
+Sources/FeedViews.swift
+  s_b14f272eb161b5::t_3db7dee39bda28 1-161
+Sources/HomeClock.swift
+  s_b14f272eb161b5::t_be35019f90b26e 1-16
+Sources/HoverFeedback.swift
+  s_b14f272eb161b5::t_56b4da02eed0c3 1-47
+Sources/InlineAttachments.swift
+  s_b14f272eb161b5::t_6c86079de16fd4 1-303
+Sources/LocalMeetingTranscription.swift
+  s_b14f272eb161b5::t_5fd0ab102d9d10 1-121
+Sources/MeetingAudioCapture.swift
+  s_b14f272eb161b5::t_1027de244c565e 1-81
+Sources/MeetingModels.swift
+  s_b14f272eb161b5::t_1423a45fb90e8f 1-81
+Sources/MeetingMonitor.swift
+  s_b14f272eb161b5::t_5d1bdd6ab53d6c 1-71
+Sources/MeetingSessionManager.swift
+  s_b14f272eb161b5::t_030a5ba7544012 1-273
+Sources/MeetingTaskCreation.swift
+  s_b14f272eb161b5::t_4026d70e3a2d32 1-33
+Sources/MeetingTranscription.swift
+  s_b14f272eb161b5::t_a113d0320838d5 1-104
+Sources/MeetingUnderstanding.swift
+  s_b14f272eb161b5::t_0cd779af840467 1-44
+Sources/MeetingViews.swift
+  s_b14f272eb161b5::t_cb927f2ba4ee9a 1-129
+Sources/NativeComponents.swift
+  s_b14f272eb161b5::t_41069cd8a39f81 1-311
+Sources/ProviderSettings.swift
+  s_b14f272eb161b5::t_c7d23b131d2ef2 1-28
+Sources/ScreenshotController.swift
+  s_b14f272eb161b5::t_d096410738cc86 1-75
+Sources/StatusActivityIndicator.swift
+  s_b14f272eb161b5::t_6486edb4733a06 1-135
+Sources/TaskCreation.swift
+  s_b14f272eb161b5::t_15f5abeed811c9 1-39
+Sources/TaskStore.swift
+  s_b14f272eb161b5::t_1a799bb28b1992 1-455
+Sources/TelosApp.swift
+  s_b14f272eb161b5::t_976656c01f1dbc 1-1070
+Sources/TelosTheme.swift
+  s_b14f272eb161b5::t_81c45296de0b7c 1-18
+Sources/UpdatePermissionReset.swift
+  s_b14f272eb161b5::t_b90f90988bd430 1-29
+assets/design/message-bubble.svg
+  s_b14f272eb161b5::t_abe541c49a305a 1-5
+assets/design/status-icon-black.svg
+  s_b14f272eb161b5::t_a9249cffdbae91 1-6
+assets/design/telos-logo.svg
+  s_b14f272eb161b5::t_af99f88c0b4ede 1-10
+scripts/build.sh
+  s_b14f272eb161b5::t_ff59520c09709c 1-28
+scripts/configure.py
+  s_b14f272eb161b5::t_78c0ff67ca34d7 1-14
+scripts/english-titles.py
+  s_b14f272eb161b5::t_5c2f05d05c3041 1-25
+scripts/setup-speech.sh
+  s_b14f272eb161b5::t_be878e414bbf0b 1-9
+scripts/setup.sh
+  s_b14f272eb161b5::t_4f5953f4a6bdbe 1-20
+tests/AttachmentInputTests.swift
+  s_b14f272eb161b5::t_f9b772136654dd 1-64
+tests/CalendarScheduleTests.swift
+  s_b14f272eb161b5::t_311ac0ff4efbb1 1-45
+tests/ComposerEditingTests.swift
+  s_b14f272eb161b5::t_b48bb53e7289b0 1-65
+tests/ComposerImagePasteTests.swift
+  s_b14f272eb161b5::t_dceb680fe76e48 1-61
+tests/DictationInsertionTests.swift
+  s_b14f272eb161b5::t_52d8f811126b5b 1-14
+tests/DictationTests.swift
+  s_b14f272eb161b5::t_39291ef66b2a06 1-35
+tests/FeedScheduleTests.swift
+  s_8a8f16ebc66605::t_db4d47e741a77f 1-22
+tests/HeaderSearchTests.swift
+  s_b14f272eb161b5::t_690d3a76afbe88 1-24
+tests/MacFixture.swift
+  s_b14f272eb161b5::t_ca76629ae3f7af 1-31
+tests/MeetingLifecycleTests.swift
+  s_b14f272eb161b5::t_d6b59c400163de 1-70
+tests/MeetingSpeechTests.swift
+  s_b14f272eb161b5::t_67a91c9ddbdc1b 1-51
+tests/MeetingTests.swift
+  s_b14f272eb161b5::t_c4ac2f80332a4a 1-57
+tests/PanelScrollTests.swift
+  s_b14f272eb161b5::t_c8a67669c26a1b 1-80
+tests/ProviderSettingsTests.swift
+  s_b14f272eb161b5::t_45f315914af2d2 1-27
+tests/ScreenshotTests.swift
+  s_b14f272eb161b5::t_014dbb84927963 1-36
+tests/StatusActivityTests.swift
+  s_b14f272eb161b5::t_97740c17cc5c63 1-57
+tests/StoreCompletion.swift
+  s_b14f272eb161b5::t_02966a04d6f116 1-41
+tests/StoreRecovery.swift
+  s_b14f272eb161b5::t_096a4565d87108 1-19
+tests/StoreSearch.swift
+  s_b14f272eb161b5::t_a86378621930dc 1-22
+tests/TaskCreationTests.swift
+  s_b14f272eb161b5::t_143505f8a5479a 1-30
+tests/ThemeTests.swift
+  s_b14f272eb161b5::t_d77acc64c98bb7 1-23
+tests/UpdatePermissionResetTests.swift
+  s_b14f272eb161b5::t_5dae9c143e3acb 1-18
+tests/live_capabilities.py
+  s_b14f272eb161b5::t_e62adcb8f39eb6 1-44
+tests/live_mac_smoke.py
+  s_b14f272eb161b5::t_5381ffc7e7e1aa 1-36
+tests/test_capabilities.py
+  s_b14f272eb161b5::t_28a11bfdfd3732 1-102
+tests/test_dictation_polish.py
+  s_b14f272eb161b5::t_3ee76c7bbe7d55 1-44
+tests/test_feed_editorial.py
+  s_b14f272eb161b5::t_53f50b8b2422ef 1-47
+tests/test_feed_policy.py
+  s_8a8f16ebc66605::t_2ced7c21ce4f33 1-83
+tests/test_feeds.py
+  s_b14f272eb161b5::t_35c3c66fe110c5 1-59
+tests/test_mac_bridge.py
+  s_b14f272eb161b5::t_e01af10df82926 1-147
+tests/test_meeting_understanding.py
+  s_b14f272eb161b5::t_9ddd6a704bc2e4 1-51
+tests/test_task_creation.py
+  s_b14f272eb161b5::t_d1ee70fa3805b9 1-29
+tests/test_worker.py
+  s_b14f272eb161b5::t_7dae2d7907f267 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d97a3c2855276d4ae8ab2c6f1444ed28bec7cae2",
+  "prompts": {},
+  "sessions": {
+    "s_8a8f16ebc66605": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0e5d2-2755-7132-a3ab-57ae2785e1f5",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    },
+    "s_b14f272eb161b5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d346-38ce-7c72-adce-5b5aba58aba9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
