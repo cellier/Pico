@@ -1,0 +1,45 @@
+import Foundation
+@main struct CalendarScheduleTests {
+    static func main() {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        func date(_ day: Int, _ hour: Int = 0, month: Int = 9) -> Date { cal.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour))! }
+        func event(_ id: String, _ start: Date, _ end: Date, _ allDay: Bool = false) -> CalendarEntry {
+            CalendarEntry(id: id, title: id, start: start, end: end, allDay: allDay)
+        }
+        let now = date(26, 8)
+        let holiday = event("holiday", date(26), date(27), true)
+        let past = event("past", date(26, 6), date(26, 8))
+        let meeting = event("meeting", date(26, 9), date(26, 10))
+        let tomorrow = event("tomorrow", date(27, 7), date(27, 8))
+        precondition(CalendarSchedule.next([holiday, past, tomorrow, meeting], now: now, calendar: cal)?.id == "meeting")
+        precondition(CalendarSchedule.next([holiday, tomorrow, past], now: now, calendar: cal)?.id == "holiday")
+        precondition(CalendarSchedule.next([holiday, tomorrow], now: date(27), calendar: cal)?.id == "tomorrow")
+        let ongoing = event("ongoing", date(26, 7), date(26, 9))
+        precondition(CalendarSchedule.next([meeting, ongoing], now: now, calendar: cal)?.id == "ongoing")
+        let grouped = CalendarSchedule.days([holiday, holiday, meeting, past], now: now, calendar: cal)
+        precondition(grouped.count == 1 && grouped[0].events.map(\.id) == ["holiday", "meeting"])
+        let spanning = event("trip", date(25), date(28), true)
+        precondition(CalendarSchedule.days([spanning], now: now, calendar: cal).count == 2)
+        // Sep 25–27 holiday: EventKit ends at Sep 28 00:00, exclusively.
+        let holidayBreak = event("中秋节（休）", date(25), date(28), true)
+        let singleHoliday = event("中秋节", date(25), date(26), true)
+        let holidayDays = CalendarSchedule.days([holidayBreak, singleHoliday], now: now, calendar: cal)
+        precondition(holidayDays.map(\.date) == [date(26), date(27)])
+        precondition(holidayDays.allSatisfy { $0.events.map(\.id) == ["中秋节（休）"] })
+        let separated = CalendarSchedule.days([meeting, event("later", date(29, 9), date(29, 10))], now: now, calendar: cal)
+        precondition(separated.map(\.date) == [date(26), date(29)])
+        precondition(CalendarSchedule.days([], now: now, calendar: cal).isEmpty)
+        let midnight = event("midnight", date(26, 23), date(27))
+        precondition(CalendarSchedule.days([midnight], now: now, calendar: cal).count == 1)
+        let last = event("last", date(2, 9, month: 10), date(2, 10, month: 10))
+        let outside = event("outside", date(3, 9, month: 10), date(3, 10, month: 10))
+        precondition(CalendarSchedule.days([last, outside], now: now, calendar: cal).flatMap(\.events).map(\.id) == ["last"])
+        let dst = event("DST", date(8, month: 3), date(9, month: 3), true)
+        precondition(dst.end.timeIntervalSince(dst.start) == 23 * 3600)
+        precondition(CalendarSchedule.days([dst], now: date(8, month: 3), calendar: cal).count == 1)
+        precondition(CalendarSchedule.dayTitle(date(26), now: now, calendar: cal) == "Today")
+        precondition(CalendarSchedule.dayTitle(date(27), now: now, calendar: cal) == "Tomorrow")
+        precondition(CalendarSchedule.next([], now: now, calendar: cal) == nil)
+        print("PASS: timed priority, ongoing/expired, earliest day, deduplication, seven-day boundary, exclusive all-day end, DST, headings")
+    }
+}

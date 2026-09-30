@@ -1,0 +1,15 @@
+.runtime/
+build/
+.DS_Store
+__pycache__/
+*.pyc
+
+# Local credentials and diagnostic/user data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/evidence/
+/config.json
+*.log
