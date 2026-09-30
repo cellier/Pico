@@ -9,7 +9,9 @@ for size in 16 32 128 256 512; do
   sips -z "$doubled" "$doubled" assets/AppIcon.png --out "build/AppIcon.iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns build/AppIcon.iconset -o build/Telos.app/Contents/Resources/AppIcon.icns
-swiftc -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -target arm64-apple-macos14.0 -swift-version 5 -O -parse-as-library Sources/*.swift -o build/Telos.app/Contents/MacOS/Telos -framework SwiftUI -framework AppKit -framework CoreText -framework EventKit
+sdk="${TELOS_SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk}"
+[[ -d "$sdk" ]] || sdk="$(xcrun --sdk macosx --show-sdk-path)"
+swiftc -sdk "$sdk" -target arm64-apple-macos14.0 -swift-version 5 -O -parse-as-library Sources/*.swift -o build/Telos.app/Contents/MacOS/Telos -framework SwiftUI -framework AppKit -framework CoreText -framework EventKit
 cp Resources/* build/Telos.app/Contents/Resources/
 cp -R Backend build/Telos.app/Contents/Resources/
 python3 - <<'PY'

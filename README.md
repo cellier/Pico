@@ -6,7 +6,7 @@ Telos 是一个原生 macOS 菜单栏 AI 工作助手。你可以输入目标、
 
 界面使用 SwiftUI / AppKit，任务执行由 Hermes Agent 与 DeepSeek 驱动，Mac 应用操作接入 macOS Harness。
 
-> 当前为 **0.5.0 开发版本**。本仓库提供源码和本机构建流程，尚未提供经过公证、可在其他 Mac 上直接安装的独立发行包。部分功能需要系统权限、网络连接或额外下载本地语音模型。
+> 开发构建与发行构建分开管理。自包含的 Apple Silicon 测试版安装包通过 [GitHub Releases](https://github.com/cellier/Telos/releases) 分发；是否已有成功产物请查看对应 Release。测试版要求 macOS 26，未经过 Developer ID 签名或 Apple 公证。详细安装说明见 [发行说明](docs/RELEASE.md)。
 
 ## 产品预览
 
@@ -116,6 +116,12 @@ Skill 是工作指令与资源，不会自动提供系统权限、账号访问�
 | Settings | 窗口右上角 Telos logo |
 | 退出 | `Command + Q` 或菜单栏右键菜单 |
 
+## 安装发行测试版
+
+在 [Releases](https://github.com/cellier/Telos/releases) 下载 DMG，拖入 Applications 后打开，并在 Settings 填入自己的 DeepSeek Key。私有仓库的下载需要仓库访问权限。
+
+发行包包含可随应用移动的 Python、Hermes、macOS Harness、Chromium 和本地中英文语音模型，不需要源码目录或开发工具。未公证测试版首次打开可能被系统阻止，见 [安装及限制](docs/RELEASE.md)。源码开发构建仍使用下述 `.runtime` 环境，两者不要混淆。
+
 ## 从源码运行
 
 ### 环境要求
@@ -129,7 +135,7 @@ Skill 是工作指令与资源，不会自动提供系统权限、账号访问�
 | 依赖工具 | Git、[uv](https://docs.astral.sh/uv/) |
 | 模型服务 | 可用的 DeepSeek API Key；任务执行与模型整理需要网络 |
 
-当前构建脚本固定了本机验证过的 SDK 路径。如果该目录不存在，需要安装相应工具链，或按你的开发环境调整 `scripts/build.sh` 中的 SDK 路径。最低部署版本不等于已经在所有旧版本系统上完成验证。
+构建脚本优先使用本机验证过的 SDK，找不到时使用当前 Xcode / Command Line Tools 的 SDK；也可通过 `TELOS_SDK` 指定。最低部署版本不等于已经在所有旧版本系统上完成验证。
 
 ### 1. 获取源码
 
@@ -291,14 +297,25 @@ Telos 常驻菜单栏，点击顶部 logo 展开。右键图标可以打开 Sett
 目标必须是可编辑输入框，并允许辅助功能访问。密码框、只读文本、特殊自绘编辑器可能不支持；也应检查本地语音环境和麦克风授权。
 
 **能直接把构建包发给别人吗？**  
-当前不建议。独立分发仍需要处理 Python 与模型依赖、路径、签名、公证、首次设置，以及另一台 Mac 上的安装验证。不要在发行包中携带个人 API Key 或用户数据。
+请使用 Releases 中通过打包检查的 DMG；`scripts/build.sh` 单独生成的开发包仍依赖 checkout。发行测试版尚未公证，也没有覆盖所有硬件和真实会议场景。不要在发行包中携带个人 API Key 或用户数据。
 
 ## 当前边界
 
-尚未提供跨设备同步、App Store 发行、自包含公证安装包、通用的公网网站发布服务或所有会议应用的支持。日常 Agent 推理依赖配置的 DeepSeek 服务，不能因为存在本地语音模型就视为完全离线应用。
+尚未提供跨设备同步、App Store 发行、经过 Apple 公证的安装包、通用的公网网站发布服务或所有会议应用的支持。日常 Agent 推理依赖配置的 DeepSeek 服务，不能因为存在本地语音模型就视为完全离线应用。
 
 仓库中的测试与预览是开发验证的一部分；真实 Mac 操作、外部发送、复杂网站访问和会议音频能力仍应以实际执行结果为准。
 
 ## 字体与第三方许可
 
 Instrument Serif 随项目附带，其 SIL Open Font License 见 [Resources/OFL.txt](Resources/OFL.txt)。其他第三方依赖遵循各自许可证。仓库目前没有为 Telos 自身声明开源许可证；GitHub 上可见或可克隆不等于获得任意再分发授权。
+
+## 构建与发布 DMG
+
+```sh
+./scripts/release/prepare.sh
+python3 scripts/release/package.py
+```
+
+安装包与 SHA-256 校验文件写入 `dist/`，不会提交到源码仓库。打包检查涵盖运行路径、外部符号链接、动态库依赖、干净用户目录下的核心导入、Chromium、本地语音模型及开发者 API Key 排除。该检查不替代真实硬件和权限验证。
+
+推送 `v*-preview.*` 标签会触发 `.github/workflows/release.yml`，在 GitHub 的 Apple Silicon macOS runner 上重建、检查并发布预发行版。工作流使用 GitHub 自动提供的令牌，权限限定在仓库内容；不需要存放个人 GitHub Token 或 DeepSeek Key。构建可能消耗私有仓库的 Actions 配额。

@@ -22,7 +22,7 @@ enum MeetingUnderstanding {
         let transcript = try JSONSerialization.jsonObject(with: encoder.encode(session.transcript))
         let formatter = ISO8601DateFormatter(); formatter.timeZone = .current
         let input = try JSONSerialization.data(withJSONObject: ["transcript": transcript, "started": formatter.string(from: session.startTime)])
-        guard let python = Bundle.main.object(forInfoDictionaryKey: "TelosPython") as? String,
+        guard let python = BundledRuntime.python(),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/meeting_understanding.py") else { throw CocoaError(.fileNoSuchFile) }
         let holder = MeetingAnalysisProcess()
         let work = Task.detached(priority: .utility) {

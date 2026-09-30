@@ -209,7 +209,7 @@ final class WorkerRun: @unchecked Sendable {
     }
     func run(_ id: UUID, prompt: String, new: Bool) {
         guard runs[id] == nil, tasks.first(where: { $0.id == id })?.meetingID == nil else { return }
-        guard let python = Bundle.main.object(forInfoDictionaryKey: "TelosPython") as? String,
+        guard let python = BundledRuntime.python(),
               FileManager.default.isExecutableFile(atPath: python),
               let worker = Bundle.main.resourceURL?.appendingPathComponent("Backend/worker.py") else {
             mutate(id) { $0.status = "error"; $0.summary = "Hermes runtime is missing. Run scripts/setup.sh, then rebuild." }; save(); return
@@ -343,7 +343,7 @@ final class WorkerRun: @unchecked Sendable {
         }
     }
     func loadProfile(deleteMemory id: String? = nil) {
-        guard let python = Bundle.main.object(forInfoDictionaryKey: "TelosPython") as? String,
+        guard let python = BundledRuntime.python(),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/capabilities.py") else { return }
         let directory = dataDir.path
         DispatchQueue.global(qos: .utility).async { [weak self] in
@@ -367,7 +367,7 @@ final class WorkerRun: @unchecked Sendable {
         } catch { profileError = error.localizedDescription }
     }
     func checkMacAccess() {
-        guard let python = Bundle.main.object(forInfoDictionaryKey: "TelosPython") as? String,
+        guard let python = BundledRuntime.python(),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/mac_bridge.py") else { return }
         macAccess = "Checking Mac access…"
         DispatchQueue.global(qos: .utility).async { [weak self] in

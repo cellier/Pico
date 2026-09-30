@@ -45,7 +45,7 @@ extension TaskStore {
     }
     func feedCommand(_ command: [String: Any] = [:], refreshDue: Bool = false) {
         guard ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil else { return }
-        guard let python = Bundle.main.object(forInfoDictionaryKey: "TelosPython") as? String,
+        guard let python = BundledRuntime.python(),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/feeds.py"),
               let input = try? JSONSerialization.data(withJSONObject: command) else { return }
         let directory = dataDir.path

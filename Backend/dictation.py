@@ -1,7 +1,15 @@
 """Local bilingual transcription. No audio leaves this process or machine."""
-import contextlib, json, sys, wave
+import contextlib, json, sys, wave, os
 from pathlib import Path
 MODEL = 'mlx-community/Qwen3-ASR-0.6B-4bit'
+
+def model_path():
+    bundled = os.environ.get('TELOS_SPEECH_MODEL')
+    if bundled:
+        return bundled
+    from huggingface_hub import snapshot_download
+    return snapshot_download(MODEL, local_files_only=True)
+
 _model = None
 _warmed = False
 
@@ -17,8 +25,7 @@ def transcribe(path):
     global _model
     if _model is None:
         from mlx_audio.stt import load
-        model_path = snapshot_download(MODEL, local_files_only=True)
-        _model = load(model_path)
+        _model = load(model_path())
     result = _model.generate(samples, language=None, temperature=0.0, max_tokens=2048,
                              hotwords=['Telos', 'Zoom Slides', 'PowerPoint', 'Copilot'])
     return result.text.strip()
@@ -28,7 +35,7 @@ def warm():
     if _model is None:
         from huggingface_hub import snapshot_download
         from mlx_audio.stt import load
-        _model = load(snapshot_download(MODEL, local_files_only=True))
+        _model = load(model_path())
     if not _warmed:
         # Loading weights does not compile/evaluate the audio + decode path.
         # Exercise it before the user releases their first recording.

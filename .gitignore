@@ -13,3 +13,4 @@ __pycache__/
 /evidence/
 /config.json
 *.log
+/dist/

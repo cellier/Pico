@@ -1,0 +1,38 @@
+name: Build macOS preview release
+on:
+  push:
+    tags: ['v*-preview.*']
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      UV_NO_CACHE: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
+        with:
+          version: '0.12.5'
+      - name: Prepare pinned dependencies without personal API configuration
+        run: ./scripts/release/prepare.sh
+      - name: Run backend tests
+        run: |
+          .runtime/venv/bin/python -m unittest discover -s tests
+          swiftc -parse-as-library Sources/BundledRuntime.swift tests/BundledRuntimeTests.swift -o /tmp/telos-runtime-tests
+          /tmp/telos-runtime-tests
+      - name: Package and verify self-contained app
+        run: python3 scripts/release/package.py
+      - name: Publish DMG and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/*.dmg dist/SHA256SUMS.txt \
+            --verify-tag --prerelease \
+            --title "Telos $RELEASE_TAG · Apple Silicon Preview" \
+            --notes-file docs/RELEASE.md

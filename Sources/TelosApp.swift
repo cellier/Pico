@@ -1061,6 +1061,8 @@ final class TelosWindow: NSWindow {
 #if !TELOS_TEST
 @main struct TelosMain {
     @MainActor static func main() {
+        // Bundled Python must not write bytecode into the signed app.
+        setenv("PYTHONDONTWRITEBYTECODE", "1", 1)
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate; app.setActivationPolicy(.accessory); app.run()

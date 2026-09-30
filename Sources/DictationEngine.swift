@@ -10,7 +10,7 @@ import Foundation
     private var requestID: String?
     func warm() {
         guard process == nil,
-              let python = Bundle.main.object(forInfoDictionaryKey: "TelosSpeechPython") as? String,
+              let python = BundledRuntime.python(speech: true),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/dictation.py") else { return }
         let process = Process(), input = Pipe(), output = Pipe()
         process.executableURL = URL(fileURLWithPath: python); process.arguments = ["-B", script.path, "--serve"]

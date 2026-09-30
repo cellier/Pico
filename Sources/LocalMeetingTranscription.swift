@@ -22,7 +22,7 @@ final class LocalMeetingTranscription: MeetingTranscribing, @unchecked Sendable 
     private var accepting = true
     private let chunkBytes = 16000 * 2 * 6
     func start(localeID: String) async throws {
-        guard let python = Bundle.main.object(forInfoDictionaryKey: "TelosSpeechPython") as? String,
+        guard let python = BundledRuntime.python(speech: true),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/meeting_speech.py") else { throw problem("Local speech runtime is missing.") }
         let process = Process(), input = Pipe(), output = Pipe()
         process.executableURL = URL(fileURLWithPath: python); process.arguments = ["-B", "-u", script.path]
