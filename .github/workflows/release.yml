@@ -18,6 +18,7 @@ jobs:
       - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
         with:
           version: '0.12.5'
+          enable-cache: false
       - name: Prepare pinned dependencies without personal API configuration
         run: ./scripts/release/prepare.sh
       - name: Run backend tests
