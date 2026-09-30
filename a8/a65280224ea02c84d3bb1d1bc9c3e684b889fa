@@ -1,0 +1,55 @@
+.github/workflows/release.yml
+  s_b14f272eb161b5::t_8383b8a6099af3 1-38
+.gitignore
+  s_b14f272eb161b5::t_f880d9dedb9b1b 16
+Backend/dictation.py
+  s_b14f272eb161b5::t_8096abbf886fc5 2,5-12,28,38
+README.md
+  s_b14f272eb161b5::t_aaff8dc7410de6 9,119-124,138,300,304,311-321
+Sources/BundledRuntime.swift
+  s_b14f272eb161b5::t_95cb52f95199aa 1-11
+Sources/DictationEngine.swift
+  s_b14f272eb161b5::t_be1e9fb6208fb1 13
+Sources/FeedStore.swift
+  s_b14f272eb161b5::t_d22ce6f41dd40e 48
+Sources/LocalMeetingTranscription.swift
+  s_b14f272eb161b5::t_510198fd20badf 25
+Sources/MeetingUnderstanding.swift
+  s_b14f272eb161b5::t_85d9dc6daa0a8c 25
+Sources/TaskStore.swift
+  s_b14f272eb161b5::t_6873092f2745bb 212,346,370
+Sources/TelosApp.swift
+  s_b14f272eb161b5::t_3eabc8c3282bc1 1064-1065
+docs/RELEASE.md
+  s_b14f272eb161b5::t_1204e0d69fabba 1-38
+scripts/build.sh
+  s_b14f272eb161b5::t_3981fde53cc66b 12-14
+scripts/release/main-requirements.txt
+  s_b14f272eb161b5::t_e74de333f0c96a 1-87
+scripts/release/package.py
+  s_b14f272eb161b5::t_efcc30183b5f71 1-123
+scripts/release/prepare.sh
+  s_b14f272eb161b5::t_b629b52cd19143 1-22
+scripts/release/speech-requirements.txt
+  s_b14f272eb161b5::t_ceba1b16c3c593 1-53
+scripts/release/verify.py
+  s_b14f272eb161b5::t_9aa064a40f1967 1-49
+tests/BundledRuntimeTests.swift
+  s_b14f272eb161b5::t_f9fc4337e0dc82 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a8a65280224ea02c84d3bb1d1bc9c3e684b889fa",
+  "prompts": {},
+  "sessions": {
+    "s_b14f272eb161b5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d346-38ce-7c72-adce-5b5aba58aba9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
