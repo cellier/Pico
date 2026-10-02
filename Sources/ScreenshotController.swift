@@ -1,14 +1,22 @@
 import AppKit
 import Carbon
 
-/// Uses the system selection UI: crosshair drag, Space for windows, Escape to cancel.
-/// Captures go directly to the pasteboard; no file or agent upload is involved.
+/// System selection UI: crosshair drag, Space for windows, Escape to cancel.
+/// macOS 26 + a PaperKit SDK: copy the original, then open a local markup editor.
+/// Other builds retain direct clipboard capture. Nothing is uploaded to an agent.
 @MainActor final class ScreenshotController {
     static let arguments = ["-i", "-c", "-d", "-Jselection", "-t", "png"]
+    static func arguments(outputURL: URL?) -> [String] {
+        guard let outputURL else { return arguments }
+        // An owned output file identifies THIS capture. Never treat a change in
+        // the global pasteboard as proof that screenshot selection succeeded.
+        return arguments.filter { $0 != "-c" } + [outputURL.path]
+    }
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private var capture: Process?
     private var pending: Task<Void, Never>?
+    private let editor = ScreenshotEditor()
     var prepare: () -> Void = {}
     var finished: () -> Void = {}
     var isSelecting: Bool { pending != nil || capture != nil }
@@ -42,24 +50,61 @@ import Carbon
             await Task.yield()
             guard !Task.isCancelled, let self else { return }
             self.pending = nil
+            let directory: URL?
+            do {
+                if ScreenshotEditor.isSupported {
+                    let url = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("TelosScreenshot-\(UUID().uuidString)", isDirectory: true)
+                    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false,
+                                                            attributes: [.posixPermissions: 0o700])
+                    directory = url
+                } else { directory = nil }
+            } catch {
+                self.finished()
+                self.failed("Could not prepare the screenshot editor: \(error.localizedDescription)")
+                return
+            }
+            let output = directory?.appendingPathComponent("capture.png")
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-            process.arguments = Self.arguments
+            process.arguments = Self.arguments(outputURL: output)
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
             process.terminationHandler = { [weak self] ended in
                 Task { @MainActor in
+                    // Also remove the owned temporary file after stop() or if
+                    // the controller disappeared while screencapture was exiting.
+                    defer { if let directory { try? FileManager.default.removeItem(at: directory) } }
                     guard let self, self.capture === ended else { return }
-                    self.capture = nil; self.finished()
+                    self.capture = nil
+                    self.finished()
+                    // Escape / permission denial must not open an old image or
+                    // overwrite the pasteboard. Native -d displays capture errors.
+                    guard ended.terminationReason == .exit, ended.terminationStatus == 0,
+                          let output, FileManager.default.fileExists(atPath: output.path) else { return }
+                    do {
+                        let values = try output.resourceValues(forKeys: [.fileSizeKey])
+                        guard let size = values.fileSize, size <= ScreenshotMarkupDocument.maximumImageBytes else {
+                            throw ScreenshotEditorError.invalidImage
+                        }
+                        let data = try Data(contentsOf: output)
+                        try self.editor.show(pngData: data)
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        if !pasteboard.setData(data, forType: .png) {
+                            self.failed("The screenshot is open in the editor, but could not be copied. Use Copy Image to try again.")
+                        }
+                    } catch { self.failed("Could not open the screenshot editor: \(error.localizedDescription)") }
                 }
             }
             self.capture = process
             do { try process.run() }
             catch {
-                self.capture = nil; self.finished()
+                if let directory { try? FileManager.default.removeItem(at: directory) }
+                self.capture = nil
+                self.finished()
                 self.failed("Could not start macOS screenshot selection. Please try again.")
             }
-            // Native -d displays permission/capture errors. Escape is a normal cancellation.
         }
     }
 
