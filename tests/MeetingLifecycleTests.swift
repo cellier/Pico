@@ -25,10 +25,17 @@ final class FakeMeetingSpeech: MeetingTranscribing {
         manager.enabled = true
         let now = Date()
         let joined = MeetingObservation(signal: .joined, pid: 123, title: "Test Meeting")
+        manager.preparing = true
+        await manager.receive(joined, at: now.addingTimeInterval(-10))
+        await manager.receive(joined, at: now.addingTimeInterval(-5))
+        precondition(store.tasks.isEmpty && audio.starts == 0, "Permission/model setup must not race meeting startup")
+        manager.preparing = false
         await manager.receive(joined, at: now)
         await manager.receive(joined, at: now.addingTimeInterval(5))
         try await Task.sleep(nanoseconds: 100_000_000)
         precondition(store.tasks.count == 1 && store.tasks[0].status == "running" && audio.starts == 1)
+        manager.enable()
+        precondition(!manager.preparing, "Setting up access during capture must not start a second speech engine")
         let id = store.tasks[0].meetingID!
         await manager.receive(joined, at: now.addingTimeInterval(9))
         precondition(store.tasks.count == 1)
@@ -38,8 +45,11 @@ final class FakeMeetingSpeech: MeetingTranscribing {
         precondition(audio.stops == 0)
         await manager.receive(.init(signal: .absent), at: now.addingTimeInterval(20))
         await manager.receive(.init(signal: .absent), at: now.addingTimeInterval(51))
-        precondition(audio.stops == 1 && store.tasks[0].status == "completed")
+        precondition(audio.stops == 1 && store.tasks[0].status == "ready")
+        precondition(store.tasks[0].completedAt == nil, "Ending recording must keep the task on the home page")
         precondition(store.meetings[id]!.transcript.count == 2)
+        store.complete(store.tasks[0].id)
+        precondition(store.tasks[0].status == "completed", "Only user completion archives the task")
         let restored = try MeetingRepository(directory: store.dataDir.appendingPathComponent("meetings")).load().first!
         precondition(restored.status == .completed && restored.transcript.count == 2)
         precondition(store.tasks.count == 1, "No automatic todo creation")
@@ -51,16 +61,17 @@ final class FakeMeetingSpeech: MeetingTranscribing {
         await interruptedManager.receive(joined, at: now)
         await interruptedManager.receive(joined, at: now.addingTimeInterval(5))
         await interruptedManager.shutdown()
-        precondition(interruptedStore.tasks.count == 1 && interruptedStore.tasks[0].status == "completed")
+        precondition(interruptedStore.tasks.count == 1 && interruptedStore.tasks[0].status == "ready")
         let interruptedID = interruptedStore.tasks[0].meetingID!
         precondition(interruptedStore.meetings[interruptedID]?.status == .interrupted)
         await interruptedManager.receive(joined, at: now.addingTimeInterval(15))
         precondition(interruptedStore.tasks.count == 1, "Shutdown prevents a late detection from restarting capture")
-        let recoveredStore = TaskStore(); recoveredStore.tasks = []
+        let recoveredStore = TaskStore(); recoveredStore.tasks = store.tasks
         let recovered = MeetingSessionManager(store: recoveredStore)
         try Data("broken fixture".utf8).write(to: store.dataDir.appendingPathComponent("meetings/broken.json"))
         recovered.start()
         precondition(recoveredStore.meetings[id]?.transcript.count == 2)
+        precondition(recoveredStore.tasks.first { $0.meetingID == id }?.status == "completed", "Restart must preserve manual archive")
         precondition(recoveredStore.meetings[interruptedID]?.status == .interrupted)
         precondition(!recovered.setupMessage.isEmpty, "Report corrupted file without hiding other meetings")
         await recovered.shutdown()

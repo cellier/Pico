@@ -90,7 +90,7 @@ final class WorkerRun: @unchecked Sendable {
     @Published var error: String?
     @Published var macAccess = "Checking Mac access…"
     @Published var showMacAccess = false
-    @Published var screenshotShortcutStatus = "Drag to capture a region. Press Space to select a window, then click. Escape cancels. Screenshots are copied to your clipboard with the system shutter sound."
+    @Published var screenshotShortcutStatus = "Drag to capture a region. Press Space to select a window, then click. Escape cancels. The screenshot opens for local AI editing; type or hold to speak, then copy or save PNG."
     @Published var permissionResetNotice: String?
     @Published var soul = ""
     @Published var memoryNotes: [MemoryNote] = []
@@ -230,11 +230,11 @@ final class WorkerRun: @unchecked Sendable {
         // A dedicated reader drains the pipe through EOF before observing exit.
         do {
             try run.process.run()
-            var request: [String: Any] = ["task_id": id.uuidString, "prompt": prompt, "new": new]
+            var request: [String: Any] = ["task_id": id.uuidString, "prompt": prompt, "new": new, "auto_approve": tasks.first(where: { $0.id == id })?.feedID == nil]
             if let feedID = tasks.first(where: { $0.id == id })?.feedID { request["feed_id"] = feedID }
             let data = try JSONSerialization.data(withJSONObject: request)
             try input.fileHandleForWriting.write(contentsOf: data + Data([10]))
-            // Keep stdin open: only native UI decisions may answer approval requests.
+            // Keep stdin open for task-creation acknowledgements and interactive Feed approvals.
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 while true {
                     let chunk = output.fileHandleForReading.availableData
@@ -272,6 +272,10 @@ final class WorkerRun: @unchecked Sendable {
                 try? run.input?.write(contentsOf: data + Data([10]))
             }
             return
+        case "auto_approved":
+            mutate(id) {
+                $0.messages.append(Message(role: "confirmation", text: "Automatically approved: " + (e.text ?? "Task action")))
+            }
         case "approval":
             guard let approvalID = e.approval_id, let hash = e.action_hash, let expiry = e.expires_at else { return }
             streams[id] = nil
@@ -425,11 +429,12 @@ final class WorkerRun: @unchecked Sendable {
             session.transcript = transcript
             if mode == "meeting" {
                 session.analysisStatus = "ready"
+                session.summary = [MeetingDecision(text: "本次发布保留现有 onboarding 流程。", evidence: TranscriptEvidence(segmentID: transcript[3].id, startTime: 32, endTime: 38, text: transcript[3].text))]
                 session.suggestions = [SuggestedMeetingTask(title: "Check webinar integration", description: "Check whether the integration works with webinars.", owner: "me", kind: "commitment", confidence: 0.98, evidence: TranscriptEvidence(segmentID: transcript[1].id, startTime: 16, endTime: 21, text: transcript[1].text)), SuggestedMeetingTask(title: "Send the updated deck to Jeff", description: "将更新后的演示文稿发给 Jeff。", owner: "me", kind: "commitment", confidence: 0.96, evidence: TranscriptEvidence(segmentID: transcript[2].id, startTime: 25, endTime: 30, text: transcript[2].text))]
             }
             meetings[session.id] = session
             tasks[0].meetingID = session.id; tasks[0].title = session.title
-            tasks[0].status = mode == "meeting" ? "completed" : "running"
+            tasks[0].status = mode == "meeting" ? "ready" : "running"
             tasks[0].summary = mode == "meeting" ? "Meeting completed" : "Recording & transcribing…"
             selected = tasks[0].id
         }

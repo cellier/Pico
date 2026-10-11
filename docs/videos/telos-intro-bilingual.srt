@@ -1,0 +1,94 @@
+1
+00:00:00,280 --> 00:00:03,791
+Let me show you Telos, the assistant I use every day.
+这是 Telos，我每天都在用的助手。
+
+2
+00:00:04,380 --> 00:00:08,747
+In the Task panel, I press and hold my mouse or trackpad, then speak.
+在任务面板里，按住鼠标左键或触控板，就能直接说话。
+
+3
+00:00:09,347 --> 00:00:11,920
+For example: What can you do for me?
+比如：你能帮我做些什么？
+
+4
+00:00:12,639 --> 00:00:15,865
+Telos turns my voice into text, ready to send.
+Telos 会把语音转成文字，点发送即可。
+
+5
+00:00:16,447 --> 00:00:19,672
+If it's a task Telos can handle, it gets to work.
+如果是 Telos 能处理的任务，它就会直接开始执行。
+
+6
+00:00:20,378 --> 00:00:23,100
+Here, it explains what it can help me with.
+这里展示的是它可以帮我完成的事情。
+
+7
+00:00:23,680 --> 00:00:27,639
+It supports a wide range of tasks, though the results can vary.
+它能处理很多种任务，不过实际效果会有所差异。
+
+8
+00:00:28,213 --> 00:00:32,404
+The Calendar tab shows what's coming up, including tomorrow's meetings.
+日历可以快速查看接下来的安排，比如明天的会议。
+
+9
+00:00:33,213 --> 00:00:36,045
+The Feed tab tracks news from my industry.
+信息流用来关注我所在行业的动态。
+
+10
+00:00:36,737 --> 00:00:40,397
+Telos checks for updates periodically and gathers them here.
+Telos 会定期收集最新信息，汇总到这里。
+
+11
+00:00:40,980 --> 00:00:45,388
+It also includes everyday utilities, like this built-in screenshot tool.
+它也提供日常小工具，比如内置的截图功能。
+
+12
+00:00:45,980 --> 00:00:48,037
+Now, let's look at meetings.
+接下来看看会议功能。
+
+13
+00:00:48,729 --> 00:00:51,520
+I'll start a Zoom meeting to show you how it works.
+我开一个 Zoom 会议，演示一下。
+
+14
+00:00:52,113 --> 00:00:56,847
+Once I'm in the meeting, Telos automatically starts recording and transcribing.
+进入会议后，Telos 就会自动开始录音和转写。
+
+15
+00:00:57,447 --> 00:01:00,305
+As I speak, the transcript appears here.
+我说话时，转写内容会显示在这里。
+
+16
+00:01:01,024 --> 00:01:03,706
+It also identifies me as the speaker.
+它还会识别出当前说话的人是我。
+
+17
+00:01:04,280 --> 00:01:08,049
+When I end the meeting, Telos automatically stops recording.
+会议结束后，Telos 会自动停止录音。
+
+18
+00:01:08,980 --> 00:01:11,988
+It then organizes the meeting content for me.
+随后，它会帮我整理会议内容。
+
+19
+00:01:12,580 --> 00:01:18,785
+That's Telos. It's replaced several tools I used to pay for, and I use it every day.
+这就是 Telos。它替代了我原先付费使用的好几款工具，已经成为我的日常。

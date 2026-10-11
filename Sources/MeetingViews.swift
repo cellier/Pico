@@ -9,7 +9,7 @@ struct MeetingSettingsView: View {
     @AppStorage("TelosMeetingLanguage") private var language = "mixed"
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Meeting → Transcript → Todo").font(.system(size: 14, weight: .medium))
+            Text("Meeting Setup").font(.system(size: 14, weight: .medium))
             Text("Detect Zoom meetings and transcribe your microphone and Zoom audio separately on this Mac, including when using headphones. Audio recordings are not kept. After a meeting, the transcript is sent to your configured DeepSeek provider to suggest tasks. Nothing becomes a todo until you confirm.").font(.system(size: 12)).foregroundStyle(.secondary)
             Picker("Meeting language", selection: $language) {
                 Text("Chinese + English · Local Qwen").tag("mixed")
@@ -17,16 +17,36 @@ struct MeetingSettingsView: View {
                 Text("English · Apple").tag("en-US")
             }.disabled(manager.enabled || manager.preparing)
             Text("Apple provides streaming partial results for the selected language. Local Qwen handles mixed Chinese and English in short chunks. Both stay on this Mac. Requires macOS 26.").font(.system(size: 12)).foregroundStyle(.secondary)
+            accessRow("Accessibility · Detect Zoom meetings", ready: manager.accessibilityReady, pane: "Privacy_Accessibility")
+            accessRow("Screen & System Audio Recording", ready: manager.screenAudioReady, pane: "Privacy_ScreenCapture")
+            accessRow("Microphone · Your voice", ready: manager.microphoneReady, pane: "Privacy_Microphone")
             HStack {
                 Button(manager.enabled ? "Turn off meeting capture" : "Enable Zoom meetings") { manager.enabled ? manager.disable() : manager.enable() }
-                    .disabled(manager.preparing).buttonStyle(.bordered).nativeHoverFeedback()
+                    .disabled(manager.preparing || manager.repairingAccess).buttonStyle(.bordered).nativeHoverFeedback()
                 if manager.enabled {
-                    Button("Set up meeting access") { manager.enable() }.disabled(manager.preparing).nativeHoverFeedback()
+                    Button("Set up meeting access") { manager.enable() }.disabled(manager.preparing || manager.repairingAccess || manager.capturing).nativeHoverFeedback()
                 }
                 if manager.preparing { ProgressView().controlSize(.small) }
             }
             if !manager.setupMessage.isEmpty { Text(manager.setupMessage).font(.system(size: 12)).foregroundStyle(.secondary) }
+            if !manager.accessibilityReady {
+                Text("If System Settings shows Telos as enabled here but access is still needed, repair the old permission and add the current app again.").font(.system(size: 12)).foregroundStyle(.secondary)
+                HStack {
+                    Button("Repair Accessibility…") { manager.repairAccessibility() }
+                        .disabled(manager.preparing || manager.repairingAccess || manager.capturing)
+                    Button("Show current Telos app") { manager.revealInstalledApp() }
+                }
+            }
+            if !manager.repairMessage.isEmpty { Text(manager.repairMessage).font(.system(size: 12)).foregroundStyle(.secondary) }
         }
+    }
+    private func accessRow(_ title: String, ready: Bool, pane: String) -> some View {
+        HStack {
+            Label(title, systemImage: ready ? "checkmark.circle.fill" : "exclamationmark.circle")
+            Spacer()
+            if ready { Text("Ready").foregroundStyle(.secondary) }
+            else { Button("Open Settings") { manager.openPermissionSettings(pane) } }
+        }.font(.system(size: 12))
     }
 }
 struct MeetingDetailView: View {
@@ -40,12 +60,33 @@ struct MeetingDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
-                    Text(session.title).font(serif(28)).textSelection(.enabled)
-                    TimelineView(.periodic(from: .now, by: 15)) { context in
-                        Text("\(max(0, Int((session.endTime ?? context.date).timeIntervalSince(session.startTime) / 60))) min · \(running ? "Meeting in progress" : "Meeting \(session.status.rawValue)")")
-                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(session.title).font(serif(28)).textSelection(.enabled).id("meetingOverview")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(session.provider).font(.system(size: 13, weight: .medium))
+                        Text("Started · " + session.startTime.formatted(date: .abbreviated, time: .shortened))
+                        if let ended = session.endTime {
+                            Text("Ended · " + ended.formatted(date: .abbreviated, time: .shortened))
+                        }
+                        TimelineView(.periodic(from: .now, by: 15)) { context in
+                            Text("\(max(0, Int((session.endTime ?? context.date).timeIntervalSince(session.startTime) / 60))) min · \(running ? "Meeting in progress" : session.status == .interrupted ? "Recording interrupted" : "Meeting ended")")
+                        }
+                    }.font(.system(size: 13)).foregroundStyle(.secondary).textSelection(.enabled)
+                    if !running {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Summary").font(.system(size: 16, weight: .semibold))
+                            if let points = session.summary, !points.isEmpty {
+                                ForEach(points) { point in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(point.text).textSelection(.enabled)
+                                        evidence(point.evidence, proxy: proxy)
+                                    }
+                                }
+                            } else {
+                                Text(session.analysisStatus == "analyzing" ? "Summarizing your meeting…" : session.analysisStatus == "ready" ? "Not enough transcribed content to summarize." : "Summary is not available yet. Your saved transcript is below.")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    Text(session.startTime.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 12)).foregroundStyle(.secondary)
                     if running {
                         HStack {
                             Text(session.status == .preparing ? "Preparing transcription…" : session.status == .finishing ? "Saving final transcript…" : "Recording & transcribing…")
@@ -55,8 +96,8 @@ struct MeetingDetailView: View {
                     }
                     if let notice = session.notice { Text(notice).font(.system(size: 13)).foregroundStyle(.secondary).textSelection(.enabled) }
                     if !running {
-                        if session.analysisStatus == "analyzing" { Label("Finding possible next actions…", systemImage: "sparkles").font(.system(size: 13)) }
-                        else if session.analysisStatus == "failed" || session.analysisStatus == "not_started" {
+                        if session.analysisStatus == "analyzing" { Label("Summarizing and finding next actions…", systemImage: "sparkles").font(.system(size: 13)) }
+                        else if session.analysisStatus == "failed" || session.analysisStatus == "not_started" || session.summary == nil {
                             Button("Analyze saved transcript") { store.meetingManager.analyze(session.id) }.disabled(!session.transcript.contains { $0.isFinal })
                         }
                         if !session.suggestions.isEmpty {
@@ -101,6 +142,9 @@ struct MeetingDetailView: View {
                     Color.clear.frame(height: 30).id("transcriptBottom")
                 }.padding(.horizontal, 24).padding(.top, 44).padding(.bottom, 20).frame(maxWidth: .infinity, alignment: .leading)
             }.scrollIndicators(.hidden).softScrollEdges(top: 40, bottom: 28, whiteSurface: true)
+                .onChange(of: session.status) { _, status in
+                    if status == .completed || status == .interrupted { proxy.scrollTo("meetingOverview", anchor: .top) }
+                }
                 .onChange(of: session.transcript.last?.text) { _, _ in if running && follow { proxy.scrollTo("transcriptBottom", anchor: .bottom) } }
         }.background(TelosTheme.surface).font(.system(size: 14))
     }

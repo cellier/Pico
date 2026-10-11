@@ -35,7 +35,7 @@ class DailyFeedTests(unittest.TestCase):
   with patch('feeds.time.time',return_value=time.time()+90000):
    self.assertEqual(self.publish([])['published'],0)
    self.assertEqual(len(self.repo.snapshot()['items']),1)
-   self.assertGreater(self.repo.snapshot()['feeds'][0]['last_refresh'],time.time()-1)
+   self.assertEqual(self.repo.snapshot()['feeds'][0]['last_refresh'],0) # Publication alone is not discovery evidence.
  def test_cross_competitor_duplicate_batch_rolls_back(self):
   with self.assertRaises(ValueError):self.publish([self.item(),self.item('Canva')])
   self.assertEqual(self.repo.snapshot()['items'],[])

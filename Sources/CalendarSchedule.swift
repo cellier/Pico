@@ -14,6 +14,11 @@ struct CalendarDay: Identifiable {
     let events: [CalendarEntry]
 }
 
+struct CalendarMenuText: Equatable {
+    let time: String
+    let title: String
+}
+
 enum CalendarSchedule {
     static func days(_ events: [CalendarEntry], now: Date, calendar: Calendar = .current) -> [CalendarDay] {
         let today = calendar.startOfDay(for: now)
@@ -40,15 +45,15 @@ enum CalendarSchedule {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.calendar = calendar; f.timeZone = calendar.timeZone; f.dateFormat = "EEE MMM d"
         return f.string(from: date)
     }
-    static func time(_ event: CalendarEntry) -> String {
+    static func time(_ event: CalendarEntry, calendar: Calendar = .current) -> String {
         if event.allDay { return "All-day" }
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "h:mm a"
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.calendar = calendar; f.timeZone = calendar.timeZone; f.dateFormat = "h:mm a"
         return f.string(from: event.start)
     }
-    static func menuTitle(_ event: CalendarEntry?, now: Date = .now) -> String? {
+    static func menuText(_ event: CalendarEntry?, now: Date = .now, calendar: Calendar = .current) -> CalendarMenuText? {
         guard let event else { return nil }
-        let prefix = Calendar.current.isDate(event.start, inSameDayAs: now) || event.start < now ? "" : dayTitle(event.start, now: now) + " · "
-        return prefix + time(event) + " · " + event.title
+        let prefix = calendar.isDate(event.start, inSameDayAs: now) || event.start < now ? "" : dayTitle(event.start, now: now, calendar: calendar) + " "
+        return CalendarMenuText(time: prefix + time(event, calendar: calendar), title: event.title)
     }
 }
 

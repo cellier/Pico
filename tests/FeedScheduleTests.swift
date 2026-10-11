@@ -17,6 +17,11 @@ import Foundation
         precondition(!due("2026-09-27T08:00:00+08:00", interval: 0))
         precondition(!due("2026-09-28T07:45:00+08:00", interval: 60))
         precondition(due("2026-09-28T07:00:00+08:00", interval: 60))
+        let stamp = now.timeIntervalSince1970
+        precondition(FeedSchedule.isDue(intervalMinutes: 1440, lastRefresh: stamp, lastAttempt: stamp - 901, now: now, status: "partial", nextRetry: stamp - 1))
+        precondition(!FeedSchedule.isDue(intervalMinutes: 1440, lastRefresh: 0, lastAttempt: stamp - 901, now: now, status: "failed", nextRetry: stamp + 900))
+        precondition(!FeedSchedule.isDue(intervalMinutes: 1440, lastRefresh: 0, lastAttempt: stamp - 901, now: now, status: "running"))
+        precondition(FeedSchedule.isDue(intervalMinutes: 1440, lastRefresh: 0, lastAttempt: stamp - 1201, now: now, status: "running"))
         print("PASS: calendar-day refresh, same-day skip, catch-up, failure retry and manual feeds")
     }
 }

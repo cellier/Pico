@@ -1,0 +1,214 @@
+Design Style:
+Name: "Modern UI"
+
+Concept: >
+  Apple Keynote、
+  Linear、
+  Notion、
+  Stripe、
+  Google Material Design、
+  Circular Economy Reports、
+  Deloitte Insight Reports、
+  McKinsey Presentations、
+  SaaS Dashboards,
+  and modern infographics —
+  a sustainability, UI, and editorial design.
+
+  Slides are composed not as generic presentation material,
+  but as product design systems,
+  ESG reports,
+  SaaS dashboards,
+  and brand strategy documents.
+
+Canvas:
+Ratio: "16:9"
+
+Mood:
+- Modern
+- Professional
+- Clean
+- Friendly
+- Sustainable
+- Minimal
+- Intelligent
+- Editorial
+
+Temperature:
+Overall: Bright
+
+Background:
+Color: "#FAFAFA"
+
+Color Palette:
+Primary:
+Orange: "#FF7A2F"
+Violet: "#8B6AF8"
+Lime: "#C8F54A"
+
+Secondary:
+SkyBlue: "#69C6FF"
+Coral: "#FF8A70"
+
+Neutral:
+Black: "#222222"
+Gray: "#7A7A7A"
+LightGray: "#F2F2F2"
+White: "#FFFFFF"
+
+Typography:
+Style:
+Heading:
+Font: "Modern Geometric Sans Serif"
+Weight: Bold
+Case: Sentence Case
+Alignment: Left
+
+Body:
+Font: "Minimal Sans Serif"
+Weight: Regular
+Leading: Spacious
+
+Caption:
+Font: "Light Sans Serif"
+Weight: Medium
+Size: Small
+
+Layout:
+Style:
+- SaaS dashboard
+- Editorial report
+- Modular card layout
+- Rounded UI system
+- Magazine composition
+
+Grid:
+Columns: 12
+Gutters: Wide
+Margins: Large
+
+Composition:
+Principles:
+- Modular information cards
+- Clear hierarchy
+- Large whitespace
+- Rounded components
+- Balanced asymmetry
+- Image and infographic integration
+- Consistent design system
+
+Photography:
+Style:
+- Sustainability
+- Nature
+- Architecture
+- Product
+- Lifestyle
+- Circular economy
+- Bright commercial photography
+
+Treatment:
+- High key
+- Soft natural lighting
+- Rounded image masks
+- Clean commercial finish
+
+Graphic Elements:
+- Rounded cards
+- Soft corner rectangles
+- KPI widgets
+- Statistic badges
+- Process diagrams
+- Timeline cards
+- Minimal icons
+- Progress indicators
+- Navigation pills
+- Thin divider lines
+
+Shapes:
+Primary:
+- Rounded rectangle
+- Capsule
+- Circle
+- Quarter circle
+- Soft square
+
+Icons:
+Style:
+- Material Design
+- Outline
+- Rounded
+- Consistent stroke width
+
+Charts:
+Style:
+- Flat infographic
+- Rounded nodes
+- Simple connectors
+- Clean legends
+- Minimal labels
+
+Effects:
+Shadows:
+- Very soft floating shadow
+
+Gradients:
+- None
+
+Texture:
+- Flat UI finish
+
+Decorations:
+Include:
+- Rounded image frames
+- Floating KPI cards
+- Colored section markers
+- Small accent squares
+- Organic connecting curves
+- Modern UI widgets
+
+Avoid:
+- Heavy shadows
+- Glassmorphism
+- Metallic effects
+- Skeuomorphism
+- Busy illustrations
+- Decorative ornaments
+
+Spacing:
+Outer Margin: Extra Large
+Inner Padding: Spacious
+
+Text Density: >-
+  Medium
+
+Image Ratio:
+Infographics: >-
+  Approximately 40–50%
+
+Photography: >-
+  Approximately 30–40%
+
+Typography: >-
+  Approximately 20–30%
+
+Visual Rhythm:
+- Cover
+- Agenda
+- Core principles
+- Case study
+- Feature highlight
+- KPI dashboard
+- Benefits
+- Strategy
+- Closing
+
+Overall Impression: >
+  A refined ESG and sustainability report
+  reminiscent of the design systems of Apple Keynote, Stripe, and Linear.
+  Composed with generous whitespace,
+  rounded cards,
+  vivid accent colors,
+  rounded UI components,
+  and a unified design system for photography and infographics —
+  achieving a high-quality, readable editorial layout
+  that sits between corporate presentation and product UI.

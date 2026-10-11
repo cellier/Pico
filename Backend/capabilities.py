@@ -20,12 +20,16 @@ SKILLS = {
 'memory': ('Remember user preferences across tasks', 'telos_memory search retrieves shared local notes. Save durable user preferences or facts only when the user asks to remember them. Never save credentials. Cite uncertainty and date time-sensitive notes. telos_memory delete removes a specific entry. SOUL.md is user-editable identity, not user profile or authority to bypass approval.'),
 }
 
-def initialize(data, home):
+def initialize(data, home, auto_approve=False):
     data, home = Path(data), Path(home)
     home.mkdir(parents=True, exist_ok=True)
     identity=data/'SOUL.md'
     if not identity.exists(): identity.write_text(SOUL); identity.chmod(0o600)
-    (home/'SOUL.md').write_text(identity.read_text())
+    identity_text=identity.read_text()
+    if auto_approve:
+        from approval_policy import automatic_instructions
+        identity_text=automatic_instructions(identity_text)
+    (home/'SOUL.md').write_text(identity_text)
     # This small fixed tool catalog fits directly in context. Avoid the discovery
     # bridge's extra turns and nested, weakly typed tool_call arguments.
     import yaml
@@ -39,6 +43,11 @@ def initialize(data, home):
         folder=skills/name; folder.mkdir(exist_ok=True)
         file=folder/'SKILL.md'
         if not file.exists(): file.write_text(f'---\nname: {name}\ndescription: {desc}\n---\n\n{body}\n')
+    bundled=Path(__file__).resolve().parent/'skills/presentations/SKILL.md'
+    presentation_skill=skills/'telos-presentations'/'SKILL.md'
+    if bundled.exists() and not presentation_skill.exists():
+        presentation_skill.parent.mkdir(exist_ok=True)
+        presentation_skill.write_text(bundled.read_text())
     target=home/'skills'
     if not target.exists(): target.symlink_to(skills, target_is_directory=True)
     with sqlite3.connect(data/'memory.sqlite') as db:
@@ -130,6 +139,12 @@ class Capabilities:
         target=self.data/'skills'/exact['name']; target.mkdir(exist_ok=True)
         (target/'SKILL.md').write_text(exact['content'])
         return {'installed':name,'path':str(target/'SKILL.md'),'available':'Next task turn; use skills_list and skill_view.'}
+    @property
+    def presentations(self):
+        if not hasattr(self, '_presentations'):
+            from presentations import Presentations
+            self._presentations=Presentations(self)
+        return self._presentations
     def office(self,args):
         path=self.path(args['name']); path.parent.mkdir(parents=True,exist_ok=True)
         spec=args['spec']; ext=path.suffix.lower(); title=spec.get('title',path.stem)
@@ -157,15 +172,7 @@ class Capabilities:
                 for col in ws.columns: ws.column_dimensions[col[0].column_letter].width=min(60,max(14,max(len(str(c.value or '')) for c in col)+2))
             wb.save(path)
         elif ext=='.pptx':
-            from pptx import Presentation
-            from pptx.util import Inches, Pt
-            prs=Presentation(); prs.slide_width=Inches(13.333); prs.slide_height=Inches(7.5)
-            for item in spec.get('slides',[{'title':title,'body':''}]):
-                slide=prs.slides.add_slide(prs.slide_layouts[1]); slide.shapes.title.text=item['title']; slide.placeholders[1].text=item.get('body','')
-                for shape in slide.shapes:
-                    if shape.has_text_frame:
-                        for p in shape.text_frame.paragraphs: p.font.name='Arial'; p.font.size=Pt(28)
-            prs.save(path)
+            return self.presentations.create(args)
         elif ext=='.pdf':
             from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
             from reportlab.lib.styles import getSampleStyleSheet

@@ -61,12 +61,35 @@ private final class StatusEventLabel: NSTextField {
 /// The icon has a fixed local coordinate space, independent of the event label's width.
 @MainActor final class StatusActivityIndicator {
     static let animationKey = "telos.taskActivity"
+    nonisolated static let maximumEventWidth: CGFloat = 320
+    // Leave room for the camera housing/app menus and the other status items.
+    static func availableWidth(screenFrame: NSRect, topRightArea: NSRect?, itemFrame: NSRect?) -> CGFloat {
+        // Status items may be reordered onto either side of the camera housing.
+        // Do not reserve an imaginary 45% of unnotched displays for app menus.
+        // AppKit manages competition with other apps' menu items.
+        let onLeftOfNotch = topRightArea.map { area in itemFrame.map { $0.maxX <= area.minX } ?? false } ?? false
+        let safeLeft = onLeftOfNotch ? screenFrame.minX : (topRightArea?.minX ?? screenFrame.minX)
+        let segmentWidth = screenFrame.maxX - safeLeft
+        var available = min(maximumEventWidth, segmentWidth - 16)
+        if let itemFrame {
+            available = min(available, itemFrame.maxX - safeLeft - 16)
+        }
+        return max(0, floor(available))
+    }
+    static func eventWidth(textWidth: CGFloat, availableWidth: CGFloat, thickness: CGFloat) -> CGFloat {
+        let cap = min(maximumEventWidth, availableWidth)
+        // A tiny clipped label is less useful than a clearly visible icon.
+        guard cap >= 80 else { return thickness }
+        // Short titles such as “调休” still need to meet layout's label threshold.
+        return min(cap, max(80, ceil(textWidth) + 45))
+    }
     private weak var button: NSButton?
     let iconView = StatusActivityImageView()
     private let marker = StatusEventMarker()
+    private let timeLabel = StatusEventLabel(labelWithString: "")
     private let eventLabel = StatusEventLabel(labelWithString: "")
     private var count = 0
-    private var eventTitle: String?
+    private var event: CalendarMenuText?
     var iconFrame: NSRect { iconView.frame }
 
     init(button: NSButton) {
@@ -75,23 +98,28 @@ private final class StatusEventLabel: NSTextField {
         button.image = nil
         button.addSubview(iconView)
         iconView.setAccessibilityElement(false)
-        eventLabel.font = .systemFont(ofSize: 13, weight: .regular)
-        eventLabel.textColor = .labelColor
-        eventLabel.lineBreakMode = .byTruncatingTail
-        eventLabel.maximumNumberOfLines = 1
-        eventLabel.setAccessibilityElement(false)
-        button.addSubview(eventLabel)
+        timeLabel.font = .systemFont(ofSize: 9, weight: .regular)
+        eventLabel.font = .systemFont(ofSize: 11, weight: .regular)
+        for label in [timeLabel, eventLabel] {
+            label.textColor = .labelColor
+            label.lineBreakMode = .byTruncatingTail
+            label.maximumNumberOfLines = 1
+            label.setAccessibilityElement(false)
+            button.addSubview(label)
+        }
         button.addSubview(marker)
         marker.setAccessibilityElement(false)
         layout()
     }
     static func runningCount(_ tasks: [Todo]) -> Int { tasks.filter { $0.status == "running" }.count }
-    func setEvent(_ title: String?) -> CGFloat {
-        eventTitle = title
-        eventLabel.stringValue = title ?? ""
+    func setEvent(_ event: CalendarMenuText?, availableWidth: CGFloat = maximumEventWidth) -> CGFloat {
+        self.event = event
+        timeLabel.stringValue = event?.time ?? ""
+        eventLabel.stringValue = event?.title ?? ""
         // NSTextField includes its text-cell insets and fallback fonts in this measurement.
-        let textWidth = eventLabel.intrinsicContentSize.width
-        let width: CGFloat = title == nil ? NSStatusBar.system.thickness : min(480, ceil(textWidth) + 45)
+        let textWidth = max(timeLabel.intrinsicContentSize.width, eventLabel.intrinsicContentSize.width)
+        let width: CGFloat = event == nil ? NSStatusBar.system.thickness
+            : Self.eventWidth(textWidth: textWidth, availableWidth: availableWidth, thickness: NSStatusBar.system.thickness)
         layout(width: width)
         updateAccessibility()
         return width
@@ -99,16 +127,24 @@ private final class StatusEventLabel: NSTextField {
     func layout(width: CGFloat? = nil) {
         guard let button else { return }
         let width = width ?? button.bounds.width
-        iconView.frame = NSRect(x: eventTitle == nil ? (width - 16) / 2 : 5, y: (button.bounds.height - 16) / 2, width: 16, height: 16)
+        let showTitle = event != nil && width >= 80
+        iconView.frame = NSRect(x: showTitle ? 5 : (width - 16) / 2, y: (button.bounds.height - 16) / 2, width: 16, height: 16)
         iconView.needsLayout = true
         marker.frame = NSRect(x: 28, y: (button.bounds.height - 9) / 2, width: 2, height: 9)
-        marker.isHidden = eventTitle == nil
-        eventLabel.frame = NSRect(x: 35, y: (button.bounds.height - 18) / 2, width: max(0, width - 41), height: 18)
-        eventLabel.isHidden = eventTitle == nil
+        marker.isHidden = !showTitle
+        let scale = min(1, button.bounds.height / 24)
+        let bottom = (button.bounds.height - 24 * scale) / 2
+        timeLabel.font = .systemFont(ofSize: 9 * scale, weight: .regular)
+        eventLabel.font = .systemFont(ofSize: 11 * scale, weight: .regular)
+        let timeY = button.isFlipped ? bottom : bottom + 13 * scale
+        let titleY = button.isFlipped ? bottom + 11 * scale : bottom
+        eventLabel.frame = NSRect(x: 35, y: titleY, width: max(0, width - 41), height: 13 * scale)
+        timeLabel.frame = NSRect(x: 35, y: timeY, width: max(0, width - 41), height: 11 * scale)
+        timeLabel.isHidden = !showTitle; eventLabel.isHidden = !showTitle
     }
     private func updateAccessibility() {
         let activity = count > 0 ? " — \(count) tasks running" : ""
-        let text = "Telos" + activity + (eventTitle.map { " — " + $0 } ?? "")
+        let text = "Telos" + activity + (event.map { " — " + $0.time + " · " + $0.title } ?? "")
         button?.toolTip = text; button?.setAccessibilityLabel(text)
     }
     func update(count: Int, reduceMotion: Bool) {

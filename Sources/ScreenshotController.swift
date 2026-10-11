@@ -2,13 +2,14 @@ import AppKit
 import Carbon
 
 /// Uses the system selection UI: crosshair drag, Space for windows, Escape to cancel.
-/// Captures go directly to the pasteboard; no file or agent upload is involved.
+/// Capture locally, then open the editor. Local edits stay offline; annotation mode uses the configured provider.
 @MainActor final class ScreenshotController {
     static let arguments = ["-i", "-c", "-d", "-Jselection", "-t", "png"]
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private var capture: Process?
     private var pending: Task<Void, Never>?
+    var captured: (NSImage) -> Void = { _ in }
     var prepare: () -> Void = {}
     var finished: () -> Void = {}
     var isSelecting: Bool { pending != nil || capture != nil }
@@ -47,10 +48,18 @@ import Carbon
             process.arguments = Self.arguments
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
+            let pasteboardChange = NSPasteboard.general.changeCount
             process.terminationHandler = { [weak self] ended in
                 Task { @MainActor in
                     guard let self, self.capture === ended else { return }
-                    self.capture = nil; self.finished()
+                    self.capture = nil
+                    if ended.terminationStatus == 0, NSPasteboard.general.changeCount != pasteboardChange, let image = NSImage(pasteboard: .general) {
+                        // Publish standard image formats before opening the editor.
+                        // The editor's Copy button is only needed for subsequent edits.
+                        if !Self.copyCapturedImage(image) { self.failed("Could not copy the screenshot. Try Copy in the editor.") }
+                        self.finished()
+                        self.captured(image)
+                    } else { self.finished() }
                 }
             }
             self.capture = process
@@ -61,6 +70,17 @@ import Carbon
             }
             // Native -d displays permission/capture errors. Escape is a normal cancellation.
         }
+    }
+
+    @discardableResult
+    static func copyCapturedImage(_ image: NSImage, to pasteboard: NSPasteboard = .general) -> Bool {
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:]) else { return false }
+        let item = NSPasteboardItem()
+        guard item.setData(png, forType: .png), item.setData(tiff, forType: .tiff) else { return false }
+        pasteboard.clearContents()
+        return pasteboard.writeObjects([item])
     }
 
     func stop() {

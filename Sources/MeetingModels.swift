@@ -42,6 +42,7 @@ struct MeetingSession: Codable, Identifiable {
     var status: MeetingStatus = .preparing
     var suggestions: [SuggestedMeetingTask] = []
     var decisions: [MeetingDecision] = []
+    var summary: [MeetingDecision]?
     var analysisStatus = "not_started"
     var notice: String?
     var locale: String

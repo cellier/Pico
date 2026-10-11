@@ -1,0 +1,191 @@
+Design Style:
+Name: "Blue Collage"
+
+Concept: >
+  An information-broadcast editorial design
+  inspired by real-estate news media,
+  social carousel posts,
+  retro advertising, newspaper infographics,
+  and contemporary financial Instagram accounts.
+
+  Difficult news and policy changes
+  are rebuilt as "approachable visual news"
+  that anyone can grasp instantly.
+
+  Monochrome photography, humorous motifs,
+  and strong contrast
+  balance expert credibility with shareability.
+
+Canvas:
+Ratio: "16:9"
+
+Mood:
+- Informative
+- Accessible
+- Contemporary
+- Friendly
+- Editorial
+- Bold
+- Trustworthy
+- Conversational
+
+Temperature:
+Overall: Cool
+
+Color Palette:
+Background:
+LightGray: "#E9E9E7"
+
+Primary:
+RealtyBlue: "#0F6BFF"
+
+Secondary:
+Black: "#111111"
+
+Accent:
+White: "#FFFFFF"
+LightGray: "#F4F4F2"
+
+Typography:
+Headlines:
+Style: >
+  Bold, highly legible sans-serif.
+
+  Short and powerful like news headlines,
+  prioritizing at-a-glance comprehension.
+
+Weight: 700-900
+Case: Mixed
+Tracking: Slightly Tight
+
+Secondary:
+Style: >
+  Simple sans-serif.
+
+  Supporting information and explanatory text
+  are set small and neatly arranged.
+
+Weight: 400-600
+
+Numbers:
+Style: >
+  Statistics and monetary values are set extremely large,
+  functioning as the lead element of the infographic.
+
+Weight: 800-900
+
+Layout:
+Structure: >
+  A simple information-organization layout
+  fusing Instagram carousels
+  with news cards.
+
+  Each slide is based on a three-layer structure:
+  "headline + visual + point."
+
+Composition:
+- Large headlines
+- Central imagery
+- Statistic callouts
+- Simple information blocks
+- Editorial balance
+- Strong focal points
+- Generous margins
+- Modular layouts
+
+Alignment:
+Preference: Left aligned
+ControlledChaos: Low
+
+Graphic Elements:
+Shapes:
+- Rounded labels
+- Information cards
+- Circular accents
+- Speech bubbles
+- Starburst symbols
+- Underlines
+- Simple frames
+
+Symbols:
+- Spark icons
+- Explosive bursts
+- Arrows
+- Chat bubbles
+- Minimal badges
+
+Decorative Rules:
+- Decorations should emphasize information.
+- Use symbols sparingly.
+- Maintain a clean news aesthetic.
+- Avoid unnecessary complexity.
+
+Imagery:
+Style: >
+  Cut-out monochrome and portrait photography
+  combined with blue color fields.
+
+  To keep things from feeling too heavy,
+  humorous motifs such as animals, vintage portraits,
+  and sculptures are also used.
+
+Treatment:
+- Black-and-white photography
+- Thick white outlines
+- Simple cutouts
+- High contrast
+- Minimal shadows
+- Editorial collage effect
+
+Subjects:
+- People reacting
+- Everyday financial situations
+- Classical sculptures
+- Pets and animals
+- Money-related objects
+- Consumer lifestyle scenes
+- Vintage imagery
+
+Background:
+Style: >
+  Built on a light gray base,
+  with blue and black cards inserted.
+
+  The area ratio of white, blue, and black
+  shifts from slide to slide
+  to prevent monotony.
+
+Effects:
+Texture: >-
+  Subtle paper grain
+  Newsprint softness
+
+Shadow: >-
+  Minimal
+
+Depth: >-
+  Flat editorial layering
+
+Distortion: >-
+  None
+
+Visual Rules:
+- Use blue as the dominant accent color.
+- Headlines should be immediately understandable.
+- Prioritize clarity over decoration.
+- Use oversized numbers for data emphasis.
+- Combine seriousness with subtle humor.
+- Keep imagery simple and high contrast.
+- Maintain a clean editorial rhythm.
+- Design for mobile-first readability.
+
+Exclusions:
+- Luxury real estate aesthetics
+- Corporate stock photography
+- Glassmorphism
+- Heavy gradients
+- Metallic effects
+- Complex 3D rendering
+- Overly playful cartoon styles
+- Dense information overload
+- Decorative serif typography

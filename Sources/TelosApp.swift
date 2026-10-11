@@ -540,6 +540,8 @@ struct MacAccessView: View {
             Text("Web search, opening websites, files and skills work without Mac control permissions.").font(.system(size: 13)).foregroundStyle(.secondary)
             MeetingSettingsView(manager: store.meetingManager)
             Divider()
+            KeyDisplaySettingsView()
+            Divider()
             Toggle("Voice typing · Hold left mouse", isOn: $voiceTypingEnabled).font(.system(size: 14, weight: .medium))
             Text("Hold still in an editable text field for 0.55 seconds. Speak after the tone, then release to insert. Chinese, English and mixed speech are processed locally. Dragging cancels; password fields are excluded.").font(.system(size: 13)).foregroundStyle(.secondary)
             Toggle("Polish voice text with DeepSeek", isOn: $voicePolish)
@@ -788,6 +790,7 @@ final class TelosWindow: NSWindow {
     var store: TaskStore!
     var statusItem: NSStatusItem!
     private let screenshots = ScreenshotController()
+    private var screenshotEditor: ScreenshotEditor?
     let dictation = DictationController()
     private var activityIndicator: StatusActivityIndicator?
     private var activitySubscriptions = Set<AnyCancellable>()
@@ -798,10 +801,18 @@ final class TelosWindow: NSWindow {
     var transitionID = UUID()
     let presentation = PanelPresentation()
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "screenshot",
+           let path = ProcessInfo.processInfo.environment["TELOS_SCREENSHOT_IMAGE"], let image = NSImage(contentsOfFile: path) {
+            let editor = ScreenshotEditor(image: image); screenshotEditor = editor
+            editor.closed = { NSApp.terminate(nil) }; editor.show(); return
+        }
         if let fontURL = Bundle.main.url(forResource: "InstrumentSerif-Regular", withExtension: "ttf") {
             CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
         }
         store = TaskStore()
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil {
+            DispatchQueue.main.async { KeyDisplayController.shared.start() }
+        }
         let view = PanelHostingView(rootView: StatusPanelRoot(store: store, presentation: presentation))
         window = TelosWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 732), styleMask: [.borderless], backing: .buffered, defer: false)
         // Inherit the system appearance; the override is only for isolated previews.
@@ -848,17 +859,14 @@ final class TelosWindow: NSWindow {
 
         }
         CalendarStore.shared.$events.combineLatest(CalendarStore.shared.$now)
-            .receive(on: RunLoop.main).sink { [weak self] events, now in
-                guard let self, let indicator = self.activityIndicator else { return }
-                let title = CalendarSchedule.menuTitle(CalendarSchedule.next(events, now: now), now: now)
-                self.statusItem.length = indicator.setEvent(title)
-                indicator.layout(width: self.statusItem.length)
-                if self.panelShown {
-                    let frame = self.panelFrame()
-                    self.window.setFrame(frame, display: true)
-                    self.presentation.anchorX = ((self.statusButtonFrame?.midX ?? frame.midX) - frame.minX) / frame.width
-                }
-            }.store(in: &activitySubscriptions)
+            .receive(on: RunLoop.main).sink { [weak self] _, _ in self?.updateStatusEvent() }
+            .store(in: &activitySubscriptions)
+        // Other apps can add menu items or change the active display without a calendar update.
+        Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+            .sink { [weak self] _ in self?.updateStatusEvent() }.store(in: &activitySubscriptions)
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.updateStatusEvent() }
+            .store(in: &activitySubscriptions)
         if ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] != nil {
             let frame = panelFrame(); window.setFrame(frame, display: false)
             presentation.anchorX = ((statusButtonFrame?.midX ?? frame.midX) - frame.minX) / frame.width
@@ -871,6 +879,14 @@ final class TelosWindow: NSWindow {
            ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] == nil {
             dictation.start()
             store.meetingManager.start()
+            screenshots.captured = { [weak self] image in
+                guard let self else { return }
+                self.screenshotEditor?.close()
+                let editor = ScreenshotEditor(image: image)
+                self.screenshotEditor = editor
+                editor.closed = { [weak self] in self?.screenshotEditor = nil }
+                editor.show()
+            }
             screenshots.prepare = { [weak self] in self?.stopOutsideDismissal() }
             screenshots.finished = { [weak self] in
                 guard let self, self.panelShown else { return }
@@ -881,24 +897,8 @@ final class TelosWindow: NSWindow {
                 store.screenshotShortcutStatus = "Option+A is unavailable. Another app may be using it. Change that app's shortcut and restart Telos; Take Screenshot is still available in the menu."
             }
         }
-        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil,
-           ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] == nil,
-           let build = Bundle.main.object(forInfoDictionaryKey: "TelosBuildID") as? String,
-           UserDefaults.standard.string(forKey: UpdatePermissionReset.marker) != build {
-            store.permissionResetNotice = "New version installed. Refreshing Telos permissions…"
-            showPanel()
-            Task { [weak self] in
-                let result = await Task.detached { UpdatePermissionReset.perform(build: build) }.value
-                guard let self else { return }
-                if result == .reset {
-                    self.store.permissionResetNotice = "Telos permissions were reset for this update. Please grant Accessibility and Screen Recording again, then click Check again. Reconnect Calendar from the Calendar tab if needed. Automation prompts appear when needed. Restarting this same version will not reset permissions again."
-                } else if result == .failed {
-                    self.store.permissionResetNotice = "macOS did not confirm the permission reset. Please check Telos in System Settings; its permissions have not been marked as reset."
-                }
-                self.store.checkMacAccess()
-                CalendarStore.shared.refresh()
-            }
-        }
+        // App updates retain existing permissions. macOS requests any required
+        // authorization through the normal feature-specific permission flow.
         if let path = ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
@@ -907,6 +907,26 @@ final class TelosWindow: NSWindow {
                 NSApp.terminate(nil)
             }
         }
+    }
+    private func updateStatusEvent() {
+        guard let indicator = activityIndicator, let screen = statusItem.button?.window?.screen ?? NSScreen.main else { return }
+        let calendar = CalendarStore.shared
+        let event = CalendarSchedule.menuText(CalendarSchedule.next(calendar.events, now: calendar.now), now: calendar.now)
+        let itemFrame = statusItemFrame
+        let available = itemFrame == nil ? 0 : StatusActivityIndicator.availableWidth(screenFrame: screen.frame,
+            topRightArea: screen.auxiliaryTopRightArea, itemFrame: itemFrame)
+        let width = indicator.setEvent(event, availableWidth: available)
+        if statusItem.length != width { statusItem.length = width }
+        indicator.layout(width: width)
+        if panelShown {
+            let frame = panelFrame()
+            if window.frame != frame { window.setFrame(frame, display: true) }
+            presentation.anchorX = ((statusButtonFrame?.midX ?? frame.midX) - frame.minX) / frame.width
+        }
+    }
+    private var statusItemFrame: NSRect? {
+        guard let button = statusItem.button, let owner = button.window, owner.frame.width > 0 else { return nil }
+        return owner.convertToScreen(button.convert(button.bounds, to: nil))
     }
     var statusButtonFrame: NSRect? {
         guard let button = statusItem.button, let owner = button.window, owner.frame.width > 0 else { return nil }
@@ -1030,7 +1050,11 @@ final class TelosWindow: NSWindow {
         if let deactivateObserver { NotificationCenter.default.removeObserver(deactivateObserver) }
         outsideClickMonitor = nil; localClickMonitor = nil; deactivateObserver = nil
     }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showPanel(); return false }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // The isolated screenshot preview has no main panel or status item.
+        guard window != nil else { return false }
+        showPanel(); return false
+    }
     func makeMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); let app = NSMenu(); appItem.submenu = app
@@ -1055,7 +1079,7 @@ final class TelosWindow: NSWindow {
         Task { await store.meetingManager.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
-    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); dictation.stop(); store.stopAll() }
+    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); dictation.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 #if !TELOS_TEST

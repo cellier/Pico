@@ -8,6 +8,12 @@ import Combine
     @Published var setupMessage = ""
     @Published var preparing = false
     @Published var accessReady = false
+    @Published private(set) var accessibilityReady = false
+    @Published private(set) var screenAudioReady = false
+    @Published private(set) var microphoneReady = false
+    @Published private(set) var repairMessage = ""
+    @Published private(set) var repairingAccess = false
+    var capturing: Bool { activeID != nil }
     private var lastDiagnostic = ""
     private weak var store: TaskStore?
     private var timer: Timer?
@@ -60,19 +66,19 @@ import Combine
         RunLoop.main.add(persistTimer!, forMode: .common)
     }
     func enable() {
-        guard !preparing else { return }
+        guard !preparing, !repairingAccess, activeID == nil else { return }
         guard #available(macOS 26, *) else { setupMessage = "Meeting transcription requires macOS 26 or later."; return }
         enabled = true; UserDefaults.standard.set(true, forKey: "TelosMeetingsEnabled")
         preparing = true; setupMessage = "Preparing on-device speech…"
         Task {
-            defer { preparing = false }
+            defer { preparing = false; refreshAccessState() }
             let mic = await AVCaptureDevice.requestAccess(for: .audio)
-            guard mic else { setupMessage = "Allow Telos microphone access in System Settings."; return }
-            guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else { setupMessage = "Allow Screen & System Audio Recording, then enable meetings again."; return }
+            guard mic else { openPermissionSettings("Privacy_Microphone"); return }
+            guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else { openPermissionSettings("Privacy_ScreenCapture"); return }
             guard AXIsProcessTrusted() else {
                 let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
                 _ = AXIsProcessTrustedWithOptions(options)
-                setupMessage = "Allow Accessibility for Zoom meeting detection, then enable meetings again."; return
+                openPermissionSettings("Privacy_Accessibility"); return
             }
             do {
                 if locale == "mixed" {
@@ -81,9 +87,34 @@ import Combine
                 } else { try await MeetingTranscription.prepareAssets(localeID: locale) }
                 enabled = true; UserDefaults.standard.set(true, forKey: "TelosMeetingsEnabled")
                 accessReady = true
+                suppressedPID = nil; captureFailure = nil; debouncer.reset()
                 setupMessage = "Waiting for a Zoom meeting…"
-            } catch { setupMessage = error.localizedDescription }
+            } catch { captureFailure = error.localizedDescription; setupMessage = error.localizedDescription }
         }
+    }
+    func openPermissionSettings(_ pane: String) {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + pane) else { return }
+        NSWorkspace.shared.open(url)
+    }
+    func repairAccessibility() {
+        guard !repairingAccess, !preparing, activeID == nil else { return }
+        repairingAccess = true
+        Task {
+            let result = await Task.detached(priority: .utility) { UpdatePermissionReset.resetAccessibility() }.value
+            repairingAccess = false
+            refreshAccessState()
+            if result {
+                repairMessage = "Old Accessibility permission cleared. Add this Telos app and turn it on in System Settings. If macOS asks, quit and reopen Telos."
+                let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(options)
+            } else {
+                repairMessage = "macOS could not clear Accessibility. Remove Telos from the list, then add this app again and turn it on."
+            }
+            openPermissionSettings("Privacy_Accessibility")
+        }
+    }
+    func revealInstalledApp() {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
     var locale: String { UserDefaults.standard.string(forKey: "TelosMeetingLanguage") ?? "mixed" }
     func disable() {
@@ -96,6 +127,7 @@ import Combine
         let accessibility = AXIsProcessTrusted()
         let screen = CGPreflightScreenCaptureAccess()
         let mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        accessibilityReady = accessibility; screenAudioReady = screen; microphoneReady = mic
         accessReady = accessibility && screen && mic
         if !enabled { setupMessage = "Automatic meeting capture is off." }
         else if !preparing && activeID == nil {
@@ -103,7 +135,7 @@ import Combine
             if !accessibility { missing.append("Accessibility (meeting detection)") }
             if !screen { missing.append("Screen & System Audio Recording") }
             if !mic { missing.append("Microphone") }
-            setupMessage = missing.isEmpty ? "Waiting for a Zoom meeting…" : "Permission needed: " + missing.joined(separator: ", ") + ". Click Set up meeting access."
+            setupMessage = missing.isEmpty ? (captureFailure.map { "Capture stopped: " + $0 + ". Click Set up meeting access to retry this meeting." } ?? "Waiting for a Zoom meeting…") : "Permission needed: " + missing.joined(separator: ", ") + ". Click Set up meeting access."
         }
     }
     private func writeDiagnostic(signal: String) {
@@ -121,17 +153,17 @@ import Combine
     private func poll() {
         refreshAccessState()
         if !enabled { writeDiagnostic(signal: "disabled") }
-        guard enabled, !shuttingDown, !polling, !finishing, starting == nil else { return }
+        guard enabled, !preparing, !repairingAccess, !shuttingDown, !polling, !finishing, starting == nil else { return }
         polling = true
         Task {
             let detector = self.detector
             let observation = await Task.detached(priority: .utility) { detector.observe() }.value
             polling = false
             guard enabled, !shuttingDown else { return }
-            if activeID == nil && accessReady && !preparing {
+            if activeID == nil && accessReady && !preparing && suppressedPID == nil && captureFailure == nil {
                 switch observation.signal {
                 case .joined: setupMessage = "Zoom meeting detected. Starting transcription…"
-                case .absent: setupMessage = "Waiting for a Zoom meeting…"
+                case .absent, .ended: setupMessage = "Waiting for a Zoom meeting…"
                 case .unknown: setupMessage = "Zoom is open, but its meeting controls could not be confirmed yet."
                 }
             }
@@ -141,14 +173,14 @@ import Combine
         }
     }
     func receive(_ observation: MeetingObservation, at now: Date) async {
-        guard enabled, !shuttingDown, !finishing, starting == nil else { return }
+        guard enabled, !preparing, !repairingAccess, !shuttingDown, !finishing, starting == nil else { return }
         if suppressedPID != nil {
-            if observation.signal == .absent { suppressedPID = nil; debouncer.reset() }
+            if (observation.signal == .absent || observation.signal == .ended) { suppressedPID = nil; debouncer.reset() }
             else { return }
         }
         if let changed = debouncer.update(observation.signal, at: now, remoteAudioRecently: now.timeIntervalSince(lastAudio) < 10) {
             if changed { begin(observation) }
-            else { await finish() }
+            else { await finish(endedAt: debouncer.transitionTime) }
         }
     }
     private func addTask(_ session: MeetingSession) {
@@ -162,15 +194,19 @@ import Combine
         store.mutate(id) {
             $0.title = session.title
             if session.status == .completed || session.status == .interrupted {
-                $0.status = "completed"; $0.completedAt = session.endTime
-                $0.summary = session.status == .completed ? "Meeting completed" : "Meeting interrupted"
+                // Ending capture does not archive the user's task. Preserve manual completion.
+                if $0.status != "completed" { $0.status = "ready"; $0.completedAt = nil }
+                $0.summary = session.summary?.first?.text ?? (session.status == .completed ? "Meeting ended · Ready for review" : "Meeting interrupted · Transcript saved")
             } else { $0.status = "running"; $0.summary = session.status == .preparing ? "Preparing meeting transcription…" : "Recording & transcribing…" }
         }
         store.save()
     }
     private func begin(_ observation: MeetingObservation) {
         guard activeID == nil, let store, #available(macOS 26, *) else { return }
-        let session = MeetingSession(title: observation.title, locale: locale, processID: observation.pid)
+        let rawTitle = observation.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = ["zoom", "zoom meeting", "zoom workplace", "会议", "zoom 会议", ""].contains(rawTitle.lowercased())
+            ? "Zoom Meeting · " + Date().formatted(date: .abbreviated, time: .shortened) : rawTitle
+        let session = MeetingSession(title: title, locale: locale, processID: observation.pid)
         do { try repository.save(session) } catch { setupMessage = "Could not save meeting: \(error.localizedDescription)"; debouncer.reset(); return }
         store.meetings[session.id] = session; activeID = session.id; lastAudio = .distantPast; captureFailure = nil
         addTask(session)
@@ -215,9 +251,10 @@ import Combine
         if let id = activeID { suppressedPID = store?.meetings[id]?.processID }
         Task { await finish() }
     }
-    func finish(interrupted: Bool = false, notice: String? = nil) async {
+    func finish(interrupted: Bool = false, notice: String? = nil, endedAt: Date? = nil) async {
         guard let id = activeID, !finishing, let store else { return }
         finishing = true
+        let captureEndedAt = endedAt ?? Date()
         if let starting { starting.cancel(); await starting.value; self.starting = nil }
         store.meetings[id]?.status = .finishing
         await capture?.stop()
@@ -226,12 +263,14 @@ import Combine
         await Task.yield()
         let interrupted = interrupted || captureFailure != nil
         store.meetings[id]?.status = interrupted ? .interrupted : .completed
-        store.meetings[id]?.endTime = Date()
+        store.meetings[id]?.endTime = max(store.meetings[id]?.startTime ?? captureEndedAt, captureEndedAt)
         if let notice = notice ?? captureFailure { store.meetings[id]?.notice = notice }
         if interrupted { suppressedPID = store.meetings[id]?.processID }
         dirty = true; flush()
         if let session = store.meetings[id] { updateTask(session) }
         activeID = nil; capture = nil; transcriber = nil; finishing = false
+        refreshAccessState()
+        writeDiagnostic(signal: interrupted ? "capture_failed" : "finished")
         if !interrupted && ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil { analyze(id) }
     }
     private func flush() {
@@ -253,8 +292,12 @@ import Combine
                     MeetingUnderstanding.verified(candidate.evidence, in: session) && candidate.confidence >= 0.85 && !created.contains { $0.evidence.segmentID == candidate.evidence.segmentID && $0.evidence.text == candidate.evidence.text }
                 }
                 updated.decisions = (result.decisions ?? []).filter { MeetingUnderstanding.verified($0.evidence, in: session) }
+                updated.summary = (result.summary ?? []).filter { MeetingUnderstanding.verified($0.evidence, in: session) }
+                if let title = result.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, !(updated.summary ?? []).isEmpty {
+                    updated.title = String(title.prefix(160))
+                }
                 updated.analysisStatus = "ready"
-                try repository.save(updated); store.meetings[id] = updated
+                try repository.save(updated); store.meetings[id] = updated; updateTask(updated)
             } catch {
                 store.meetings[id]?.analysisStatus = "failed"
                 store.meetings[id]?.notice = "Analysis did not finish. Transcript is saved; you can retry."

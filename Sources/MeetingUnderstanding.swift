@@ -1,6 +1,8 @@
 import Foundation
 
 struct MeetingAnalysisResult: Decodable {
+    var title: String?
+    var summary: [MeetingDecision]?
     var suggestions: [SuggestedMeetingTask]?
     var decisions: [MeetingDecision]?
     var error: String?
@@ -21,7 +23,7 @@ enum MeetingUnderstanding {
         let encoder = JSONEncoder()
         let transcript = try JSONSerialization.jsonObject(with: encoder.encode(session.transcript))
         let formatter = ISO8601DateFormatter(); formatter.timeZone = .current
-        let input = try JSONSerialization.data(withJSONObject: ["transcript": transcript, "started": formatter.string(from: session.startTime)])
+        let input = try JSONSerialization.data(withJSONObject: ["transcript": transcript, "started": formatter.string(from: session.startTime), "ended": session.endTime.map { formatter.string(from: $0) } ?? "", "meeting_title": session.title, "provider": session.provider])
         guard let python = BundledRuntime.python(),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/meeting_understanding.py") else { throw CocoaError(.fileNoSuchFile) }
         let holder = MeetingAnalysisProcess()

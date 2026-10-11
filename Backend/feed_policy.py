@@ -20,7 +20,7 @@ def timestamp(value):
     if date.tzinfo is None:raise ValueError('Source published_at must include a timezone')
     return date.timestamp()
 
-def validate_item(item,lookback_hours,validate_url,now=None):
+def validate_item(item,lookback_hours,validate_url,now=None,collected=None):
     now=time.time() if now is None else now
     competitor=str(item.get('competitor','')).strip()
     if not competitor or len(competitor)>160:raise ValueError('Supply the canonical competitor name; combine its updates into one item')
@@ -31,9 +31,12 @@ def validate_item(item,lookback_hours,validate_url,now=None):
         key=str(event.get('key','')).strip().casefold()
         if not key or len(key)>240:raise ValueError('Every event needs a stable key; reuse it for the same news across different sources')
         published=timestamp(event.get('published_at'))
-        if not now-lookback_hours*3600<=published<=now:raise ValueError('Only verified news published within the current rolling window is allowed; exclude unknown or future dates')
         url=validate_url(event.get('url',''))
         if not url:raise ValueError('Every event needs a verified source URL')
+        saved=(collected or {}).get(canonical_url(url))
+        delayed=saved is not None and abs(saved-published)<1 and now-7*86400<=published<=now
+        if not now-lookback_hours*3600<=published<=now and not delayed:
+            raise ValueError('Only verified news in the rolling window, or dated collected backlog within 7 days, is allowed')
         result.append((key,canonical_url(url),published))
     if len({x[0] for x in result})!=len(result) or len({x[1] for x in result})!=len(result):raise ValueError('Merge duplicate events and sources before publishing')
     canonical=identity(competitor)

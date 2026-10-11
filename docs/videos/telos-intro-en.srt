@@ -1,0 +1,75 @@
+1
+00:00:00,280 --> 00:00:03,791
+Let me show you Telos, the assistant I use every day.
+
+2
+00:00:04,380 --> 00:00:08,747
+In the Task panel, I press and hold my mouse or trackpad, then speak.
+
+3
+00:00:09,347 --> 00:00:11,920
+For example: What can you do for me?
+
+4
+00:00:12,639 --> 00:00:15,865
+Telos turns my voice into text, ready to send.
+
+5
+00:00:16,447 --> 00:00:19,672
+If it's a task Telos can handle, it gets to work.
+
+6
+00:00:20,378 --> 00:00:23,100
+Here, it explains what it can help me with.
+
+7
+00:00:23,680 --> 00:00:27,639
+It supports a wide range of tasks, though the results can vary.
+
+8
+00:00:28,213 --> 00:00:32,404
+The Calendar tab shows what's coming up, including tomorrow's meetings.
+
+9
+00:00:33,213 --> 00:00:36,045
+The Feed tab tracks news from my industry.
+
+10
+00:00:36,737 --> 00:00:40,397
+Telos checks for updates periodically and gathers them here.
+
+11
+00:00:40,980 --> 00:00:45,388
+It also includes everyday utilities, like this built-in screenshot tool.
+
+12
+00:00:45,980 --> 00:00:48,037
+Now, let's look at meetings.
+
+13
+00:00:48,729 --> 00:00:51,520
+I'll start a Zoom meeting to show you how it works.
+
+14
+00:00:52,113 --> 00:00:56,847
+Once I'm in the meeting, Telos automatically starts recording and transcribing.
+
+15
+00:00:57,447 --> 00:01:00,305
+As I speak, the transcript appears here.
+
+16
+00:01:01,024 --> 00:01:03,706
+It also identifies me as the speaker.
+
+17
+00:01:04,280 --> 00:01:08,049
+When I end the meeting, Telos automatically stops recording.
+
+18
+00:01:08,980 --> 00:01:11,988
+It then organizes the meeting content for me.
+
+19
+00:01:12,580 --> 00:01:18,785
+That's Telos. It's replaced several tools I used to pay for, and I use it every day.

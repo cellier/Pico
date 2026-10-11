@@ -52,7 +52,7 @@ class CapabilityTests(unittest.TestCase):
         self.assertEqual((self.data/'another-task/SOUL.md').read_text(),'My identity')
         self.assertIn('中文',self.cap.memory({'action':'search','query':'中文'})['notes'][0]['text'])
     def test_real_office_formats_and_formula_injection(self):
-        for ext in ['pdf','docx','pptx','xlsx']:
+        for ext in ['pdf','docx','xlsx']:
             self.cap.office({'name':'demo.'+ext,'spec':{'title':'中文文档','sections':[{'heading':'测试','text':'你好 Telos'}],'sheets':[{'name':'Data','rows':[['name','value'],['formula','=HYPERLINK("bad")']]}],'slides':[{'title':'中文','body':'Hello'}]}})
             path=self.work/('demo.'+ext)
             self.assertGreater(path.stat().st_size,100)
@@ -60,6 +60,12 @@ class CapabilityTests(unittest.TestCase):
             else: self.assertTrue(zipfile.is_zipfile(path))
         from openpyxl import load_workbook
         self.assertEqual(load_workbook(self.work/'demo.xlsx').active['B2'].data_type,'s')
+    def test_pptx_routes_to_reviewed_workflow(self):
+        with patch('presentations.Presentations.create',return_value={'status':'draft'}) as create:
+            args={'name':'deck.pptx','spec':{'slides':[]}}
+            self.assertEqual(self.cap.office(args),{'status':'draft'})
+            create.assert_called_once_with(args)
+        self.assertFalse((self.work/'deck.pptx').exists())
     def test_denial_never_runs_code_or_installs_skill(self):
         with patch('capabilities.subprocess.run') as run:
             with self.assertRaises(ValueError): self.cap.python({'source':'print(1)','reason':'test'})

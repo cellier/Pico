@@ -6,6 +6,7 @@ struct FeedList: View {
     var query: String
     var newFeed: () -> Void
     var topInset: CGFloat = 60
+    @State private var showingRules = false
     var items: [FeedItem] {
         guard !query.isEmpty else { return store.feedItems }
         return store.feedItems.filter { ($0.title + " " + $0.body).localizedStandardContains(query) }
@@ -13,6 +14,18 @@ struct FeedList: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                if !store.feeds.isEmpty && query.isEmpty {
+                    HStack {
+                        Spacer()
+                        Button("Manage feeds") { showingRules = true }.buttonStyle(HoverButtonStyle()).font(.system(size: 12))
+                    }.padding(.horizontal, 24).padding(.bottom, 4)
+                }
+                ForEach(store.feeds.filter { $0.needsRetry }) { feed in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(feed.title).font(.system(size: 12, weight: .medium))
+                        Text(feed.healthText).font(.system(size: 12)).foregroundStyle(.secondary)
+                    }.padding(.horizontal, 24).padding(.vertical, 10)
+                }
                 if items.isEmpty {
                     ContentUnavailableView(query.isEmpty ? (store.feeds.isEmpty ? "A feed shaped by you" : "No articles yet") : "No results", systemImage: "text.below.photo", description: Text(query.isEmpty ? (store.feeds.isEmpty ? "Tell Telos what you want to follow in a new task. Your updates will appear here." : "New articles will appear here.") : "Try another topic."))
                         .padding(.top, 40)
@@ -24,6 +37,10 @@ struct FeedList: View {
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 10) {
                         Text(item.title).font(serif(24)).tracking(0.3).lineSpacing(-5).fixedSize(horizontal: false, vertical: true).textSelection(.enabled).progressiveScrollBlur()
+                        if item.delayed == 1 {
+                            Text("Delayed discovery · original source dates below")
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
                         Text(description(item)).font(.system(size: 14)).lineSpacing(1).tracking(-0.2).foregroundStyle(TelosTheme.shade(0.35, 0.72)).textSelection(.enabled).progressiveScrollBlur()
                         if !item.images.isEmpty {
                             ScrollView(.horizontal) {
@@ -49,6 +66,7 @@ struct FeedList: View {
                 guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return .discarded }
                 return .systemAction
             })
+            .sheet(isPresented: $showingRules) { FeedRulesView(store: store, newFeed: newFeed) }
     }
     func description(_ item: FeedItem) -> AttributedString {
         var value = (try? AttributedString(markdown: item.body, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(item.body)
@@ -101,6 +119,10 @@ struct FeedRulesView: View {
                             Text(feed.enabled ? (feed.interval_minutes == 0 ? "Manual" : "Every \(feed.interval_minutes) min") : "Paused").font(.caption).foregroundStyle(.secondary)
                         }
                         Text(feed.rules).font(.system(size: 13)).lineLimit(3).foregroundStyle(.secondary)
+                        Text(feed.healthText).font(.system(size: 12)).foregroundStyle(feed.needsRetry ? Color.orange : Color.secondary)
+                        if let total = feed.source_count, total > 0 {
+                            Text("\(feed.checked_sources ?? 0) of \(total) sources checked").font(.system(size: 11)).foregroundStyle(.secondary)
+                        }
                         HStack {
                             Button("Edit rules") { editing = feed }
                             Button("Refresh") { store.refreshFeed(feed) }.disabled(store.tasks.contains { $0.feedID == feed.id && ["running", "awaiting_approval"].contains($0.status) })

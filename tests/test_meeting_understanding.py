@@ -49,3 +49,37 @@ class MeetingUnderstandingTests(unittest.TestCase):
         segments = [dict(self.me, id=str(uuid.uuid4()), text='A' * 3000) for _ in range(100)]
         analyze({'transcript':segments,'started':'2026-09-27'}, client, 'test')
         self.assertEqual(set(calls), {s['id'] for s in segments})
+
+
+    def test_summary_requires_real_final_evidence(self):
+        raw = {'title': 'Review webinar integration', 'summary': [
+            {'text': 'A follow-up was requested.', 'segment_id': self.others['id'], 'quote': self.others['text']},
+            {'text': 'Invented outcome', 'segment_id': self.me['id'], 'quote': 'not actually said'}]}
+        result = validate(raw, self.segments, '2026-09-27')
+        self.assertEqual(len(result['summary']), 1)
+        self.assertEqual(result['title'], 'Review webinar integration')
+        self.others['isFinal'] = False
+        result = validate(raw, self.segments, '2026-09-27')
+        self.assertEqual(result['summary'], [])
+        self.assertIsNone(result['title'])
+
+    def test_empty_transcript_does_not_call_model(self):
+        result = analyze({'transcript': [], 'started':'2026-09-27'}, None, 'test')
+        self.assertEqual(result['summary'], [])
+        self.assertIsNone(result['title'])
+
+    def test_analysis_retains_summary_title_and_actions(self):
+        import json
+        from types import SimpleNamespace
+        def completion(**kwargs):
+            payload = json.loads(kwargs['messages'][1]['content'])
+            self.assertEqual(payload['meeting_title'], 'Project review')
+            raw = {'title':'Review project delivery', 'tasks':[self.task(self.me)],
+                   'summary':[{'text':'The revised deck will be sent tomorrow.',
+                               'segment_id':self.me['id'], 'quote':self.me['text']}]}
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(raw)))])
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=completion)))
+        result = analyze({'transcript': self.segments, 'started':'2026-09-27', 'meeting_title':'Project review'}, client, 'test')
+        self.assertEqual(result['title'], 'Review project delivery')
+        self.assertEqual(len(result['summary']), 1)
+        self.assertEqual(len(result['suggestions']), 1)

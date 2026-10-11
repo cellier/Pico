@@ -1,0 +1,195 @@
+Design Style:
+Name: "Dark Financial Editorial"
+Concept: "A wealth-building presentation design fusing luxury, intellect, and modern architectural beauty"
+
+Canvas:
+Ratio: "16:9"
+Background:
+Primary: "#1B1B1D"
+Secondary: "#E7E7E7"
+
+Mood:
+- "Luxury"
+- "Minimal"
+- "Editorial"
+- "Architectural"
+- "Strategic"
+- "Global"
+
+Color Palette:
+Base:
+- "#1B1B1D"
+- "#E7E7E7"
+
+Text:
+- "#FFFFFF"
+- "#111111"
+
+Accent:
+- "#FF5A0A"
+
+Secondary:
+- "#5A5A5A"
+- "#BDBDBD"
+
+Typography:
+Heading:
+Font: "Modern Sans Serif"
+Weight: "800-900"
+Style:
+- "Bold"
+- "Wide Tracking"
+- "Large Scale"
+Color:
+DarkBG: "#FFFFFF"
+LightBG: "#111111"
+
+JapaneseHeading:
+Font: "Rounded Modern Gothic"
+Weight: "300-500"
+Style:
+- "Elegant"
+- "Spacious"
+
+Body:
+Font: "Minimal Sans Serif"
+Weight: "300-400"
+LineHeight: "1.7-2.0"
+Color:
+DarkBG: "#F2F2F2"
+LightBG: "#222222"
+
+Numbers:
+Font: "Condensed Sans"
+Weight: "700"
+
+Visual Identity:
+Core Elements:
+- "Oversized donut ring"
+- "Translucent circles"
+- "Grid structure"
+- "Monochrome architectural photography"
+- "Strong whitespace"
+
+Shapes:
+- "Circle"
+- "Donut"
+- "Rounded Rectangle"
+- "Full-height Split"
+
+Decorations:
+- "Micro logo"
+- "Accent button"
+- "Orange line"
+- "Translucent overlay"
+
+Image Style:
+Theme:
+- "Brutalist Architecture"
+- "Modern Buildings"
+- "Urban Geometry"
+- "Monochrome"
+- "Glass & Concrete"
+
+Treatment:
+- "Black and White"
+- "High Contrast"
+- "Film Grain"
+- "Architectural Perspective"
+
+Layout System:
+Principles:
+- "Base layout on a left/right split"
+- "Reserve generous whitespace"
+- "Limit information density"
+- "Make eye flow explicit"
+
+Grid:
+Columns: 12
+Gutters: "Wide"
+
+Slide Types:
+
+Cover:
+Background: "Dark"
+Layout:
+- "Text left / visual right"
+- "Oversized donut shape"
+- "Circular mask over architectural photo"
+- "Author information at bottom left"
+- "Small accent button"
+
+Contents:
+Background: "Dark"
+Layout:
+- "Table of contents on the left"
+- "Oversized ring decoration on the right"
+- "Numbers displayed at large scale"
+
+Section Intro:
+Layout:
+- "Full-bleed photograph"
+- "Translucent color circle"
+- "Title at top left"
+- "Body copy set with generous whitespace"
+
+Dual Cards:
+Layout:
+- "Equal left/right split"
+- "Circular imagery"
+- "Short caption below"
+- "Center aligned"
+
+Data Split:
+Layout:
+- "Chart on the left / text on the right"
+- "Background color split left/right"
+- "Charts kept simple"
+
+Chart Layout:
+ChartStyle:
+- "Minimal linework"
+- "Reduced axis ornamentation"
+- "Orange used for emphasis lines"
+- "White and gray used for supporting lines"
+
+Closing:
+Layout:
+- "Large photograph on the left"
+- "Conclusion on the right"
+- "Wide whitespace"
+- "Accent color in the background"
+
+Components:
+Buttons:
+Shape: "Rounded Pill"
+Background: "#FF5A0A"
+TextColor: "#FFFFFF"
+
+Labels:
+Style:
+- "Small Caps"
+- "Minimal"
+- "Tracking Wide"
+
+Cards:
+Radius: "Large"
+Shadow: "None"
+
+Spacing:
+OuterMargin: "Very Large"
+ContentGap: "Large"
+SectionGap: "Very Large"
+
+Animation Feel:
+- "Slow Fade"
+- "Elegant Motion"
+- "Editorial Transition"
+
+Restrictions:
+- "No heavy use of gradients"
+- "No flashy colors"
+- "No excessive 3D effects"
+- "Do not overload with information"
+- "No overly casual decoration"
+- "Content is driven by the source; this YAML does not prescribe it"

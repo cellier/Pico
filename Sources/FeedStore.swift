@@ -14,6 +14,22 @@ struct FeedRule: Codable, Identifiable {
     var revision: Int
     var lookback_hours: Int? = nil
     var group_by_competitor: Bool? = nil
+    var last_attempt: Double? = nil
+    var refresh_status: String? = nil
+    var refresh_error: String? = nil
+    var next_retry: Double? = nil
+    var source_count: Int? = nil
+    var checked_sources: Int? = nil
+    var healthText: String {
+        switch refresh_status {
+        case "running": return "Checking sources…"
+        case "partial": return "Some sources could not be checked · retry scheduled"
+        case "failed": return "Source check failed · retry scheduled"
+        case "ok": return "Sources checked · " + Date(timeIntervalSince1970: last_refresh).formatted(date: .abbreviated, time: .shortened)
+        default: return "Sources have not been checked yet"
+        }
+    }
+    var needsRetry: Bool { refresh_status == "partial" || refresh_status == "failed" }
 }
 struct FeedItem: Codable, Identifiable {
     var id: String
@@ -26,6 +42,8 @@ struct FeedItem: Codable, Identifiable {
     var read: Bool
     var hidden: Bool
     var image_urls: [String]? = nil
+    var delayed: Int? = nil
+    var source_published: Double? = nil
     var images: [String] { image_urls?.isEmpty == false ? image_urls! : (image_url.isEmpty ? [] : [image_url]) }
 }
 struct FeedSnapshot: Decodable {
@@ -75,8 +93,9 @@ extension TaskStore {
     }
     func refreshDueFeeds() {
         for feed in feeds where feed.enabled && feed.interval_minutes > 0 {
-            let lastAttempt = UserDefaults.standard.double(forKey: "feedAttempt." + feed.id)
-            if FeedSchedule.isDue(intervalMinutes: feed.interval_minutes, lastRefresh: feed.last_refresh, lastAttempt: lastAttempt) {
+            let lastAttempt = max(feed.last_attempt ?? 0, UserDefaults.standard.double(forKey: "feedAttempt." + feed.id))
+            if FeedSchedule.isDue(intervalMinutes: feed.interval_minutes, lastRefresh: feed.last_refresh, lastAttempt: lastAttempt,
+                                  status: feed.refresh_status ?? "unchecked", nextRetry: feed.next_retry ?? 0) {
                 refreshFeed(feed)
             }
         }
@@ -84,7 +103,7 @@ extension TaskStore {
     func refreshFeed(_ feed: FeedRule) {
         guard !tasks.contains(where: { $0.feedID == feed.id && ["running", "awaiting_approval"].contains($0.status) }) else { return }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "feedAttempt." + feed.id)
-        let prompt = "Refresh my existing feed \"\(feed.title)\" (ID \(feed.id)). Read its current rules, research only matching information and publish useful new items with source links. Respect exclusions and don't repeat existing items. For a daily competitor feed, only use verified news published in the most recent 24 hours. Merge multiple new updates per canonical competitor within this refresh into one new item. Preserve all historical cards; never replace prior refreshes. Reuse event keys across syndicated reports. Omit competitors without fresh news and publish an empty batch when there are no new events. Report unavailable sources honestly. Do not change rules, run arbitrary scripts or perform external actions."
+        let prompt = "Refresh my existing feed \"\(feed.title)\" (ID \(feed.id)). Read its current rules and read_feed_candidates. Review collected candidates, verify their original articles and publication times, dismiss only irrelevant or duplicate candidates and leave inaccessible candidates pending. Research matching information and publish verified new items with article links. Dated persisted candidates up to 7 days old may be published as delayed discovery with their original dates; other daily news must be within 24 hours. Merge multiple new updates per canonical competitor within this refresh into one new item. Preserve historical cards and reuse event keys. Publish an empty batch if no verified new events remain, but do not claim no news when checks failed. Do not change rules, run arbitrary scripts or perform external actions."
         if let task = tasks.first(where: { $0.feedID == feed.id }) {
             ask(task.id, text: prompt)
         } else {

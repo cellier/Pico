@@ -18,10 +18,11 @@ class FeedRepository:
             if 'image_urls' not in columns:
                 db.execute("ALTER TABLE items ADD COLUMN image_urls TEXT NOT NULL DEFAULT '[]'")
             feed_columns={row['name'] for row in db.execute('PRAGMA table_info(feeds)')}
-            for name, definition in [('lookback_hours','INTEGER NOT NULL DEFAULT 0'),('group_by_competitor','INTEGER NOT NULL DEFAULT 0')]:
+            for name, definition in [('lookback_hours','INTEGER NOT NULL DEFAULT 0'),('group_by_competitor','INTEGER NOT NULL DEFAULT 0'),('last_attempt','REAL NOT NULL DEFAULT 0'),('refresh_status',"TEXT NOT NULL DEFAULT 'unchecked'"),('refresh_error',"TEXT NOT NULL DEFAULT ''"),('next_retry','REAL NOT NULL DEFAULT 0'),('failure_count','INTEGER NOT NULL DEFAULT 0')]:
                 if name not in feed_columns:db.execute(f'ALTER TABLE feeds ADD COLUMN {name} {definition}')
             for name, definition in [('competitor','TEXT NOT NULL DEFAULT \'\''),('source_published','REAL NOT NULL DEFAULT 0')]:
                 if name not in columns:db.execute(f'ALTER TABLE items ADD COLUMN {name} {definition}')
+            if 'delayed' not in columns:db.execute('ALTER TABLE items ADD COLUMN delayed INTEGER NOT NULL DEFAULT 0')
             # Older versions keyed cards by competitor and enforced URL/title uniqueness.
             # Event batches now have their own IDs, so repeated titles must be allowed.
             schema=db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='items'").fetchone()[0]
@@ -33,6 +34,10 @@ class FeedRepository:
                 db.execute('DROP TABLE items')
                 db.execute('ALTER TABLE items_history RENAME TO items')
             db.execute('CREATE TABLE IF NOT EXISTS feed_events(feed_id TEXT NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,event_key TEXT NOT NULL,source_url TEXT NOT NULL,competitor TEXT NOT NULL,published REAL NOT NULL,PRIMARY KEY(feed_id,event_key),UNIQUE(feed_id,source_url))')
+            from feed_collection import SCHEMA
+            db.executescript(SCHEMA)
+            if 'verification_error' not in {r['name'] for r in db.execute('PRAGMA table_info(feed_candidates)')}:
+                db.execute("ALTER TABLE feed_candidates ADD COLUMN verification_error TEXT NOT NULL DEFAULT ''")
         self.path.chmod(0o600)
     @contextlib.contextmanager
     def connect(self):
@@ -51,6 +56,10 @@ class FeedRepository:
         with self.connect() as db:
             feeds=[dict(r) for r in db.execute('SELECT * FROM feeds ORDER BY updated DESC')]
             items=[dict(r) for r in db.execute('SELECT items.* FROM items JOIN feeds ON items.feed_id=feeds.id WHERE hidden=0 ORDER BY items.published DESC')]
+            for feed in feeds:
+                sources=json.loads(feed['sources'])
+                feed['source_count']=len(sources)
+                feed['checked_sources']=sum(1 for r in db.execute('SELECT url,status,last_success FROM feed_sources WHERE feed_id=?',(feed['id'],)) if r['url'] in sources and r['status']=='ok' and r['last_success']>=time.time()-7200)
         for f in feeds:f['sources']=json.loads(f['sources']);f['enabled']=bool(f['enabled']);f['group_by_competitor']=bool(f['group_by_competitor'])
         for i in items:
             i['title'],i['body']=display_copy(i['title'],i['body'])
@@ -86,12 +95,16 @@ class FeedRepository:
                 ON CONFLICT(id) DO UPDATE SET title=excluded.title,rules=excluded.rules,sources=excluded.sources,interval_minutes=excluded.interval_minutes,enabled=excluded.enabled,updated=excluded.updated,revision=excluded.revision,lookback_hours=excluded.lookback_hours,group_by_competitor=excluded.group_by_competitor''',
                 (feed_id,title,rules,json.dumps(sources),interval,int(field('enabled',True)),time.time(),task_id,revision,lookback,int(grouped)))
         return {'feed':next(f for f in self.snapshot()['feeds'] if f['id']==feed_id),'refresh_note':'Automatic refresh runs while Telos is open. An unspecified schedule is manual.'}
-    def publish(self,args):
+    def publish(self,args,run_id=None):
         feed_id=args['feed_id'];entries=args['items']
         if not isinstance(entries,list) or len(entries)>60:raise ValueError('Publish 0–60 items; an empty list completes a refresh with no new news')
         with self.connect() as db:
             policy=db.execute('SELECT * FROM feeds WHERE id=?',(feed_id,)).fetchone()
         if not policy:raise ValueError('Feed was removed; do not recreate it automatically')
+        with self.connect() as db:
+            run=db.execute('SELECT * FROM feed_runs WHERE id=? AND feed_id=? AND status=?',(run_id,feed_id,'running')).fetchone() if run_id else None
+            if run_id and not run:raise ValueError('Refresh is no longer active')
+            collected={r['url']:r['source_published'] for r in db.execute('SELECT url,source_published FROM feed_candidates WHERE feed_id=? AND source_published>=?',(feed_id,time.time()-7*86400))}
         grouped=bool(policy['group_by_competitor']); batch_competitors=set(); metadata={}
         # Validate the entire batch before making any writes.
         prepared=[]
@@ -105,21 +118,26 @@ class FeedRepository:
             images=list(dict.fromkeys(self.url(value) for value in images if value))
             key=url or title.casefold()
             if grouped:
-                key,competitor,events=validate_item(item,policy['lookback_hours'],self.url)
+                key,competitor,events=validate_item(item,policy['lookback_hours'],self.url,collected=collected if run else {})
                 if key in batch_competitors:raise ValueError('Publish one combined item per competitor')
                 batch_competitors.add(key); metadata[key]=(competitor,events)
             card_key=key if not grouped else key+'\0'+json.dumps(sorted(e[0] for e in events))
             item_id=hashlib.sha256((feed_id+'\0'+card_key).encode()).hexdigest()[:32]
             prepared.append((key,(item_id,feed_id,title,body,url,image,time.time(),json.dumps(images))))
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             feed=db.execute('SELECT * FROM feeds WHERE id=?',(feed_id,)).fetchone()
             if not feed:raise ValueError('Feed was removed; do not recreate it automatically')
+            if run_id and not db.execute("SELECT 1 FROM feed_runs WHERE id=? AND status='running'",(run_id,)).fetchone():
+                raise ValueError('Refresh is no longer active')
             if args.get('revision') is not None and args['revision']!=feed['revision']:raise ValueError('Rules changed; re-read feed rules before publishing')
             if feed['revision']!=policy['revision']:raise ValueError('Rules changed; re-read feed rules')
             published_count=0
             for key,row in prepared:
                 if grouped:
                     competitor,events=metadata[key]
+                    if any(db.execute("SELECT 1 FROM feed_candidates WHERE feed_id=? AND url=? AND verification_error!=''",(feed_id,e[1])).fetchone() for e in events):
+                        raise ValueError('An original article could not be verified; leave it pending and retry reading it before publishing')
                     existing=[db.execute('SELECT competitor FROM feed_events WHERE feed_id=? AND (event_key=? OR source_url=?)',(feed_id,e[0],e[1])).fetchone() for e in events]
                     if any(r and r['competitor']!=key for r in existing):raise ValueError('This news already belongs to another competitor item; merge it instead of duplicating')
                     if all(existing):continue
@@ -128,9 +146,14 @@ class FeedRepository:
                 db.execute('''INSERT INTO items(id,feed_id,title,body,url,image_url,published,image_urls) VALUES(?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET title=excluded.title,body=excluded.body,url=excluded.url,image_url=excluded.image_url,image_urls=excluded.image_urls''',row)
                 if grouped:
-                    db.execute('UPDATE items SET competitor=?,source_published=?,published=? WHERE id=?',(competitor,max(e[2] for e in events),time.time(),row[0]))
+                    delayed=any(e[2]<time.time()-policy['lookback_hours']*3600 for e in events)
+                    db.execute('UPDATE items SET competitor=?,source_published=?,published=?,delayed=? WHERE id=?',(competitor,max(e[2] for e in events),time.time(),int(delayed),row[0]))
+                    for event in events:
+                        db.execute("UPDATE feed_candidates SET disposition='published' WHERE feed_id=? AND url=?",(feed_id,event[1]))
                 published_count+=1
-            db.execute('UPDATE feeds SET last_refresh=? WHERE id=?',(time.time(),feed_id))
+            # Publishing proves only that cards were stored, not that discovery succeeded.
+            # The worker-owned refresh session advances the checkpoint after checking coverage.
+            if run_id:db.execute('UPDATE feed_runs SET published=published+?,did_publish=1 WHERE id=?',(published_count,run_id))
         return {'published':published_count,'feed_id':feed_id}
     def item(self,args):
         action=args['action']

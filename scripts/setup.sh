@@ -17,4 +17,5 @@ uv pip install --python .runtime/venv/bin/python -e .runtime/macos-harness
 uv pip install --python .runtime/venv/bin/python -r Backend/requirements.txt
 .runtime/venv/bin/python -m playwright install chromium
 python3 scripts/configure.py
+python3 scripts/configure-presentations.py
 ./scripts/build.sh

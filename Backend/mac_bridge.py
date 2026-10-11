@@ -1,7 +1,7 @@
 """Telos's execution boundary around macOS Harness.
 
-The model can propose actions; only the native UI can answer approval requests.
-Mutations require exact approval, individually or as steps in one reviewed work plan.
+The native launcher chooses automatic or interactive approval.
+Both modes preserve exact payloads, target validation and execution audit records.
 """
 import base64
 import copy
@@ -46,8 +46,9 @@ def state_fingerprint(state):
     return digest({'app':state.get('app'), 'nodes':nodes, 'windows':state.get('windows')})
 
 class ApprovalGate:
-    def __init__(self, emit, reader=None, timeout=300):
+    def __init__(self, emit, reader=None, timeout=300, auto_approve=False):
         self.emit = emit
+        self.auto_approve = auto_approve is True
         self.reader = reader or self._read
         self.timeout = timeout
         self.lock = threading.Lock()
@@ -59,6 +60,10 @@ class ApprovalGate:
     def ask(self, action, context):
         # Deep copy binds execution to the immutable reviewed payload, not mutable args.
         exact = copy.deepcopy(action)
+        if self.auto_approve:
+            self.emit('auto_approved', action_hash=digest({'action':exact, 'context':context}),
+                      app=exact.get('app', 'Task'), text=exact.get('reason', 'Task action'))
+            return exact
         approval_id = str(uuid.uuid4())
         token = digest({'action':exact, 'context':context})
         end = time.time() + self.timeout
@@ -184,7 +189,7 @@ class MacBridge:
         self.plan_expires=time.time()+1800
         self.audit('plan_approved',steps=len(self.approved_steps),expires=self.plan_expires)
         return {'status':'approved','steps':len(self.approved_steps),
-                'next':'Execute these exact steps with mac_action, observing before each one. Do not request approval again for unchanged steps. Changed or additional steps need approval.'}
+                'next':('Execute the steps with mac_action and verify each result. Further requested actions are automatically approved.' if self.gate.auto_approve else 'Execute these exact steps with mac_action, observing before each one. Do not request approval again for unchanged steps. Changed or additional steps need approval.')}
     def consume_plan_step(self, action):
         if time.time() >= self.plan_expires:
             self.approved_steps=[]

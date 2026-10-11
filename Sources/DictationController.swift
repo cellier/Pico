@@ -16,10 +16,23 @@ struct DictationHold {
 struct DictationEditability {
     static func allows(role: String, enabled: Bool?, editable: Bool?, secure: Bool,
                        hasInsertionRange: Bool, writableText: Bool, writableValue: Bool) -> Bool {
-        guard [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role),
+        let textRole = [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role)
+        let richEditor = role == kAXGroupRole && editable == true
+        guard textRole || richEditor,
               !secure, enabled != false, editable != false, (hasInsertionRange || editable == true) else { return false }
         return writableText || writableValue || editable == true
     }
+}
+
+/// Some web editors expose their focused AX node after the mouse-down callback.
+struct DictationActivation {
+    private var lastAttempt = -Double.infinity
+    mutating func shouldAttempt(elapsed: TimeInterval) -> Bool {
+        guard elapsed >= 0.55, elapsed - lastAttempt >= 0.15 else { return false }
+        lastAttempt = elapsed
+        return true
+    }
+    static func expired(elapsed: TimeInterval) -> Bool { elapsed >= 1.4 }
 }
 
 @MainActor final class DictationController {
@@ -40,6 +53,12 @@ struct DictationEditability {
     private var busy = false
     private var insertionPending = false
     private var insertionID = UUID()
+    private var preparedApps = Set<pid_t>()
+    private var targetMessage = "Click inside an editable text field, then hold again"
+    private var diagnostic: [String: Any] = [:]
+    private var attemptedTarget = false
+    private var diagnosticClickID = UUID()
+    private var accessibilityRequests: [pid_t: [String: Int32]] = [:]
     var enabled = true
     private struct Target {
         weak var editor: NSTextView?
@@ -63,13 +82,19 @@ struct DictationEditability {
     }
     private func refreshGlobalMonitor() {
         let trusted = AXIsProcessTrusted()
-        guard trusted != lastTrusted || (trusted && globalMonitor == nil) else { return }
+        guard trusted != lastTrusted || globalMonitor == nil else { return }
         lastTrusted = trusted
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor); self.globalMonitor = nil }
-        guard trusted else { return }
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .leftMouseDragged, .keyDown]) { [weak self] event in
+        // Mouse monitoring itself does not need Accessibility. Keep it alive so a
+        // denied permission produces an actionable HUD instead of a silent hold.
+        var mask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp, .leftMouseDragged]
+        if trusted { mask.insert(.keyDown) }
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             self?.handle(event, local: false)
         }
+        diagnostic["global_monitor"] = globalMonitor != nil
+        diagnostic["accessibility"] = trusted
+        trace("monitor_ready")
     }
     static func localEditor(in window: NSWindow, at point: NSPoint) -> NSTextView? {
         guard let editor = window.firstResponder as? NSTextView, editor.isEditable,
@@ -92,18 +117,42 @@ struct DictationEditability {
         guard enabled, UserDefaults.standard.object(forKey: "TelosVoiceTypingEnabled") == nil || UserDefaults.standard.bool(forKey: "TelosVoiceTypingEnabled") else { cancel(); return }
         switch event.type {
         case .leftMouseDown:
-            guard !busy, !insertionPending else { return }
+            guard !busy, !insertionPending else {
+                if recorder == nil { show(insertionPending ? "Inserting previous text…" : "Still transcribing your previous recording…") }
+                return
+            }
             pressWindow = local ? event.window : nil
+            attemptedTarget = false
+            diagnostic = ["local": local, "accessibility": AXIsProcessTrusted()]
+            diagnostic["button_down"] = NSEvent.pressedMouseButtons & 1 != 0
+            trace("pressed")
+            if !local { prepareAccessibility() }
+            diagnosticClickID = UUID()
+            if UserDefaults.standard.bool(forKey: "TelosDictationDiagnostics") {
+                let clickID = diagnosticClickID
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                    guard let self, self.diagnosticClickID == clickID, !self.busy else { return }
+                    let recognized = self.inputTarget() != nil
+                    self.recordDiagnostic(recognized ? "editor_found" : "editor_unavailable", fileName: "dictation-target.json")
+                }
+            }
             arm?.invalidate(); hold.begin(NSEvent.mouseLocation)
-            let started = Date(); var activated = false
+            let started = Date(); var activated = false; var activation = DictationActivation()
             let timer = Timer(timeInterval: 0.04, repeats: true) { [weak self] timer in
                 MainActor.assumeIsolated {
                     guard let self else { timer.invalidate(); return }
                     guard NSEvent.pressedMouseButtons & 1 != 0 else { self.localMouseReleased(); return }
                     self.hold.move(NSEvent.mouseLocation)
                     guard self.hold.origin != nil else { self.cancel(); return }
-                    if !activated && Date().timeIntervalSince(started) >= 0.55 {
-                        activated = true; self.beginRecording()
+                    let elapsed = Date().timeIntervalSince(started)
+                    if !activated && activation.shouldAttempt(elapsed: elapsed) {
+                        activated = self.beginRecording()
+                        if !activated && DictationActivation.expired(elapsed: elapsed) {
+                            self.recordDiagnostic("target_unavailable")
+                            self.show(self.targetMessage, dismiss: true)
+                            self.attemptedTarget = false
+                            timer.invalidate()
+                        }
                     }
                     if let recorder = self.recorder, recorder.currentTime >= 120 { self.finishRecording(); timer.invalidate() }
                 }
@@ -111,10 +160,9 @@ struct DictationEditability {
             arm = timer; RunLoop.main.add(timer, forMode: .common)
         case .leftMouseDragged:
             hold.move(NSEvent.mouseLocation)
-            if hold.origin == nil { arm?.invalidate(); if recorder != nil { cancel() } }
+            if hold.origin == nil { attemptedTarget = false; trace("drag_cancelled"); arm?.invalidate(); if recorder != nil { cancel() } }
         case .leftMouseUp:
-            hold.cancel(); arm?.invalidate(); arm = nil
-            if recorder != nil { finishRecording() }
+            localMouseReleased()
         case .keyDown:
             if event.keyCode == 53 { cancel() }
         default: break
@@ -129,16 +177,86 @@ struct DictationEditability {
         guard let value = attribute(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute), CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
         return (value as! AXUIElement)
     }
+    private func focusBelongs(to editor: AXUIElement) -> Bool {
+        var current = focusedElement()
+        for _ in 0..<6 {
+            guard let node = current else { return false }
+            if CFEqual(node, editor) { return true }
+            guard let raw = attribute(node, kAXParentAttribute), CFGetTypeID(raw) == AXUIElementGetTypeID() else { return false }
+            current = (raw as! AXUIElement)
+        }
+        return false
+    }
+    private func prepareAccessibility() {
+        guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else { return }
+        diagnostic["application"] = app.bundleIdentifier ?? "unknown"
+        if let requests = accessibilityRequests[app.processIdentifier] {
+            diagnostic.merge(requests.mapValues { $0 as Any }) { _, value in value }
+        }
+        guard preparedApps.insert(app.processIdentifier).inserted else { return }
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(root, 0.1)
+        // Chromium/CEF only exposes embedded editors after assistive technology
+        // requests its tree. Unsupported attributes on native apps are harmless.
+        diagnostic["manual_accessibility"] = AXUIElementSetAttributeValue(root, "AXManualAccessibility" as CFString, kCFBooleanTrue).rawValue
+        diagnostic["enhanced_accessibility"] = AXUIElementSetAttributeValue(root, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue).rawValue
+        accessibilityRequests[app.processIdentifier] = [
+            "manual_accessibility": diagnostic["manual_accessibility"] as? Int32 ?? 0,
+            "enhanced_accessibility": diagnostic["enhanced_accessibility"] as? Int32 ?? 0
+        ]
+        if let raw = attribute(root, kAXFocusedWindowAttribute), CFGetTypeID(raw) == AXUIElementGetTypeID() {
+            let window = raw as! AXUIElement
+            AXUIElementSetMessagingTimeout(window, 0.1)
+            _ = AXUIElementSetAttributeValue(window, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+        }
+    }
+    private func recordDiagnostic(_ state: String, fileName: String = "dictation-status.json") {
+        // Metadata only: never store field values, selected text, audio or transcripts.
+        guard ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil else { return }
+        var value = diagnostic
+        value["state"] = state; value["updated"] = ISO8601DateFormatter().string(from: Date())
+        let directory = ProcessInfo.processInfo.environment["TELOS_DATA_DIR"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Telos")
+        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys]) else { return }
+        let file = directory.appendingPathComponent(fileName)
+        try? data.write(to: file, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+    }
+    private func trace(_ state: String) {
+        if UserDefaults.standard.bool(forKey: "TelosDictationDiagnostics") { recordDiagnostic(state, fileName: "dictation-events.json") }
+    }
     private func inputTarget() -> Target? {
+        targetMessage = "Click inside an editable text field, then hold again"
         if let window = pressWindow {
             let point = window.convertPoint(fromScreen: NSEvent.mouseLocation)
             guard let editor = Self.localEditor(in: window, at: point) else { return nil }
             return Target(editor: editor, element: nil, pid: ProcessInfo.processInfo.processIdentifier, range: editor.selectedRange(), axRange: nil)
         }
-        guard AXIsProcessTrusted(), let element = focusedElement(),
-              let role = attribute(element, kAXRoleAttribute) as? String,
-              [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role),
-              (attribute(element, kAXSubroleAttribute) as? String) != kAXSecureTextFieldSubrole else { return nil }
+        guard AXIsProcessTrusted() else {
+            targetMessage = "Enable Accessibility for Telos in System Settings, then hold again"
+            return nil
+        }
+        guard let focused = focusedElement() else {
+            targetMessage = "This app has not exposed its text field yet. Click the field, then hold again"
+            diagnostic["reason"] = "no_focused_element"; return nil
+        }
+        var element = focused
+        // A rich editor can focus an inner text node; its editable parent owns insertion.
+        for _ in 0..<5 {
+            let role = attribute(element, kAXRoleAttribute) as? String ?? ""
+            if [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role)
+                || (role == kAXGroupRole && (attribute(element, "AXEditable") as? Bool) == true) { break }
+            diagnostic["focused_role"] = role
+            guard let raw = attribute(element, kAXParentAttribute), CFGetTypeID(raw) == AXUIElementGetTypeID() else { break }
+            let parent = raw as! AXUIElement
+            let parentRole = attribute(parent, kAXRoleAttribute) as? String ?? ""
+            if [kAXWindowRole, kAXApplicationRole].contains(parentRole) { break }
+            element = parent
+        }
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        let role = attribute(element, kAXRoleAttribute) as? String ?? ""
+        let subrole = attribute(element, kAXSubroleAttribute) as? String ?? ""
+        diagnostic["role"] = role; diagnostic["subrole"] = subrole
         var settable = DarwinBoolean(false)
         AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable)
         var valueSettable = DarwinBoolean(false)
@@ -150,35 +268,48 @@ struct DictationEditability {
             let value = insertionRange as! AXValue
             validRange = AXValueGetType(value) == .cfRange && AXValueGetValue(value, .cfRange, &range) && range.location >= 0 && range.length >= 0
         } else { validRange = false }
+        let editable = attribute(element, "AXEditable") as? Bool
+        let readOnly = attribute(element, "AXReadOnly") as? Bool
+        diagnostic["editable"] = editable; diagnostic["read_only"] = readOnly
+        diagnostic["insertion_range"] = validRange
+        diagnostic["writable_text"] = settable.boolValue; diagnostic["writable_value"] = valueSettable.boolValue
         guard DictationEditability.allows(role: role,
             enabled: attribute(element, kAXEnabledAttribute) as? Bool,
-            editable: attribute(element, "AXEditable") as? Bool,
-            secure: (attribute(element, kAXSubroleAttribute) as? String) == kAXSecureTextFieldSubrole,
+            editable: readOnly == true ? false : (editable ?? (readOnly == false ? true : nil)),
+            secure: subrole == kAXSecureTextFieldSubrole,
             hasInsertionRange: validRange, writableText: settable.boolValue,
-            writableValue: valueSettable.boolValue) else { return nil }
+            writableValue: valueSettable.boolValue) else {
+            diagnostic["reason"] = "not_editable"
+            if subrole == kAXSecureTextFieldSubrole { targetMessage = "Voice typing is unavailable in password fields" }
+            return nil
+        }
         // Holding a button elsewhere must not record just because a text field retains focus.
-        let mouse = NSEvent.mouseLocation
-        let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+        guard let mouse = CGEvent(source: nil)?.location else { return nil }
         var hit: AXUIElement?
-        AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(mouse.x), Float(screenHeight - mouse.y), &hit)
+        AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(mouse.x), Float(mouse.y), &hit)
         var inside = false
+        var hitRoles: [String] = []
         for _ in 0..<8 {
             guard let current = hit else { break }
+            hitRoles.append(attribute(current, kAXRoleAttribute) as? String ?? "unknown")
             if CFEqual(current, element) { inside = true; break }
             guard let parent = attribute(current, kAXParentAttribute), CFGetTypeID(parent) == AXUIElementGetTypeID() else { break }
             hit = (parent as! AXUIElement)
         }
-        guard inside else { return nil }
+        diagnostic["hit_roles"] = hitRoles
+        guard inside else { diagnostic["reason"] = "pointer_outside_editor"; return nil }
         var pid: pid_t = 0; AXUIElementGetPid(element, &pid)
         guard pid == NSWorkspace.shared.frontmostApplication?.processIdentifier else { return nil }
         return Target(editor: nil, element: element, pid: pid, range: nil, axRange: attribute(element, kAXSelectedTextRangeAttribute))
     }
-    private func beginRecording() {
-        guard !busy, let input = inputTarget() else { return }
+    private func beginRecording() -> Bool {
+        attemptedTarget = true
+        guard !busy, let input = inputTarget() else { return false }
+        attemptedTarget = false
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
             show("Allow microphone access, then hold again", dismiss: true)
             AVCaptureDevice.requestAccess(for: .audio) { _ in }
-            return
+            recordDiagnostic("microphone_denied"); return true
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("TelosVoice-\(UUID().uuidString).wav")
         do {
@@ -190,12 +321,14 @@ struct DictationEditability {
             target = input; audioURL = url; recorder = recording; busy = true
             NSSound(named: "Tink")?.play()
             show("Listening… Release to insert text")
+            recordDiagnostic("recording")
             deadline = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 120_000_000_000)
                 guard !Task.isCancelled else { return }
                 self?.finishRecording()
             }
-        } catch { try? FileManager.default.removeItem(at: url); show("Microphone could not start", dismiss: true) }
+        } catch { try? FileManager.default.removeItem(at: url); show("Microphone could not start", dismiss: true); recordDiagnostic("microphone_failed") }
+        return true
     }
     private func finishRecording() {
         guard let recorder, let audioURL else { return }
@@ -203,6 +336,7 @@ struct DictationEditability {
         deadline?.cancel(); deadline = nil
         guard length > 0.3 else { cancel(); return }
         show("Transcribing on your Mac…")
+        recordDiagnostic("transcribing")
         let polish = UserDefaults.standard.object(forKey: "TelosVoicePolish") == nil || UserDefaults.standard.bool(forKey: "TelosVoicePolish")
         engine.transcribe(audioURL, polish: polish) { [weak self] value in
             guard let self else { return }
@@ -221,6 +355,11 @@ struct DictationEditability {
     func localMouseReleased() {
         hold.cancel(); arm?.invalidate(); arm = nil
         if recorder != nil { finishRecording() }
+        else if attemptedTarget && !busy && !insertionPending {
+            recordDiagnostic("target_unavailable")
+            show(targetMessage, dismiss: true)
+        } else { trace("released") }
+        attemptedTarget = false
     }
     private func deliver(_ text: String) {
         guard let target else { return }
@@ -235,7 +374,7 @@ struct DictationEditability {
             }
             return
         }
-        guard let element = target.element, let focused = focusedElement(), CFEqual(element, focused),
+        guard let element = target.element, focusBelongs(to: element),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid,
               target.axRange.map({ saved in attribute(element, kAXSelectedTextRangeAttribute).map { CFEqual(saved, $0) } ?? false }) ?? true else {
             NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
@@ -262,7 +401,7 @@ struct DictationEditability {
             show("Text copied — press ⌘V to insert", dismiss: true); return
         }
         // Recheck focus immediately before posting; never activate or redirect another app.
-        guard let current = focusedElement(), CFEqual(current, element),
+        guard focusBelongs(to: element),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid else {
             show("Focus changed — text copied", dismiss: true); return
         }
@@ -287,8 +426,9 @@ struct DictationEditability {
     private func show(_ message: String, dismiss: Bool = false) {
         hudGeneration = UUID(); let generation = hudGeneration
         if hud == nil {
-            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 44), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            panel.isOpaque = false; panel.backgroundColor = .clear; panel.level = .floating
+            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 56), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            panel.title = "Telos Voice Typing"
+            panel.isOpaque = false; panel.backgroundColor = .clear; panel.level = .statusBar
             panel.ignoresMouseEvents = true; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             let backdrop = NSVisualEffectView(frame: panel.contentView!.bounds); backdrop.material = .hudWindow; backdrop.state = .active
             backdrop.wantsLayer = true; backdrop.layer?.cornerRadius = 16; backdrop.layer?.masksToBounds = true
@@ -297,14 +437,16 @@ struct DictationEditability {
         guard let hud else { return }
         hud.contentView?.subviews.forEach { $0.removeFromSuperview() }
         let label = NSTextField(labelWithString: message); label.font = .systemFont(ofSize: 13); label.alignment = .center
-        label.frame = NSRect(x: 8, y: 13, width: 324, height: 20); hud.contentView?.addSubview(label)
+        label.lineBreakMode = .byWordWrapping; label.maximumNumberOfLines = 2
+        label.frame = NSRect(x: 8, y: 8, width: 404, height: 40); hud.contentView?.addSubview(label)
         let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main
-        if let frame = screen?.visibleFrame { hud.setFrameOrigin(NSPoint(x: frame.midX - 170, y: frame.minY + 40)) }
+        if let frame = screen?.visibleFrame { hud.setFrameOrigin(NSPoint(x: frame.midX - 210, y: frame.minY + 40)) }
         hud.orderFrontRegardless()
         if dismiss { DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in if self?.hudGeneration == generation { self?.hud?.orderOut(nil) } } }
     }
     private func cleanupAudio() { if let audioURL { try? FileManager.default.removeItem(at: audioURL) }; audioURL = nil; target = nil }
     func cancel() {
+        attemptedTarget = false
         insertionID = UUID(); insertionPending = false
         hold.cancel(); arm?.invalidate(); arm = nil; deadline?.cancel(); deadline = nil
         if busy && recorder == nil { engine.stop() } else { engine.cancel() }

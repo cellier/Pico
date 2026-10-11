@@ -1,0 +1,3855 @@
+[
+  {
+    "id": "C8RNeJa1",
+    "name": "Academic Edge",
+    "genre": "seminar",
+    "visual_language": "editorial_print",
+    "desc": "Pure white base + academic accent color and B&W photography, editorial typography + high-contrast arrows",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "academic",
+      "photo"
+    ],
+    "source": "C8RNeJa1/style.yaml",
+    "format": "structured",
+    "previews": [
+      "C8RNeJa1/0.webp",
+      "C8RNeJa1/1.webp",
+      "C8RNeJa1/2.webp",
+      "C8RNeJa1/3.webp",
+      "C8RNeJa1/4.webp",
+      "C8RNeJa1/5.webp"
+    ]
+  },
+  {
+    "id": "11lQdoRF",
+    "name": "Architectural Cobalt",
+    "genre": "portfolio",
+    "visual_language": "architectural_mono",
+    "desc": "Deep charcoal base with moody architectural photography + white grid lines and crosshair marks, high-saturation gradient accents",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "architectural",
+      "photo",
+      "gradient"
+    ],
+    "source": "11lQdoRF/style.yaml",
+    "format": "structured",
+    "previews": [
+      "11lQdoRF/0.webp",
+      "11lQdoRF/1.webp",
+      "11lQdoRF/2.webp",
+      "11lQdoRF/3.webp",
+      "11lQdoRF/4.webp",
+      "11lQdoRF/5.webp"
+    ]
+  },
+  {
+    "id": "gNJY64An",
+    "name": "Architectural Mono",
+    "genre": "portfolio",
+    "visual_language": "architectural_mono",
+    "desc": "Light architectural gray base + pure black, B&W architectural photography + oversized year stamps and hairline dividers",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "architectural",
+      "photo",
+      "minimal"
+    ],
+    "source": "gNJY64An/style.yaml",
+    "format": "structured",
+    "previews": [
+      "gNJY64An/0.webp",
+      "gNJY64An/1.webp",
+      "gNJY64An/2.webp",
+      "gNJY64An/3.webp",
+      "gNJY64An/4.webp",
+      "gNJY64An/5.webp"
+    ]
+  },
+  {
+    "id": "aRlwmmwR",
+    "name": "Architectural Portfolio",
+    "genre": "portfolio",
+    "visual_language": "bento_grid",
+    "desc": "Light base + soft natural colors, capsule photo masks + bento grid",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "photo",
+      "minimal"
+    ],
+    "source": "aRlwmmwR/style.yaml",
+    "format": "structured",
+    "previews": [
+      "aRlwmmwR/0.webp",
+      "aRlwmmwR/1.webp",
+      "aRlwmmwR/2.webp",
+      "aRlwmmwR/3.webp",
+      "aRlwmmwR/4.webp",
+      "aRlwmmwR/5.webp"
+    ]
+  },
+  {
+    "id": "5vZkT1p0",
+    "name": "Clinical Precision",
+    "genre": "keynote",
+    "visual_language": "neon_tech",
+    "desc": "Pure black base + monochrome halo, oversized sans-serif titles + 1px white dividers",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon",
+      "minimal"
+    ],
+    "source": "5vZkT1p0/style.yaml",
+    "format": "structured",
+    "previews": [
+      "5vZkT1p0/0.webp",
+      "5vZkT1p0/1.webp",
+      "5vZkT1p0/2.webp",
+      "5vZkT1p0/3.webp",
+      "5vZkT1p0/4.webp",
+      "5vZkT1p0/5.webp"
+    ]
+  },
+  {
+    "id": "Z3U9LeT3",
+    "name": "Cobalt Editorial",
+    "genre": "editorial_report",
+    "visual_language": "magazine_editorial",
+    "desc": "Light base + high-saturation accents, brutalist sans-serif giant type + liquid textures, Swiss-style split layout",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "minimal"
+    ],
+    "source": "Z3U9LeT3/style.yaml",
+    "format": "structured",
+    "previews": [
+      "Z3U9LeT3/0.webp",
+      "Z3U9LeT3/1.webp",
+      "Z3U9LeT3/2.webp",
+      "Z3U9LeT3/3.webp",
+      "Z3U9LeT3/4.webp",
+      "Z3U9LeT3/5.webp"
+    ]
+  },
+  {
+    "id": "4hzB3lz1",
+    "name": "Compassion Flat",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "Pure white base + soft accents, flat 2D medical character illustrations + rounded cards",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "illustration",
+      "warm"
+    ],
+    "source": "4hzB3lz1/style.yaml",
+    "format": "structured",
+    "previews": [
+      "4hzB3lz1/0.webp",
+      "4hzB3lz1/1.webp",
+      "4hzB3lz1/2.webp",
+      "4hzB3lz1/3.webp",
+      "4hzB3lz1/4.webp",
+      "4hzB3lz1/5.webp"
+    ]
+  },
+  {
+    "id": "EDBe3JLq",
+    "name": "Emerald Corporate",
+    "genre": "investor_pitch",
+    "visual_language": "glass_ui",
+    "desc": "Dark base + metallic accents, crystalline geometric shards and glass-morphism rounded cards, white type",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "glass",
+      "techno",
+      "corporate"
+    ],
+    "source": "EDBe3JLq/style.yaml",
+    "format": "structured",
+    "previews": [
+      "EDBe3JLq/0.webp",
+      "EDBe3JLq/1.webp",
+      "EDBe3JLq/2.webp",
+      "EDBe3JLq/3.webp",
+      "EDBe3JLq/4.webp",
+      "EDBe3JLq/5.webp"
+    ]
+  },
+  {
+    "id": "IUz8CmTR",
+    "name": "Engaging Learner",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "Pure white base + soft multicolor, speech bubbles + wavy-line illustrations",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "illustration",
+      "playful"
+    ],
+    "source": "IUz8CmTR/style.yaml",
+    "format": "structured",
+    "previews": [
+      "IUz8CmTR/0.webp",
+      "IUz8CmTR/1.webp",
+      "IUz8CmTR/2.webp",
+      "IUz8CmTR/3.webp",
+      "IUz8CmTR/4.webp",
+      "IUz8CmTR/5.webp"
+    ]
+  },
+  {
+    "id": "6WRiToVn",
+    "name": "Lush Minimal",
+    "genre": "portfolio",
+    "visual_language": "organic_natural",
+    "desc": "Soft misty light base + natural tones, botanical photography + large rounded cards",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "photo",
+      "minimal"
+    ],
+    "source": "6WRiToVn/style.yaml",
+    "format": "structured",
+    "previews": [
+      "6WRiToVn/0.webp",
+      "6WRiToVn/1.webp",
+      "6WRiToVn/2.webp",
+      "6WRiToVn/3.webp",
+      "6WRiToVn/4.webp",
+      "6WRiToVn/5.webp"
+    ]
+  },
+  {
+    "id": "kaeyCtls",
+    "name": "Project Launch",
+    "genre": "workshop",
+    "visual_language": "hand_drawn",
+    "desc": "White base + high-saturation multicolor blocks, hand-drawn doodle-style character illustrations",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "hand_drawn",
+      "illustration"
+    ],
+    "source": "kaeyCtls/style.yaml",
+    "format": "structured",
+    "previews": [
+      "kaeyCtls/0.webp",
+      "kaeyCtls/1.webp",
+      "kaeyCtls/2.webp",
+      "kaeyCtls/3.webp",
+      "kaeyCtls/4.webp",
+      "kaeyCtls/5.webp"
+    ]
+  },
+  {
+    "id": "wqZu6oUA",
+    "name": "Silicon Refined",
+    "genre": "keynote",
+    "visual_language": "apple_minimal",
+    "desc": "Pure white base + space gray with restrained accents, generous whitespace with precise sans-serif, rounded bento grid and product macros",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "techno",
+      "photo"
+    ],
+    "source": "wqZu6oUA/style.yaml",
+    "format": "structured",
+    "previews": [
+      "wqZu6oUA/0.webp",
+      "wqZu6oUA/1.webp",
+      "wqZu6oUA/2.webp",
+      "wqZu6oUA/3.webp",
+      "wqZu6oUA/4.webp",
+      "wqZu6oUA/5.webp"
+    ]
+  },
+  {
+    "id": "YFGxv2Zw",
+    "name": "Tech Pitch",
+    "genre": "investor_pitch",
+    "visual_language": "neon_tech",
+    "desc": "Pure black base + glowing accents, high-contrast B&W photography + massive titles and minimal line charts",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon",
+      "photo",
+      "minimal"
+    ],
+    "source": "YFGxv2Zw/style.yaml",
+    "format": "structured",
+    "previews": [
+      "YFGxv2Zw/0.webp",
+      "YFGxv2Zw/1.webp",
+      "YFGxv2Zw/2.webp",
+      "YFGxv2Zw/3.webp",
+      "YFGxv2Zw/4.webp",
+      "YFGxv2Zw/5.webp"
+    ]
+  },
+  {
+    "id": "ptADcuA4",
+    "name": "Urban Ribbon",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "Charcoal and warm high contrast, 3D folded ribbons and diagonal color blocks, dusk cityscape photography",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "warm",
+      "photo",
+      "editorial"
+    ],
+    "source": "ptADcuA4/style.yaml",
+    "format": "structured",
+    "previews": [
+      "ptADcuA4/0.webp",
+      "ptADcuA4/1.webp",
+      "ptADcuA4/2.webp",
+      "ptADcuA4/3.webp",
+      "ptADcuA4/4.webp",
+      "ptADcuA4/5.webp"
+    ]
+  },
+  {
+    "id": "DBQgBaD3",
+    "name": "Visual Discovery",
+    "genre": "portfolio",
+    "visual_language": "bento_grid",
+    "desc": "Pure white base + high-saturation accents, large rounded cards with drop shadows, masonry grid",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "playful"
+    ],
+    "source": "DBQgBaD3/style.yaml",
+    "format": "structured",
+    "previews": [
+      "DBQgBaD3/0.webp",
+      "DBQgBaD3/1.webp",
+      "DBQgBaD3/2.webp",
+      "DBQgBaD3/3.webp",
+      "DBQgBaD3/4.webp",
+      "DBQgBaD3/5.webp"
+    ]
+  },
+  {
+    "id": "EAMxiurM",
+    "name": "Whimsical Animation",
+    "genre": "portfolio",
+    "visual_language": "organic_natural",
+    "desc": "Soft light base + natural tones, gouache textures and rounded capsule containers, glowing star accents",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "hand_drawn",
+      "warm"
+    ],
+    "source": "EAMxiurM/style.yaml",
+    "format": "structured",
+    "previews": [
+      "EAMxiurM/0.webp",
+      "EAMxiurM/1.webp",
+      "EAMxiurM/2.webp",
+      "EAMxiurM/3.webp",
+      "EAMxiurM/4.webp",
+      "EAMxiurM/5.webp"
+    ]
+  },
+  {
+    "id": "QJ1EegX7",
+    "name": "Architectural Timeline",
+    "genre": "portfolio",
+    "visual_language": "collage",
+    "desc": "Gallery white base + charcoal and soft accents, B&W photo collages with oversized vertical year numerals",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo",
+      "architectural"
+    ],
+    "source": "QJ1EegX7/style.yaml",
+    "format": "structured",
+    "previews": [
+      "QJ1EegX7/0.webp",
+      "QJ1EegX7/1.webp",
+      "QJ1EegX7/2.webp",
+      "QJ1EegX7/3.webp",
+      "QJ1EegX7/4.webp",
+      "QJ1EegX7/5.webp"
+    ]
+  },
+  {
+    "id": "CCpt9TKU",
+    "name": "Blue Collage",
+    "genre": "editorial_report",
+    "visual_language": "collage",
+    "desc": "Light gray base + high-saturation accents and B&W photo cutouts, bold sans-serif headlines + giant numerals, newspaper collage",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo"
+    ],
+    "source": "CCpt9TKU/style.yaml",
+    "format": "structured",
+    "previews": [
+      "CCpt9TKU/0.webp",
+      "CCpt9TKU/1.webp",
+      "CCpt9TKU/2.webp",
+      "CCpt9TKU/3.webp",
+      "CCpt9TKU/4.webp",
+      "CCpt9TKU/5.webp"
+    ]
+  },
+  {
+    "id": "YVGYOuG7",
+    "name": "Brand Guideline",
+    "genre": "brand_pitch",
+    "visual_language": "swiss_grid",
+    "desc": "Light base + soft accents, Swiss grid with swatches and typography specimens, CI manual with generous whitespace",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "editorial"
+    ],
+    "source": "YVGYOuG7/style.yaml",
+    "format": "structured",
+    "previews": [
+      "YVGYOuG7/0.webp",
+      "YVGYOuG7/1.webp",
+      "YVGYOuG7/2.webp",
+      "YVGYOuG7/3.webp",
+      "YVGYOuG7/4.webp",
+      "YVGYOuG7/5.webp"
+    ]
+  },
+  {
+    "id": "6iWlKRjP",
+    "name": "Bold Brutalist Editorial",
+    "genre": "editorial_report",
+    "visual_language": "magazine_editorial",
+    "desc": "White base + high-saturation multicolor and thin black grid, ultra-bold sans-serif giant type + overlaid photography, brutalist poster layout",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "playful"
+    ],
+    "source": "6iWlKRjP/style.yaml",
+    "format": "structured",
+    "previews": [
+      "6iWlKRjP/0.webp",
+      "6iWlKRjP/1.webp",
+      "6iWlKRjP/2.webp",
+      "6iWlKRjP/3.webp",
+      "6iWlKRjP/4.webp",
+      "6iWlKRjP/5.webp"
+    ]
+  },
+  {
+    "id": "nrSLuDKD",
+    "name": "City Isometric",
+    "genre": "editorial_report",
+    "visual_language": "infographic_diagram",
+    "desc": "Dark base + white type, multicolor accents, low-poly isometric city illustrations",
+    "aesthetic": "playful",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "illustration",
+      "analytical"
+    ],
+    "source": "nrSLuDKD/style.yaml",
+    "format": "structured",
+    "previews": [
+      "nrSLuDKD/0.webp",
+      "nrSLuDKD/1.webp",
+      "nrSLuDKD/2.webp",
+      "nrSLuDKD/3.webp",
+      "nrSLuDKD/4.webp",
+      "nrSLuDKD/5.webp"
+    ]
+  },
+  {
+    "id": "41mvRHDw",
+    "name": "Corporate Infographic",
+    "genre": "editorial_report",
+    "visual_language": "infographic_diagram",
+    "desc": "White base + cool flat icons, multi-column modules + donut charts and timelines, magazine-feature style",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "editorial",
+      "corporate"
+    ],
+    "source": "41mvRHDw/style.yaml",
+    "format": "structured",
+    "previews": [
+      "41mvRHDw/0.webp",
+      "41mvRHDw/1.webp",
+      "41mvRHDw/2.webp",
+      "41mvRHDw/3.webp",
+      "41mvRHDw/4.webp",
+      "41mvRHDw/5.webp"
+    ]
+  },
+  {
+    "id": "rbY4sY00",
+    "name": "Dark Financial Editorial",
+    "genre": "editorial_report",
+    "visual_language": "editorial_print",
+    "desc": "Dark base + high-saturation accents, bold sans-serif + B&W architectural photography and giant rings, financial narrative",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo",
+      "architectural"
+    ],
+    "source": "rbY4sY00/style.yaml",
+    "format": "structured",
+    "previews": [
+      "rbY4sY00/0.webp",
+      "rbY4sY00/1.webp",
+      "rbY4sY00/2.webp",
+      "rbY4sY00/3.webp",
+      "rbY4sY00/4.webp",
+      "rbY4sY00/5.webp"
+    ]
+  },
+  {
+    "id": "1tNBY3YD",
+    "name": "Luxury Earthtone Editorial",
+    "genre": "portfolio",
+    "visual_language": "magazine_editorial",
+    "desc": "Black base + earth-tone blocks, ultra-bold sans-serif giant headlines + fashion editorial photography, luxury lookbook",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "luxe",
+      "photo"
+    ],
+    "source": "1tNBY3YD/style.yaml",
+    "format": "structured",
+    "previews": [
+      "1tNBY3YD/0.webp",
+      "1tNBY3YD/1.webp",
+      "1tNBY3YD/2.webp",
+      "1tNBY3YD/3.webp",
+      "1tNBY3YD/4.webp",
+      "1tNBY3YD/5.webp"
+    ]
+  },
+  {
+    "id": "jXomr8Jj",
+    "name": "Editorial Runner",
+    "genre": "seminar",
+    "visual_language": "technical_drawing",
+    "desc": "Light gray engineering paper base + carbon black and single-color accents, condensed geometric sans-serif + pipe-connector frames",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "minimal"
+    ],
+    "source": "jXomr8Jj/style.yaml",
+    "format": "structured",
+    "previews": [
+      "jXomr8Jj/0.webp",
+      "jXomr8Jj/1.webp",
+      "jXomr8Jj/2.webp",
+      "jXomr8Jj/3.webp",
+      "jXomr8Jj/4.webp",
+      "jXomr8Jj/5.webp"
+    ]
+  },
+  {
+    "id": "Jwpub2Cp",
+    "name": "Geometric Risograph",
+    "genre": "seminar",
+    "visual_language": "risograph",
+    "desc": "Paper-colored base + multi-color print overlays, monospace serif headlines + semi-transparent overlaid geometry",
+    "aesthetic": "artistic",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "playful"
+    ],
+    "source": "Jwpub2Cp/style.yaml",
+    "format": "structured",
+    "previews": [
+      "Jwpub2Cp/0.webp",
+      "Jwpub2Cp/1.webp",
+      "Jwpub2Cp/2.webp",
+      "Jwpub2Cp/3.webp",
+      "Jwpub2Cp/4.webp",
+      "Jwpub2Cp/5.webp"
+    ]
+  },
+  {
+    "id": "ySUMWqpJ",
+    "name": "Industrial Manual",
+    "genre": "seminar",
+    "visual_language": "technical_drawing",
+    "desc": "Warm gray base + high-saturation line art, isometric exploded diagrams + numbered annotations and monospace labels",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "analytical"
+    ],
+    "source": "ySUMWqpJ/style.yaml",
+    "format": "structured",
+    "previews": [
+      "ySUMWqpJ/0.webp",
+      "ySUMWqpJ/1.webp",
+      "ySUMWqpJ/2.webp",
+      "ySUMWqpJ/3.webp",
+      "ySUMWqpJ/4.webp",
+      "ySUMWqpJ/5.webp"
+    ]
+  },
+  {
+    "id": "1ScfdzQV",
+    "name": "Luminous Editorial",
+    "genre": "brand_pitch",
+    "visual_language": "magazine_editorial",
+    "desc": "Soft gradient glowing base, modern sans-serif + luxurious script, poetic layouts with dreamy glowing illustrations",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "gradient",
+      "luxe",
+      "editorial"
+    ],
+    "source": "1ScfdzQV/style.yaml",
+    "format": "structured",
+    "previews": [
+      "1ScfdzQV/0.webp",
+      "1ScfdzQV/1.webp",
+      "1ScfdzQV/2.webp",
+      "1ScfdzQV/3.webp",
+      "1ScfdzQV/4.webp",
+      "1ScfdzQV/5.webp"
+    ]
+  },
+  {
+    "id": "kBPhi0zD",
+    "name": "Mediterranean Editorial",
+    "genre": "editorial_report",
+    "visual_language": "magazine_editorial",
+    "desc": "Near-white base + soft accents, condensed sans-serif + architectural motifs (arches, steps), tranquil whitespace",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "minimal",
+      "architectural"
+    ],
+    "source": "kBPhi0zD/style.yaml",
+    "format": "structured",
+    "previews": [
+      "kBPhi0zD/0.webp",
+      "kBPhi0zD/1.webp",
+      "kBPhi0zD/2.webp",
+      "kBPhi0zD/3.webp",
+      "kBPhi0zD/4.webp",
+      "kBPhi0zD/5.webp"
+    ]
+  },
+  {
+    "id": "FilbYa2o",
+    "name": "Minimal Isometric",
+    "genre": "editorial_report",
+    "visual_language": "infographic_diagram",
+    "desc": "Light gray base + black type and single-color emphasis, flat isometric business illustrations and diagonal geometry",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "illustration",
+      "analytical",
+      "minimal"
+    ],
+    "source": "FilbYa2o/style.yaml",
+    "format": "structured",
+    "previews": [
+      "FilbYa2o/0.webp",
+      "FilbYa2o/1.webp",
+      "FilbYa2o/2.webp",
+      "FilbYa2o/3.webp",
+      "FilbYa2o/4.webp",
+      "FilbYa2o/5.webp"
+    ]
+  },
+  {
+    "id": "iF6nDxzY",
+    "name": "Modern UI",
+    "genre": "ops_review",
+    "visual_language": "dashboard",
+    "desc": "Light gray-white base + multicolor rounded cards with soft shadows, SaaS dashboard editorial layout",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "playful",
+      "corporate"
+    ],
+    "source": "iF6nDxzY/style.yaml",
+    "format": "structured",
+    "previews": [
+      "iF6nDxzY/0.webp",
+      "iF6nDxzY/1.webp",
+      "iF6nDxzY/2.webp",
+      "iF6nDxzY/3.webp",
+      "iF6nDxzY/4.webp",
+      "iF6nDxzY/5.webp"
+    ]
+  },
+  {
+    "id": "UY29HFco",
+    "name": "Monochrome White",
+    "genre": "portfolio",
+    "visual_language": "product_showcase",
+    "desc": "Pure white seamless base + black accents, overhead flat-lay product photography, even whitespace and grid displays",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "photo"
+    ],
+    "source": "UY29HFco/style.yaml",
+    "format": "structured",
+    "previews": [
+      "UY29HFco/0.webp",
+      "UY29HFco/1.webp",
+      "UY29HFco/2.webp",
+      "UY29HFco/3.webp",
+      "UY29HFco/4.webp",
+      "UY29HFco/5.webp"
+    ]
+  },
+  {
+    "id": "V8vlxIxr",
+    "name": "Museum",
+    "genre": "portfolio",
+    "visual_language": "gallery_frame",
+    "desc": "Light gray base + high-contrast B&W sculpture photography and multicolor gradient halos, oversized editorial typography",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo",
+      "gradient"
+    ],
+    "source": "V8vlxIxr/style.yaml",
+    "format": "structured",
+    "previews": [
+      "V8vlxIxr/0.webp",
+      "V8vlxIxr/1.webp",
+      "V8vlxIxr/2.webp",
+      "V8vlxIxr/3.webp",
+      "V8vlxIxr/4.webp",
+      "V8vlxIxr/5.webp"
+    ]
+  },
+  {
+    "id": "JbpDOz7h",
+    "name": "Corporate Editorial Insight Report",
+    "genre": "editorial_report",
+    "visual_language": "editorial_print",
+    "desc": "White/light gray base + high-contrast accents, elegant serif headlines + dotted grid, Economist-style research report",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "analytical",
+      "corporate"
+    ],
+    "source": "JbpDOz7h/style.yaml",
+    "format": "structured",
+    "previews": [
+      "JbpDOz7h/0.webp",
+      "JbpDOz7h/1.webp",
+      "JbpDOz7h/2.webp",
+      "JbpDOz7h/3.webp",
+      "JbpDOz7h/4.webp",
+      "JbpDOz7h/5.webp"
+    ]
+  },
+  {
+    "id": "im0BoaEA",
+    "name": "Mission Driven Culture Deck",
+    "genre": "brand_pitch",
+    "visual_language": "magazine_editorial",
+    "desc": "Light gray base + multicolor accents, oversized headlines + organic arc shapes, employee-photo narrative recruiting culture book",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo",
+      "playful"
+    ],
+    "source": "im0BoaEA/style.yaml",
+    "format": "structured",
+    "previews": [
+      "im0BoaEA/0.webp",
+      "im0BoaEA/1.webp",
+      "im0BoaEA/2.webp",
+      "im0BoaEA/3.webp",
+      "im0BoaEA/4.webp",
+      "im0BoaEA/5.webp"
+    ]
+  },
+  {
+    "id": "NOGjoMRR",
+    "name": "Pop Minimal Web Portfolio",
+    "genre": "portfolio",
+    "visual_language": "poster_type",
+    "desc": "Pure white with generous whitespace + high-saturation multicolor accent blocks, minimal left-aligned grid",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "minimal",
+      "playful"
+    ],
+    "source": "NOGjoMRR/style.yaml",
+    "format": "structured",
+    "previews": [
+      "NOGjoMRR/0.webp",
+      "NOGjoMRR/1.webp",
+      "NOGjoMRR/2.webp",
+      "NOGjoMRR/3.webp",
+      "NOGjoMRR/4.webp",
+      "NOGjoMRR/5.webp"
+    ]
+  },
+  {
+    "id": "CW6kJrhZ",
+    "name": "Minimal Culture Book",
+    "genre": "portfolio",
+    "visual_language": "magazine_editorial",
+    "desc": "Light gray base + pure black monochrome, B&W documentary photography with abundant whitespace",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "editorial",
+      "photo"
+    ],
+    "source": "CW6kJrhZ/style.yaml",
+    "format": "structured",
+    "previews": [
+      "CW6kJrhZ/0.webp",
+      "CW6kJrhZ/1.webp",
+      "CW6kJrhZ/2.webp",
+      "CW6kJrhZ/3.webp",
+      "CW6kJrhZ/4.webp",
+      "CW6kJrhZ/5.webp"
+    ]
+  },
+  {
+    "id": "ShrvmWfV",
+    "name": "Circle Editorial",
+    "genre": "editorial_report",
+    "visual_language": "magazine_editorial",
+    "desc": "White base + high-saturation giant rings and B&W photography, bold geometric sans-serif, art-directed minimalist poster layout",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo",
+      "minimal"
+    ],
+    "source": "ShrvmWfV/style.yaml",
+    "format": "structured",
+    "previews": [
+      "ShrvmWfV/0.webp",
+      "ShrvmWfV/1.webp",
+      "ShrvmWfV/2.webp",
+      "ShrvmWfV/3.webp",
+      "ShrvmWfV/4.webp",
+      "ShrvmWfV/5.webp"
+    ]
+  },
+  {
+    "id": "SGT6FBOj",
+    "name": "Swiss",
+    "genre": "editorial_report",
+    "visual_language": "swiss_grid",
+    "desc": "Paper white base + high-saturation multicolor accents, huge numerals and grid rules, Swiss information design data editorial",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "analytical"
+    ],
+    "source": "SGT6FBOj/style.yaml",
+    "format": "structured",
+    "previews": [
+      "SGT6FBOj/0.webp",
+      "SGT6FBOj/1.webp",
+      "SGT6FBOj/2.webp",
+      "SGT6FBOj/3.webp",
+      "SGT6FBOj/4.webp",
+      "SGT6FBOj/5.webp"
+    ]
+  },
+  {
+    "id": "jJ8KdWpo",
+    "name": "Yellow Blueprint",
+    "genre": "seminar",
+    "visual_language": "technical_drawing",
+    "desc": "Bright base + black line art and white accents, DIY-manual style wireframe diagrams with numbered steps",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "analytical"
+    ],
+    "source": "jJ8KdWpo/style.yaml",
+    "format": "structured",
+    "previews": [
+      "jJ8KdWpo/0.webp",
+      "jJ8KdWpo/1.webp",
+      "jJ8KdWpo/2.webp",
+      "jJ8KdWpo/3.webp",
+      "jJ8KdWpo/4.webp",
+      "jJ8KdWpo/5.webp"
+    ]
+  },
+  {
+    "id": "3CHRSkMs",
+    "name": "Digital / Pop",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "High-saturation and playful, organic blob shapes + bold giant type, information-dense illustrations",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "illustration"
+    ],
+    "source": "3CHRSkMs/style.md",
+    "format": "structured",
+    "previews": [
+      "3CHRSkMs/0.webp",
+      "3CHRSkMs/1.webp",
+      "3CHRSkMs/2.webp",
+      "3CHRSkMs/3.webp",
+      "3CHRSkMs/4.webp",
+      "3CHRSkMs/5.webp"
+    ]
+  },
+  {
+    "id": "uu2GmD9M",
+    "name": "Modern Newspaper",
+    "genre": "editorial_report",
+    "visual_language": "editorial_print",
+    "desc": "Ultra-bold sans-serif headlines occupying 30–50% of the page, high-contrast alert marks, asymmetric high-density grid, business-media feel",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "minimal"
+    ],
+    "source": "uu2GmD9M/style.md",
+    "format": "structured",
+    "previews": [
+      "uu2GmD9M/0.webp",
+      "uu2GmD9M/1.webp",
+      "uu2GmD9M/2.webp",
+      "uu2GmD9M/3.webp",
+      "uu2GmD9M/4.webp",
+      "uu2GmD9M/5.webp"
+    ]
+  },
+  {
+    "id": "h5K7knHz",
+    "name": "Sharp-edged Minimalism",
+    "genre": "portfolio",
+    "visual_language": "architectural_mono",
+    "desc": "Monochrome dark tones, grid + sharp hard-edged lines, high-whitespace photography",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "minimal",
+      "architectural",
+      "photo"
+    ],
+    "source": "h5K7knHz/style.md",
+    "format": "structured",
+    "previews": [
+      "h5K7knHz/0.webp",
+      "h5K7knHz/1.webp",
+      "h5K7knHz/2.webp",
+      "h5K7knHz/3.webp",
+      "h5K7knHz/4.webp",
+      "h5K7knHz/5.webp"
+    ]
+  },
+  {
+    "id": "ggXgGVo4",
+    "name": "Studio / Mockup / Premium",
+    "genre": "keynote",
+    "visual_language": "product_showcase",
+    "desc": "Dark product mockups + grid and bold sans-serif, device screens as hero, generous whitespace",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "photo",
+      "minimal",
+      "luxe"
+    ],
+    "source": "ggXgGVo4/style.md",
+    "format": "structured",
+    "previews": [
+      "ggXgGVo4/0.webp",
+      "ggXgGVo4/1.webp",
+      "ggXgGVo4/2.webp",
+      "ggXgGVo4/3.webp",
+      "ggXgGVo4/4.webp",
+      "ggXgGVo4/5.webp"
+    ]
+  },
+  {
+    "id": "18CfuFyH",
+    "name": "Tech / Art",
+    "genre": "portfolio",
+    "visual_language": "neon_tech",
+    "desc": "High-saturation glowing grid geometry + serif/silhouette collage",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "neon",
+      "techno",
+      "gradient"
+    ],
+    "source": "18CfuFyH/style.md",
+    "format": "structured",
+    "previews": [
+      "18CfuFyH/0.webp",
+      "18CfuFyH/1.webp",
+      "18CfuFyH/2.webp",
+      "18CfuFyH/3.webp",
+      "18CfuFyH/4.webp",
+      "18CfuFyH/5.webp"
+    ]
+  },
+  {
+    "id": "7uSzPEO2",
+    "name": "Art Deco",
+    "genre": "portfolio",
+    "visual_language": "art_deco",
+    "desc": "Dark retro Art Deco, sunburst fans + double-line frames, classic elegant serif uppercase",
+    "aesthetic": "artistic",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "luxe"
+    ],
+    "source": "7uSzPEO2/style.md",
+    "format": "structured",
+    "previews": [
+      "7uSzPEO2/0.webp",
+      "7uSzPEO2/1.webp",
+      "7uSzPEO2/2.webp",
+      "7uSzPEO2/3.webp",
+      "7uSzPEO2/4.webp",
+      "7uSzPEO2/5.webp"
+    ]
+  },
+  {
+    "id": "HBdi5jjx",
+    "name": "Atelier",
+    "genre": "portfolio",
+    "visual_language": "architectural_mono",
+    "desc": "Warm-paper minimalism, wide whitespace + monospace item numbering, a single burnt-earth accent, drafting-board precision",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "architectural",
+      "warm"
+    ],
+    "source": "HBdi5jjx/style.md",
+    "format": "structured",
+    "previews": [
+      "HBdi5jjx/0.webp",
+      "HBdi5jjx/1.webp",
+      "HBdi5jjx/2.webp",
+      "HBdi5jjx/3.webp",
+      "HBdi5jjx/4.webp",
+      "HBdi5jjx/5.webp"
+    ]
+  },
+  {
+    "id": "G0eurRbb",
+    "name": "Atlas",
+    "genre": "ops_review",
+    "visual_language": "dashboard",
+    "desc": "Left color bar + upper-right subtle dot pattern, rounded thin-border cards with color-chip numerals, sans-serif",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "corporate"
+    ],
+    "source": "G0eurRbb/style.md",
+    "format": "structured",
+    "previews": [
+      "G0eurRbb/0.webp",
+      "G0eurRbb/1.webp",
+      "G0eurRbb/2.webp",
+      "G0eurRbb/3.webp",
+      "G0eurRbb/4.webp",
+      "G0eurRbb/5.webp"
+    ]
+  },
+  {
+    "id": "tTJoLDYD",
+    "name": "Atrium",
+    "genre": "portfolio",
+    "visual_language": "organic_natural",
+    "desc": "Bright warm palette, arched structures + elegant serif, calm and unhurried",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "warm",
+      "architectural"
+    ],
+    "source": "tTJoLDYD/style.md",
+    "format": "structured",
+    "previews": [
+      "tTJoLDYD/0.webp",
+      "tTJoLDYD/1.webp",
+      "tTJoLDYD/2.webp",
+      "tTJoLDYD/3.webp",
+      "tTJoLDYD/4.webp",
+      "tTJoLDYD/5.webp"
+    ]
+  },
+  {
+    "id": "gUysfZAC",
+    "name": "Aurora",
+    "genre": "investor_pitch",
+    "visual_language": "neon_tech",
+    "desc": "Dark base + a glowing gradient sweep, modern sans-serif large headings + monospace small labels",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "neon",
+      "gradient",
+      "techno"
+    ],
+    "source": "gUysfZAC/style.md",
+    "format": "structured",
+    "previews": [
+      "gUysfZAC/0.webp",
+      "gUysfZAC/1.webp",
+      "gUysfZAC/2.webp",
+      "gUysfZAC/3.webp",
+      "gUysfZAC/4.webp",
+      "gUysfZAC/5.webp"
+    ]
+  },
+  {
+    "id": "VQ97vmGA",
+    "name": "Bain Style",
+    "genre": "consulting_report",
+    "visual_language": "action_title",
+    "desc": "Full-sentence action titles pressed against a rule + gray-base charts with single-color highlight; answer-first",
+    "aesthetic": "corporate",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "corporate",
+      "analytical"
+    ],
+    "source": "VQ97vmGA/style.md",
+    "format": "structured",
+    "previews": [
+      "VQ97vmGA/0.webp",
+      "VQ97vmGA/1.webp",
+      "VQ97vmGA/2.webp",
+      "VQ97vmGA/3.webp",
+      "VQ97vmGA/4.webp",
+      "VQ97vmGA/5.webp"
+    ]
+  },
+  {
+    "id": "CuEEUrFy",
+    "name": "Basel",
+    "genre": "portfolio",
+    "visual_language": "swiss_grid",
+    "desc": "Bright minimal, Swiss grid + hard black lines, oversized upper/lowercase modern sans-serif headlines",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "minimal",
+      "editorial"
+    ],
+    "source": "CuEEUrFy/style.md",
+    "format": "structured",
+    "previews": [
+      "CuEEUrFy/0.webp",
+      "CuEEUrFy/1.webp",
+      "CuEEUrFy/2.webp",
+      "CuEEUrFy/3.webp",
+      "CuEEUrFy/4.webp",
+      "CuEEUrFy/5.webp"
+    ]
+  },
+  {
+    "id": "X368DfSh",
+    "name": "BCG Style",
+    "genre": "consulting_report",
+    "visual_language": "action_title",
+    "desc": "Serif action titles pressed against double lines + agenda tracker, growth-share matrix; answer-first",
+    "aesthetic": "corporate",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "corporate",
+      "analytical"
+    ],
+    "source": "X368DfSh/style.md",
+    "format": "structured",
+    "previews": [
+      "X368DfSh/0.webp",
+      "X368DfSh/1.webp",
+      "X368DfSh/2.webp",
+      "X368DfSh/3.webp",
+      "X368DfSh/4.webp",
+      "X368DfSh/5.webp"
+    ]
+  },
+  {
+    "id": "nsvGrXIj",
+    "name": "Benchmark",
+    "genre": "consulting_report",
+    "visual_language": "analytical_grid",
+    "desc": "Competitor comparison matrix + single-column highlight, monospace data labels",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "corporate"
+    ],
+    "source": "nsvGrXIj/style.md",
+    "format": "structured",
+    "previews": [
+      "nsvGrXIj/0.webp",
+      "nsvGrXIj/1.webp",
+      "nsvGrXIj/2.webp",
+      "nsvGrXIj/3.webp",
+      "nsvGrXIj/4.webp",
+      "nsvGrXIj/5.webp"
+    ]
+  },
+  {
+    "id": "RkhDAx93",
+    "name": "Billboard",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "Dark and bold, full-bleed single color + huge bold slogans, minimal brand mark",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "minimal",
+      "editorial"
+    ],
+    "source": "RkhDAx93/style.md",
+    "format": "structured",
+    "previews": [
+      "RkhDAx93/0.webp",
+      "RkhDAx93/1.webp",
+      "RkhDAx93/2.webp",
+      "RkhDAx93/3.webp",
+      "RkhDAx93/4.webp"
+    ]
+  },
+  {
+    "id": "OmV4VZGR",
+    "name": "Broadsheet",
+    "genre": "editorial_report",
+    "visual_language": "editorial_print",
+    "desc": "Bright newspaper feel, masthead nameplate + justified columns and drop caps, classic serif and ruled numeric boxes",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "academic"
+    ],
+    "source": "OmV4VZGR/style.md",
+    "format": "structured",
+    "previews": [
+      "OmV4VZGR/0.webp",
+      "OmV4VZGR/1.webp",
+      "OmV4VZGR/2.webp",
+      "OmV4VZGR/3.webp",
+      "OmV4VZGR/4.webp",
+      "OmV4VZGR/5.webp"
+    ]
+  },
+  {
+    "id": "thfYdaqL",
+    "name": "Circuit",
+    "genre": "seminar",
+    "visual_language": "circuit_board",
+    "desc": "Dark tech, PCB traces + IC cards and pad nodes, monospace terminal font",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon"
+    ],
+    "source": "thfYdaqL/style.md",
+    "format": "structured",
+    "previews": [
+      "thfYdaqL/0.webp",
+      "thfYdaqL/1.webp",
+      "thfYdaqL/2.webp",
+      "thfYdaqL/3.webp",
+      "thfYdaqL/4.webp",
+      "thfYdaqL/5.webp"
+    ]
+  },
+  {
+    "id": "OqbUHMeB",
+    "name": "Demo Day",
+    "genre": "investor_pitch",
+    "visual_language": "poster_type",
+    "desc": "Bright bold minimalism, huge numerals + short phrases, an accent-color bar under keywords",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "minimal",
+      "editorial"
+    ],
+    "source": "OqbUHMeB/style.md",
+    "format": "structured",
+    "previews": [
+      "OqbUHMeB/0.webp",
+      "OqbUHMeB/1.webp",
+      "OqbUHMeB/2.webp",
+      "OqbUHMeB/3.webp",
+      "OqbUHMeB/4.webp",
+      "OqbUHMeB/5.webp"
+    ]
+  },
+  {
+    "id": "e8Dm5N5g",
+    "name": "Drafting Room",
+    "genre": "seminar",
+    "visual_language": "technical_drawing",
+    "desc": "Dark tech minimalism, grid base + dimension annotations and section hatches, corner title block",
+    "aesthetic": "analytical",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "analytical",
+      "techno"
+    ],
+    "source": "e8Dm5N5g/style.md",
+    "format": "structured",
+    "previews": [
+      "e8Dm5N5g/0.webp",
+      "e8Dm5N5g/1.webp",
+      "e8Dm5N5g/2.webp",
+      "e8Dm5N5g/3.webp",
+      "e8Dm5N5g/4.webp",
+      "e8Dm5N5g/5.webp"
+    ]
+  },
+  {
+    "id": "gBNy6pQ0",
+    "name": "EY Style",
+    "genre": "consulting_report",
+    "visual_language": "action_title",
+    "desc": "Dark corporate, a single spotlight beam running through charts and points, bold sans-serif",
+    "aesthetic": "corporate",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "corporate",
+      "analytical"
+    ],
+    "source": "gBNy6pQ0/style.md",
+    "format": "structured",
+    "previews": [
+      "gBNy6pQ0/0.webp",
+      "gBNy6pQ0/1.webp",
+      "gBNy6pQ0/2.webp",
+      "gBNy6pQ0/3.webp",
+      "gBNy6pQ0/4.webp",
+      "gBNy6pQ0/5.webp"
+    ]
+  },
+  {
+    "id": "S5BYFAT6",
+    "name": "Hearth",
+    "genre": "brand_pitch",
+    "visual_language": "luxury_minimal",
+    "desc": "Bright warm palette, soft warm-white base + elegant serif large headings with a single terracotta accent",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "luxe",
+      "warm",
+      "minimal"
+    ],
+    "source": "S5BYFAT6/style.md",
+    "format": "structured",
+    "previews": [
+      "S5BYFAT6/0.webp",
+      "S5BYFAT6/1.webp",
+      "S5BYFAT6/2.webp",
+      "S5BYFAT6/3.webp",
+      "S5BYFAT6/4.webp",
+      "S5BYFAT6/5.webp"
+    ]
+  },
+  {
+    "id": "la4BpyO5",
+    "name": "Holo",
+    "genre": "investor_pitch",
+    "visual_language": "glass_ui",
+    "desc": "A single iridescent gradient blurred behind the content, outlining card edges",
+    "aesthetic": "tech",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "glass",
+      "gradient"
+    ],
+    "source": "la4BpyO5/style.md",
+    "format": "structured",
+    "previews": [
+      "la4BpyO5/0.webp",
+      "la4BpyO5/1.webp",
+      "la4BpyO5/2.webp",
+      "la4BpyO5/3.webp",
+      "la4BpyO5/4.webp",
+      "la4BpyO5/5.webp"
+    ]
+  },
+  {
+    "id": "tHnmLRmP",
+    "name": "Keynote Minimal",
+    "genre": "keynote",
+    "visual_language": "stage_talk",
+    "desc": "Dark minimalism, one idea per screen + oversized sentence-style statements and simplified giant numerals, single accent color",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "minimal"
+    ],
+    "source": "tHnmLRmP/style.md",
+    "format": "structured",
+    "previews": [
+      "tHnmLRmP/0.webp",
+      "tHnmLRmP/1.webp",
+      "tHnmLRmP/2.webp",
+      "tHnmLRmP/3.webp",
+      "tHnmLRmP/4.webp",
+      "tHnmLRmP/5.webp"
+    ]
+  },
+  {
+    "id": "86SQrh5w",
+    "name": "Ledger",
+    "genre": "editorial_report",
+    "visual_language": "editorial_print",
+    "desc": "Bright and calm, ruled ledger paper + a single accent border, double-underlined totals, elegant serif",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "analytical",
+      "warm"
+    ],
+    "source": "86SQrh5w/style.md",
+    "format": "structured",
+    "previews": [
+      "86SQrh5w/0.webp",
+      "86SQrh5w/1.webp",
+      "86SQrh5w/2.webp",
+      "86SQrh5w/3.webp",
+      "86SQrh5w/4.webp",
+      "86SQrh5w/5.webp"
+    ]
+  },
+  {
+    "id": "vXPDT3Xy",
+    "name": "Metro",
+    "genre": "ops_review",
+    "visual_language": "transit_map",
+    "desc": "Bright and lively, transit line map + station dots, narrow modern sans-serif",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "playful"
+    ],
+    "source": "vXPDT3Xy/style.md",
+    "format": "structured",
+    "previews": [
+      "vXPDT3Xy/0.webp",
+      "vXPDT3Xy/1.webp",
+      "vXPDT3Xy/2.webp",
+      "vXPDT3Xy/3.webp",
+      "vXPDT3Xy/4.webp",
+      "vXPDT3Xy/5.webp"
+    ]
+  },
+  {
+    "id": "VYeFPtUP",
+    "name": "Monolith",
+    "genre": "brand_pitch",
+    "visual_language": "luxury_minimal",
+    "desc": "Dark luxurious minimalism, oversized thin type + monospace labels and a few faint lines, restrained whitespace",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "luxe",
+      "minimal"
+    ],
+    "source": "VYeFPtUP/style.md",
+    "format": "structured",
+    "previews": [
+      "VYeFPtUP/0.webp",
+      "VYeFPtUP/1.webp",
+      "VYeFPtUP/2.webp",
+      "VYeFPtUP/3.webp",
+      "VYeFPtUP/4.webp",
+      "VYeFPtUP/5.webp"
+    ]
+  },
+  {
+    "id": "PDEGfISq",
+    "name": "Oat",
+    "genre": "portfolio",
+    "visual_language": "luxury_minimal",
+    "desc": "Bright warm minimalism, soft serif paired with clean sans-serif + arch motif, generous whitespace",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "luxe",
+      "warm",
+      "minimal"
+    ],
+    "source": "PDEGfISq/style.md",
+    "format": "structured",
+    "previews": [
+      "PDEGfISq/0.webp",
+      "PDEGfISq/1.webp",
+      "PDEGfISq/2.webp",
+      "PDEGfISq/3.webp",
+      "PDEGfISq/4.webp",
+      "PDEGfISq/5.webp"
+    ]
+  },
+  {
+    "id": "1WcTGeIc",
+    "name": "Operator",
+    "genre": "ops_review",
+    "visual_language": "dashboard",
+    "desc": "Bright tech, status chips + monospace numerals laid out for four-minute readability",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "techno"
+    ],
+    "source": "1WcTGeIc/style.md",
+    "format": "structured",
+    "previews": [
+      "1WcTGeIc/0.webp",
+      "1WcTGeIc/1.webp",
+      "1WcTGeIc/2.webp",
+      "1WcTGeIc/3.webp",
+      "1WcTGeIc/4.webp",
+      "1WcTGeIc/5.webp"
+    ]
+  },
+  {
+    "id": "be5xhTa1",
+    "name": "Passepartout",
+    "genre": "portfolio",
+    "visual_language": "gallery_frame",
+    "desc": "Bright and calm, wide neutral mat with thin frame + letter-spaced museum labels, elegant serif",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "minimal",
+      "editorial",
+      "luxe"
+    ],
+    "source": "be5xhTa1/style.md",
+    "format": "structured",
+    "previews": [
+      "be5xhTa1/0.webp",
+      "be5xhTa1/1.webp",
+      "be5xhTa1/2.webp",
+      "be5xhTa1/3.webp",
+      "be5xhTa1/4.webp",
+      "be5xhTa1/5.webp"
+    ]
+  },
+  {
+    "id": "J1sryHEo",
+    "name": "Pitch Book",
+    "genre": "investor_pitch",
+    "visual_language": "analytical_grid",
+    "desc": "Valuation-range charts + dense comparison tables and confidential marks, classic serif",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "corporate"
+    ],
+    "source": "J1sryHEo/style.md",
+    "format": "structured",
+    "previews": [
+      "J1sryHEo/0.webp",
+      "J1sryHEo/1.webp",
+      "J1sryHEo/2.webp",
+      "J1sryHEo/3.webp",
+      "J1sryHEo/4.webp",
+      "J1sryHEo/5.webp"
+    ]
+  },
+  {
+    "id": "zRo3aTtG",
+    "name": "PwC Style",
+    "genre": "consulting_report",
+    "visual_language": "action_title",
+    "desc": "Bright warm palette, sentence-style serif titles + semi-transparent frame mosaic, warm color family",
+    "aesthetic": "corporate",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "corporate",
+      "analytical",
+      "warm"
+    ],
+    "source": "zRo3aTtG/style.md",
+    "format": "structured",
+    "previews": [
+      "zRo3aTtG/0.webp",
+      "zRo3aTtG/1.webp",
+      "zRo3aTtG/2.webp",
+      "zRo3aTtG/3.webp",
+      "zRo3aTtG/4.webp",
+      "zRo3aTtG/5.webp"
+    ]
+  },
+  {
+    "id": "F31mX6fO",
+    "name": "QBR",
+    "genre": "ops_review",
+    "visual_language": "dashboard",
+    "desc": "KPI tiles + status color-coded tables and swim-lane roadmap, monospace labels",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "corporate"
+    ],
+    "source": "F31mX6fO/style.md",
+    "format": "structured",
+    "previews": [
+      "F31mX6fO/0.webp",
+      "F31mX6fO/1.webp",
+      "F31mX6fO/2.webp",
+      "F31mX6fO/3.webp",
+      "F31mX6fO/4.webp",
+      "F31mX6fO/5.webp"
+    ]
+  },
+  {
+    "id": "6KpNYGXO",
+    "name": "Seminar",
+    "genre": "seminar",
+    "visual_language": "journal_figure",
+    "desc": "Bright minimal, header color bar + theorem color blocks, serif body, LaTeX lecture notes",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "academic",
+      "analytical",
+      "minimal"
+    ],
+    "source": "6KpNYGXO/style.md",
+    "format": "structured",
+    "previews": [
+      "6KpNYGXO/0.webp",
+      "6KpNYGXO/1.webp",
+      "6KpNYGXO/2.webp",
+      "6KpNYGXO/3.webp",
+      "6KpNYGXO/4.webp",
+      "6KpNYGXO/5.webp"
+    ]
+  },
+  {
+    "id": "48Z9H1At",
+    "name": "Six-Pager",
+    "genre": "editorial_report",
+    "visual_language": "editorial_print",
+    "desc": "Bright minimal, numbered document pages + densely-set serif body and ruled data tables, no-bullet narrative memo",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "academic",
+      "analytical"
+    ],
+    "source": "48Z9H1At/style.md",
+    "format": "structured",
+    "previews": [
+      "48Z9H1At/0.webp",
+      "48Z9H1At/1.webp",
+      "48Z9H1At/2.webp",
+      "48Z9H1At/3.webp",
+      "48Z9H1At/4.webp",
+      "48Z9H1At/5.webp"
+    ]
+  },
+  {
+    "id": "MeD0SaIX",
+    "name": "Spark",
+    "genre": "investor_pitch",
+    "visual_language": "poster_type",
+    "desc": "Bright and bold, heavy display type + color blocks and giant numerals",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "minimal"
+    ],
+    "source": "MeD0SaIX/style.md",
+    "format": "structured",
+    "previews": [
+      "MeD0SaIX/0.webp",
+      "MeD0SaIX/1.webp",
+      "MeD0SaIX/2.webp",
+      "MeD0SaIX/3.webp",
+      "MeD0SaIX/4.webp",
+      "MeD0SaIX/5.webp"
+    ]
+  },
+  {
+    "id": "qVmjaAuA",
+    "name": "Syllabus",
+    "genre": "seminar",
+    "visual_language": "roadmap_timeline",
+    "desc": "Bright and gentle, course syllabus + progress-tracked checkboxes, rounded sans-serif with monospace",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "academic",
+      "playful"
+    ],
+    "source": "qVmjaAuA/style.md",
+    "format": "structured",
+    "previews": [
+      "qVmjaAuA/0.webp",
+      "qVmjaAuA/1.webp",
+      "qVmjaAuA/2.webp",
+      "qVmjaAuA/3.webp",
+      "qVmjaAuA/4.webp",
+      "qVmjaAuA/5.webp"
+    ]
+  },
+  {
+    "id": "PYClxCEx",
+    "name": "TED Style",
+    "genre": "keynote",
+    "visual_language": "stage_talk",
+    "desc": "Near-black stage + oversized statements with word highlights and giant statistic numerals, one idea per screen",
+    "aesthetic": "minimal",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "minimal"
+    ],
+    "source": "PYClxCEx/style.md",
+    "format": "structured",
+    "previews": [
+      "PYClxCEx/0.webp",
+      "PYClxCEx/1.webp",
+      "PYClxCEx/2.webp",
+      "PYClxCEx/3.webp",
+      "PYClxCEx/4.webp",
+      "PYClxCEx/5.webp"
+    ]
+  },
+  {
+    "id": "5GZr0Ari",
+    "name": "Telemetry",
+    "genre": "ops_review",
+    "visual_language": "dashboard",
+    "desc": "Dark tech, monitoring dashboard + mini trend charts and status lights, sans-serif with monospace numerals",
+    "aesthetic": "analytical",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "techno"
+    ],
+    "source": "5GZr0Ari/style.md",
+    "format": "structured",
+    "previews": [
+      "5GZr0Ari/0.webp",
+      "5GZr0Ari/1.webp",
+      "5GZr0Ari/2.webp",
+      "5GZr0Ari/3.webp",
+      "5GZr0Ari/4.webp",
+      "5GZr0Ari/5.webp"
+    ]
+  },
+  {
+    "id": "UMJD6tBv",
+    "name": "Term Sheet",
+    "genre": "investor_pitch",
+    "visual_language": "editorial_print",
+    "desc": "Bright cool white, editorial serif titles + sans-serif data columns, calm and authoritative",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "analytical",
+      "corporate"
+    ],
+    "source": "UMJD6tBv/style.md",
+    "format": "structured",
+    "previews": [
+      "UMJD6tBv/0.webp",
+      "UMJD6tBv/1.webp",
+      "UMJD6tBv/2.webp",
+      "UMJD6tBv/3.webp",
+      "UMJD6tBv/4.webp",
+      "UMJD6tBv/5.webp"
+    ]
+  },
+  {
+    "id": "hUOIxSkD",
+    "name": "Ticker",
+    "genre": "ops_review",
+    "visual_language": "terminal_mono",
+    "desc": "Pure black base + monospace ticker strip and dense gain/loss tables",
+    "aesthetic": "analytical",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "techno"
+    ],
+    "source": "hUOIxSkD/style.md",
+    "format": "structured",
+    "previews": [
+      "hUOIxSkD/0.webp",
+      "hUOIxSkD/1.webp",
+      "hUOIxSkD/2.webp",
+      "hUOIxSkD/3.webp",
+      "hUOIxSkD/4.webp",
+      "hUOIxSkD/5.webp"
+    ]
+  },
+  {
+    "id": "H8uXouRd",
+    "name": "Traction",
+    "genre": "investor_pitch",
+    "visual_language": "dashboard",
+    "desc": "White base with KPI cards + monospace numerals and clean charts, data-driven",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "corporate"
+    ],
+    "source": "H8uXouRd/style.md",
+    "format": "structured",
+    "previews": [
+      "H8uXouRd/0.webp",
+      "H8uXouRd/1.webp",
+      "H8uXouRd/2.webp",
+      "H8uXouRd/3.webp",
+      "H8uXouRd/4.webp",
+      "H8uXouRd/5.webp"
+    ]
+  },
+  {
+    "id": "qAcKEsPO",
+    "name": "Trailhead",
+    "genre": "seminar",
+    "visual_language": "roadmap_timeline",
+    "desc": "Bright warm palette, a dotted trail linking numbered milestones, serif with humanist sans-serif",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "analytical",
+      "warm"
+    ],
+    "source": "qAcKEsPO/style.md",
+    "format": "structured",
+    "previews": [
+      "qAcKEsPO/0.webp",
+      "qAcKEsPO/1.webp",
+      "qAcKEsPO/2.webp",
+      "qAcKEsPO/3.webp",
+      "qAcKEsPO/4.webp",
+      "qAcKEsPO/5.webp"
+    ]
+  },
+  {
+    "id": "AUXs2IOR",
+    "name": "Whiteboard",
+    "genre": "workshop",
+    "visual_language": "hand_drawn",
+    "desc": "Bright and lively, tilted sticky notes + marker handwriting and circle annotations",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "hand_drawn",
+      "playful"
+    ],
+    "source": "AUXs2IOR/style.md",
+    "format": "structured",
+    "previews": [
+      "AUXs2IOR/0.webp",
+      "AUXs2IOR/1.webp",
+      "AUXs2IOR/2.webp",
+      "AUXs2IOR/3.webp",
+      "AUXs2IOR/4.webp",
+      "AUXs2IOR/5.webp"
+    ]
+  },
+  {
+    "id": "mSH24WNN",
+    "name": "Wireframe",
+    "genre": "workshop",
+    "visual_language": "technical_drawing",
+    "desc": "Bright tech minimalism, dashed frames + placeholder color bars and numbered pushpins, mid-review low-fidelity",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "minimal",
+      "techno"
+    ],
+    "source": "mSH24WNN/style.md",
+    "format": "structured",
+    "previews": [
+      "mSH24WNN/0.webp",
+      "mSH24WNN/1.webp",
+      "mSH24WNN/2.webp",
+      "mSH24WNN/3.webp",
+      "mSH24WNN/4.webp",
+      "mSH24WNN/5.webp"
+    ]
+  },
+  {
+    "id": "jVwKWaLK",
+    "name": "Architectural Mono",
+    "genre": "portfolio",
+    "visual_language": "architectural_mono",
+    "desc": "Light architectural gray canvas with B&W brutalist photography, oversized year-stamp numerals and thin hairline dividers",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "photo",
+      "minimal"
+    ],
+    "source": "jVwKWaLK/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "jVwKWaLK/0.webp",
+      "jVwKWaLK/1.webp",
+      "jVwKWaLK/2.webp",
+      "jVwKWaLK/3.webp",
+      "jVwKWaLK/4.webp",
+      "jVwKWaLK/dense.webp"
+    ]
+  },
+  {
+    "id": "ktFQgo28",
+    "name": "Artisan Rust",
+    "genre": "portfolio",
+    "visual_language": "hand_drawn",
+    "desc": "Warm rust canvas with hand-drawn white doodles (hearts/stars/bolts), sticker-style photo borders and tall condensed sans",
+    "aesthetic": "organic",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "organic",
+      "warm",
+      "hand_drawn"
+    ],
+    "source": "ktFQgo28/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "ktFQgo28/0.webp",
+      "ktFQgo28/1.webp",
+      "ktFQgo28/2.webp",
+      "ktFQgo28/3.webp",
+      "ktFQgo28/4.webp",
+      "ktFQgo28/dense.webp"
+    ]
+  },
+  {
+    "id": "QGvxVOHQ",
+    "name": "Artisanal Bloom",
+    "genre": "portfolio",
+    "visual_language": "organic_natural",
+    "desc": "Warm beige canvas with golden botanical fine-line illustrations, flowing script headlines and dotted-line timelines",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "warm",
+      "illustration"
+    ],
+    "source": "QGvxVOHQ/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "QGvxVOHQ/0.webp",
+      "QGvxVOHQ/1.webp",
+      "QGvxVOHQ/2.webp",
+      "QGvxVOHQ/3.webp",
+      "QGvxVOHQ/4.webp",
+      "QGvxVOHQ/dense.webp"
+    ]
+  },
+  {
+    "id": "ZWPBJD9l",
+    "name": "Athletic Energy",
+    "genre": "brand_pitch",
+    "visual_language": "flat_illustration",
+    "desc": "Pale-lime canvas with salmon and mint stippled sports illustrations, chunky blocky headlines and running-track curves",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "illustration",
+      "energetic",
+      "playful"
+    ],
+    "source": "ZWPBJD9l/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "ZWPBJD9l/0.webp",
+      "ZWPBJD9l/1.webp",
+      "ZWPBJD9l/2.webp",
+      "ZWPBJD9l/3.webp",
+      "ZWPBJD9l/4.webp",
+      "ZWPBJD9l/dense.webp"
+    ]
+  },
+  {
+    "id": "XfhHNrdp",
+    "name": "Atrium",
+    "genre": "editorial_report",
+    "visual_language": "organic_natural",
+    "desc": "Warm cream canvas with sage arches, terracotta italic accents and Fraunces display serif in quiet editorial rhythm",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "warm",
+      "organic"
+    ],
+    "source": "XfhHNrdp/style.md",
+    "format": "image-native",
+    "previews": [
+      "XfhHNrdp/0.webp",
+      "XfhHNrdp/1.webp",
+      "XfhHNrdp/2.webp",
+      "XfhHNrdp/3.webp",
+      "XfhHNrdp/4.webp",
+      "XfhHNrdp/5.webp",
+      "XfhHNrdp/dense.webp"
+    ]
+  },
+  {
+    "id": "plk6qz7d",
+    "name": "Biochemical Doodles",
+    "genre": "seminar",
+    "visual_language": "hand_drawn",
+    "desc": "Textured paper canvas with hand-drawn scientific sketches (DNA/beakers/cells) in muted wine and sage tones",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "academic",
+      "organic"
+    ],
+    "source": "plk6qz7d/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "plk6qz7d/0.webp",
+      "plk6qz7d/1.webp",
+      "plk6qz7d/2.webp",
+      "plk6qz7d/3.webp",
+      "plk6qz7d/4.webp",
+      "plk6qz7d/dense.webp"
+    ]
+  },
+  {
+    "id": "PFQIMRa0",
+    "name": "Botanical Journal",
+    "genre": "seminar",
+    "visual_language": "collage",
+    "desc": "Warm cream canvas with torn notebook paper, washi tape strips, hand-drawn botanical doodles and bubbly script headings",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "hand_drawn",
+      "organic",
+      "playful"
+    ],
+    "source": "PFQIMRa0/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "PFQIMRa0/0.webp",
+      "PFQIMRa0/1.webp",
+      "PFQIMRa0/2.webp",
+      "PFQIMRa0/3.webp",
+      "PFQIMRa0/4.webp",
+      "PFQIMRa0/5.webp",
+      "PFQIMRa0/dense.webp"
+    ]
+  },
+  {
+    "id": "ApAhzbPc",
+    "name": "Chalkboard",
+    "genre": "seminar",
+    "visual_language": "chalkboard",
+    "desc": "Dark green chalkboard canvas inside a tan wood frame with handwritten chalk-white type and dashed yellow underline rules",
+    "aesthetic": "playful",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "hand_drawn",
+      "academic",
+      "playful"
+    ],
+    "source": "ApAhzbPc/style.md",
+    "format": "image-native",
+    "previews": [
+      "ApAhzbPc/0.webp",
+      "ApAhzbPc/1.webp",
+      "ApAhzbPc/2.webp",
+      "ApAhzbPc/3.webp",
+      "ApAhzbPc/4.webp",
+      "ApAhzbPc/5.webp",
+      "ApAhzbPc/dense.webp"
+    ]
+  },
+  {
+    "id": "pDwcRW61",
+    "name": "Classic Pop",
+    "genre": "portfolio",
+    "visual_language": "collage",
+    "desc": "High-saturation solid canvas rotating per slide with classical marble sculpture cutouts, neon pop props and ultra-bold sans",
+    "aesthetic": "artistic",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "playful",
+      "editorial"
+    ],
+    "source": "pDwcRW61/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "pDwcRW61/0.webp",
+      "pDwcRW61/1.webp",
+      "pDwcRW61/2.webp",
+      "pDwcRW61/3.webp",
+      "pDwcRW61/4.webp",
+      "pDwcRW61/dense.webp"
+    ]
+  },
+  {
+    "id": "PvI0ioy8",
+    "name": "Classical Gallery",
+    "genre": "seminar",
+    "visual_language": "editorial_print",
+    "desc": "Parchment canvas with sage-green blocks, pink and dark-olive ornamental filigree accents and classical sculpture anchors",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "academic",
+      "editorial",
+      "luxe"
+    ],
+    "source": "PvI0ioy8/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "PvI0ioy8/0.webp",
+      "PvI0ioy8/1.webp",
+      "PvI0ioy8/2.webp",
+      "PvI0ioy8/3.webp",
+      "PvI0ioy8/4.webp",
+      "PvI0ioy8/5.webp",
+      "PvI0ioy8/dense.webp"
+    ]
+  },
+  {
+    "id": "cTbuBl70",
+    "name": "Classical Scrapbook",
+    "genre": "portfolio",
+    "visual_language": "collage",
+    "desc": "Kraft paper canvas with torn-edge parchment layers, classical sculpture cutouts, washi tape and flowing cursive script",
+    "aesthetic": "artistic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "academic",
+      "luxe"
+    ],
+    "source": "cTbuBl70/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "cTbuBl70/0.webp",
+      "cTbuBl70/1.webp",
+      "cTbuBl70/2.webp",
+      "cTbuBl70/3.webp",
+      "cTbuBl70/4.webp",
+      "cTbuBl70/5.webp",
+      "cTbuBl70/dense.webp"
+    ]
+  },
+  {
+    "id": "7eCJEvt3",
+    "name": "Clinical Doodles",
+    "genre": "seminar",
+    "visual_language": "hand_drawn",
+    "desc": "Soft sky-blue canvas with grid paper texture, hand-drawn nurse doodles, cloud containers and Schoolbell handwriting",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "playful",
+      "illustration"
+    ],
+    "source": "7eCJEvt3/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "7eCJEvt3/0.webp",
+      "7eCJEvt3/1.webp",
+      "7eCJEvt3/2.webp",
+      "7eCJEvt3/3.webp",
+      "7eCJEvt3/4.webp",
+      "7eCJEvt3/dense.webp"
+    ]
+  },
+  {
+    "id": "PiOWlVJz",
+    "name": "Collage",
+    "genre": "portfolio",
+    "visual_language": "collage",
+    "desc": "Warm paper canvas with torn cut-paper shapes in muted brights, translucent tape strips and halftone patches",
+    "aesthetic": "artistic",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "hand_drawn",
+      "editorial",
+      "playful"
+    ],
+    "source": "PiOWlVJz/style.md",
+    "format": "image-native",
+    "previews": [
+      "PiOWlVJz/0.webp",
+      "PiOWlVJz/1.webp",
+      "PiOWlVJz/2.webp",
+      "PiOWlVJz/3.webp",
+      "PiOWlVJz/4.webp",
+      "PiOWlVJz/5.webp",
+      "PiOWlVJz/dense.webp"
+    ]
+  },
+  {
+    "id": "E2dyIRpT",
+    "name": "Creative Classroom",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "Soft cream canvas with chalkboard-green wood-frame boards, playful 2D vector illustrations and hand-drawn edges",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "illustration",
+      "playful",
+      "academic"
+    ],
+    "source": "E2dyIRpT/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "E2dyIRpT/0.webp",
+      "E2dyIRpT/1.webp",
+      "E2dyIRpT/2.webp",
+      "E2dyIRpT/3.webp",
+      "E2dyIRpT/4.webp",
+      "E2dyIRpT/dense.webp"
+    ]
+  },
+  {
+    "id": "aPCI4B6R",
+    "name": "Creative Notebook",
+    "genre": "workshop",
+    "visual_language": "journal_figure",
+    "desc": "White graph-paper canvas with pastel coral and blue organic blobs, numbered pill cards and sticky-note accents",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "playful",
+      "academic",
+      "illustration"
+    ],
+    "source": "aPCI4B6R/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "aPCI4B6R/0.webp",
+      "aPCI4B6R/1.webp",
+      "aPCI4B6R/2.webp",
+      "aPCI4B6R/3.webp",
+      "aPCI4B6R/4.webp",
+      "aPCI4B6R/dense.webp"
+    ]
+  },
+  {
+    "id": "eJ1WiPGf",
+    "name": "Creative Spark",
+    "genre": "brand_pitch",
+    "visual_language": "magazine_editorial",
+    "desc": "Deep charcoal canvas with neon-lilac accents, elegant script paired with heavy block sans and four-point sparkle motifs",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "neon",
+      "editorial",
+      "luxe"
+    ],
+    "source": "eJ1WiPGf/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "eJ1WiPGf/0.webp",
+      "eJ1WiPGf/1.webp",
+      "eJ1WiPGf/2.webp",
+      "eJ1WiPGf/3.webp",
+      "eJ1WiPGf/4.webp",
+      "eJ1WiPGf/dense.webp"
+    ]
+  },
+  {
+    "id": "60BZxqXG",
+    "name": "Creative Workshop",
+    "genre": "workshop",
+    "visual_language": "flat_illustration",
+    "desc": "White notebook-grid canvas with pastel pink wavy blobs, kawaii art-supply doodles and multi-color blocky headings",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "illustration",
+      "hand_drawn"
+    ],
+    "source": "60BZxqXG/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "60BZxqXG/0.webp",
+      "60BZxqXG/1.webp",
+      "60BZxqXG/2.webp",
+      "60BZxqXG/3.webp",
+      "60BZxqXG/4.webp",
+      "60BZxqXG/dense.webp"
+    ]
+  },
+  {
+    "id": "GLM76O18",
+    "name": "Cyber AI",
+    "genre": "keynote",
+    "visual_language": "neon_tech",
+    "desc": "Deep midnight-blue canvas with neon-purple and electric-cyan accents, 3D glowing robot illustrations and isometric UI blocks",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon",
+      "gradient"
+    ],
+    "source": "GLM76O18/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "GLM76O18/0.webp",
+      "GLM76O18/1.webp",
+      "GLM76O18/2.webp",
+      "GLM76O18/3.webp",
+      "GLM76O18/4.webp",
+      "GLM76O18/5.webp",
+      "GLM76O18/dense.webp"
+    ]
+  },
+  {
+    "id": "SRFpqgIh",
+    "name": "Cyber Pixel",
+    "genre": "keynote",
+    "visual_language": "pixel_art",
+    "desc": "Deep navy canvas with pixelated 8-bit icons in cyan and magenta, neon glow effects and floating pixel motifs",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon",
+      "retro"
+    ],
+    "source": "SRFpqgIh/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "SRFpqgIh/0.webp",
+      "SRFpqgIh/1.webp",
+      "SRFpqgIh/2.webp",
+      "SRFpqgIh/3.webp",
+      "SRFpqgIh/4.webp",
+      "SRFpqgIh/dense.webp"
+    ]
+  },
+  {
+    "id": "ZIpXZOJz",
+    "name": "Deep Forest",
+    "genre": "editorial_report",
+    "visual_language": "magazine_editorial",
+    "desc": "Off-white canvas with full-bleed forest and mountain photography, wide bold sans headlines and minimal leaf accents",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "photo",
+      "organic",
+      "editorial"
+    ],
+    "source": "ZIpXZOJz/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "ZIpXZOJz/0.webp",
+      "ZIpXZOJz/1.webp",
+      "ZIpXZOJz/2.webp",
+      "ZIpXZOJz/3.webp",
+      "ZIpXZOJz/4.webp",
+      "ZIpXZOJz/dense.webp"
+    ]
+  },
+  {
+    "id": "sGsYSO2z",
+    "name": "Deformed Flat Persona",
+    "genre": "brand_pitch",
+    "visual_language": "flat_illustration",
+    "desc": "Flat solid-color canvas with deformed thick-outlined character illustrations in a gentle three-color palette",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "illustration",
+      "playful",
+      "minimal"
+    ],
+    "source": "sGsYSO2z/style.md",
+    "format": "image-native",
+    "previews": [
+      "sGsYSO2z/0.webp",
+      "sGsYSO2z/1.webp",
+      "sGsYSO2z/2.webp",
+      "sGsYSO2z/3.webp",
+      "sGsYSO2z/4.webp",
+      "sGsYSO2z/dense.webp"
+    ]
+  },
+  {
+    "id": "3R0cmpfr",
+    "name": "Digital Neo Pop",
+    "genre": "brand_pitch",
+    "visual_language": "flat_illustration",
+    "desc": "White dot-pattern canvas with organic amoeba shapes in vivid pink/cyan/purple, gothic outline typography and SNS-style motifs",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "illustration",
+      "gradient"
+    ],
+    "source": "3R0cmpfr/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "3R0cmpfr/0.webp",
+      "3R0cmpfr/1.webp",
+      "3R0cmpfr/2.webp",
+      "3R0cmpfr/3.webp",
+      "3R0cmpfr/4.webp",
+      "3R0cmpfr/dense.webp"
+    ]
+  },
+  {
+    "id": "VemtZBkr",
+    "name": "Drafting Room",
+    "genre": "seminar",
+    "visual_language": "technical_drawing",
+    "desc": "Drafting-blue canvas with fine graph-paper grid, blueprint-white outlines, dimension lines and diagonal hatching",
+    "aesthetic": "analytical",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "architectural",
+      "analytical",
+      "techno"
+    ],
+    "source": "VemtZBkr/style.md",
+    "format": "image-native",
+    "previews": [
+      "VemtZBkr/0.webp",
+      "VemtZBkr/1.webp",
+      "VemtZBkr/2.webp",
+      "VemtZBkr/3.webp",
+      "VemtZBkr/4.webp",
+      "VemtZBkr/5.webp",
+      "VemtZBkr/dense.webp"
+    ]
+  },
+  {
+    "id": "kxSvDxo0",
+    "name": "Eco Modern",
+    "genre": "brand_pitch",
+    "visual_language": "magazine_editorial",
+    "desc": "Dark canvas with full-bleed nature photography, frosted-glass containers, bold geometric sans and vibrant lime accent dots",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "photo",
+      "organic",
+      "glass"
+    ],
+    "source": "kxSvDxo0/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "kxSvDxo0/0.webp",
+      "kxSvDxo0/1.webp",
+      "kxSvDxo0/2.webp",
+      "kxSvDxo0/3.webp",
+      "kxSvDxo0/4.webp",
+      "kxSvDxo0/5.webp",
+      "kxSvDxo0/dense.webp"
+    ]
+  },
+  {
+    "id": "Sb5wFPGA",
+    "name": "Expedition",
+    "genre": "seminar",
+    "visual_language": "journal_figure",
+    "desc": "Parchment canvas with sepia borders, dashed route lines connecting numbered port circles and compass rose motifs",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "retro",
+      "editorial",
+      "academic"
+    ],
+    "source": "Sb5wFPGA/style.md",
+    "format": "image-native",
+    "previews": [
+      "Sb5wFPGA/0.webp",
+      "Sb5wFPGA/1.webp",
+      "Sb5wFPGA/2.webp",
+      "Sb5wFPGA/3.webp",
+      "Sb5wFPGA/4.webp",
+      "Sb5wFPGA/dense.webp"
+    ]
+  },
+  {
+    "id": "S8Z5Fv2V",
+    "name": "Field Notes",
+    "genre": "consulting_report",
+    "visual_language": "journal_figure",
+    "desc": "Kraft-brown canvas with rotated white ruled index cards, masking tape, typewriter monospace and red pencil ellipses",
+    "aesthetic": "analytical",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "academic",
+      "hand_drawn",
+      "editorial"
+    ],
+    "source": "S8Z5Fv2V/style.md",
+    "format": "image-native",
+    "previews": [
+      "S8Z5Fv2V/0.webp",
+      "S8Z5Fv2V/1.webp",
+      "S8Z5Fv2V/2.webp",
+      "S8Z5Fv2V/3.webp",
+      "S8Z5Fv2V/4.webp",
+      "S8Z5Fv2V/5.webp",
+      "S8Z5Fv2V/dense.webp"
+    ]
+  },
+  {
+    "id": "QsuDJvF6",
+    "name": "Film Scrapbook",
+    "genre": "portfolio",
+    "visual_language": "collage",
+    "desc": "Charcoal-black canvas with film-strip borders, ripped cream paper containers and mustard hand-drawn highlight circles",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "hand_drawn",
+      "retro"
+    ],
+    "source": "QsuDJvF6/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "QsuDJvF6/0.webp",
+      "QsuDJvF6/1.webp",
+      "QsuDJvF6/2.webp",
+      "QsuDJvF6/3.webp",
+      "QsuDJvF6/4.webp",
+      "QsuDJvF6/dense.webp"
+    ]
+  },
+  {
+    "id": "j2s0xyoG",
+    "name": "Fresh Catering",
+    "genre": "brand_pitch",
+    "visual_language": "apple_minimal",
+    "desc": "White canvas with warm terracotta rounded cards, peach circular background accents and clean Poppins geometric sans",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "warm",
+      "minimal",
+      "corporate"
+    ],
+    "source": "j2s0xyoG/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "j2s0xyoG/0.webp",
+      "j2s0xyoG/1.webp",
+      "j2s0xyoG/2.webp",
+      "j2s0xyoG/3.webp",
+      "j2s0xyoG/4.webp",
+      "j2s0xyoG/dense.webp"
+    ]
+  },
+  {
+    "id": "Nx1QoJtX",
+    "name": "Garden Doodles",
+    "genre": "portfolio",
+    "visual_language": "hand_drawn",
+    "desc": "Soft-beige canvas with hand-drawn sun/plant/flower doodles in terracotta and sage, rounded containers and Mali handwriting",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "warm",
+      "organic"
+    ],
+    "source": "Nx1QoJtX/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "Nx1QoJtX/0.webp",
+      "Nx1QoJtX/1.webp",
+      "Nx1QoJtX/2.webp",
+      "Nx1QoJtX/3.webp",
+      "Nx1QoJtX/4.webp",
+      "Nx1QoJtX/dense.webp"
+    ]
+  },
+  {
+    "id": "zv857Vl1",
+    "name": "Groovy 70s",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "Warm-cream canvas with wavy multi-color rainbow stripes in burnt orange/mustard/teal and psychedelic display serif",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "warm",
+      "playful"
+    ],
+    "source": "zv857Vl1/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "zv857Vl1/0.webp",
+      "zv857Vl1/1.webp",
+      "zv857Vl1/2.webp",
+      "zv857Vl1/3.webp",
+      "zv857Vl1/4.webp",
+      "zv857Vl1/dense.webp"
+    ]
+  },
+  {
+    "id": "Nlnxa0Kn",
+    "name": "Hand Drawn Scrapbook",
+    "genre": "workshop",
+    "visual_language": "collage",
+    "desc": "Cream canvas with pastel gingham grid, hand-drawn Kawaii doodles (flowers/hearts) and washi tape banner strips",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "playful",
+      "illustration"
+    ],
+    "source": "Nlnxa0Kn/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "Nlnxa0Kn/0.webp",
+      "Nlnxa0Kn/1.webp",
+      "Nlnxa0Kn/2.webp",
+      "Nlnxa0Kn/3.webp",
+      "Nlnxa0Kn/4.webp",
+      "Nlnxa0Kn/dense.webp"
+    ]
+  },
+  {
+    "id": "yh8g2L65",
+    "name": "Kawaii Playful",
+    "genre": "workshop",
+    "visual_language": "flat_illustration",
+    "desc": "Pale-cream canvas with subtle green notebook grid, chibi cat character illustrations and rounded bubble headings",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "illustration",
+      "hand_drawn"
+    ],
+    "source": "yh8g2L65/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "yh8g2L65/0.webp",
+      "yh8g2L65/1.webp",
+      "yh8g2L65/2.webp",
+      "yh8g2L65/3.webp",
+      "yh8g2L65/4.webp",
+      "yh8g2L65/5.webp",
+      "yh8g2L65/dense.webp"
+    ]
+  },
+  {
+    "id": "0NRRfmWY",
+    "name": "Kawaii Pop",
+    "genre": "portfolio",
+    "visual_language": "flat_illustration",
+    "desc": "Cream canvas with pastel-pink halftone patterns, bubbly clouds and melting drip shapes with navy bubbly script",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "retro",
+      "illustration"
+    ],
+    "source": "0NRRfmWY/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "0NRRfmWY/0.webp",
+      "0NRRfmWY/1.webp",
+      "0NRRfmWY/2.webp",
+      "0NRRfmWY/3.webp",
+      "0NRRfmWY/4.webp",
+      "0NRRfmWY/dense.webp"
+    ]
+  },
+  {
+    "id": "WkmAgmg9",
+    "name": "Kawaii Wellness",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "Creamy-white canvas with pastel-pink checkered accents, chubby kawaii fitness characters and twinkling star sparkles",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "playful",
+      "illustration",
+      "hand_drawn"
+    ],
+    "source": "WkmAgmg9/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "WkmAgmg9/0.webp",
+      "WkmAgmg9/1.webp",
+      "WkmAgmg9/2.webp",
+      "WkmAgmg9/3.webp",
+      "WkmAgmg9/4.webp",
+      "WkmAgmg9/dense.webp"
+    ]
+  },
+  {
+    "id": "31YO9XTx",
+    "name": "Learning Time",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "Soft-cream canvas with grained-texture geometric shapes in sky-blue/emerald/coral, hourglass icons and Venn-style bullets",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "academic",
+      "illustration",
+      "playful"
+    ],
+    "source": "31YO9XTx/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "31YO9XTx/0.webp",
+      "31YO9XTx/1.webp",
+      "31YO9XTx/2.webp",
+      "31YO9XTx/3.webp",
+      "31YO9XTx/4.webp",
+      "31YO9XTx/dense.webp"
+    ]
+  },
+  {
+    "id": "tuVGyEMP",
+    "name": "Lookbook",
+    "genre": "brand_pitch",
+    "visual_language": "lookbook",
+    "desc": "Warm near-black canvas with tonal gradient reference plates, Playfair serif titles, uppercase Archivo labels and single amber accent",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "luxe",
+      "photo"
+    ],
+    "source": "tuVGyEMP/style.md",
+    "format": "image-native",
+    "previews": [
+      "tuVGyEMP/0.webp",
+      "tuVGyEMP/1.webp",
+      "tuVGyEMP/2.webp",
+      "tuVGyEMP/3.webp",
+      "tuVGyEMP/4.webp",
+      "tuVGyEMP/5.webp",
+      "tuVGyEMP/dense.webp"
+    ]
+  },
+  {
+    "id": "RTTSTGzQ",
+    "name": "Lush Minimal",
+    "genre": "portfolio",
+    "visual_language": "organic_natural",
+    "desc": "Minty-white canvas with sage/olive accents, rounded botanical photography containers and donut charts at studio pace",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "photo",
+      "minimal"
+    ],
+    "source": "RTTSTGzQ/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "RTTSTGzQ/0.webp",
+      "RTTSTGzQ/1.webp",
+      "RTTSTGzQ/2.webp",
+      "RTTSTGzQ/3.webp",
+      "RTTSTGzQ/4.webp",
+      "RTTSTGzQ/dense.webp"
+    ]
+  },
+  {
+    "id": "PfSLcshR",
+    "name": "Luxury Editorial",
+    "genre": "brand_pitch",
+    "visual_language": "magazine_editorial",
+    "desc": "Deep-espresso canvas with gold sparkle accents, condensed serif headlines paired with cursive script and macro fashion photography",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "luxe",
+      "editorial",
+      "photo"
+    ],
+    "source": "PfSLcshR/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "PfSLcshR/0.webp",
+      "PfSLcshR/1.webp",
+      "PfSLcshR/2.webp",
+      "PfSLcshR/3.webp",
+      "PfSLcshR/4.webp",
+      "PfSLcshR/dense.webp"
+    ]
+  },
+  {
+    "id": "Nt8VmtdA",
+    "name": "Magazine Style",
+    "genre": "editorial_report",
+    "visual_language": "magazine_editorial",
+    "desc": "Matte dusty-pink canvas with large centered cutout portrait, asymmetric speech bubbles and L-shaped crop marks in corners",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "warm",
+      "playful"
+    ],
+    "source": "Nt8VmtdA/style.md",
+    "format": "image-native",
+    "previews": [
+      "Nt8VmtdA/0.webp",
+      "Nt8VmtdA/1.webp",
+      "Nt8VmtdA/2.webp",
+      "Nt8VmtdA/3.webp",
+      "Nt8VmtdA/4.webp",
+      "Nt8VmtdA/dense.webp"
+    ]
+  },
+  {
+    "id": "G1k2Q0kO",
+    "name": "Medicine Pop",
+    "genre": "brand_pitch",
+    "visual_language": "flat_illustration",
+    "desc": "Cream canvas with deep-purple and energy-orange medical vector illustrations, large plus symbols and saturated color blocks",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "illustration",
+      "playful",
+      "corporate"
+    ],
+    "source": "G1k2Q0kO/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "G1k2Q0kO/0.webp",
+      "G1k2Q0kO/1.webp",
+      "G1k2Q0kO/2.webp",
+      "G1k2Q0kO/3.webp",
+      "G1k2Q0kO/4.webp",
+      "G1k2Q0kO/dense.webp"
+    ]
+  },
+  {
+    "id": "aHJxaPu1",
+    "name": "Midnight Tactical",
+    "genre": "brand_pitch",
+    "visual_language": "neon_tech",
+    "desc": "Matte-black canvas with tilted lime-green highlight boxes, dark-green pill labels, chevron accents and monospace metadata",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon",
+      "editorial"
+    ],
+    "source": "aHJxaPu1/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "aHJxaPu1/0.webp",
+      "aHJxaPu1/1.webp",
+      "aHJxaPu1/2.webp",
+      "aHJxaPu1/3.webp",
+      "aHJxaPu1/4.webp",
+      "aHJxaPu1/dense.webp"
+    ]
+  },
+  {
+    "id": "HhR317Cx",
+    "name": "Neo Retro Dev Deck",
+    "genre": "keynote",
+    "visual_language": "pixel_art",
+    "desc": "Cream grid-paper canvas with stacked color blocks in hot pink/yellow/cyan and thick black borders, plus 8-bit pixel icons",
+    "aesthetic": "tech",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "techno",
+      "editorial"
+    ],
+    "source": "HhR317Cx/style.md",
+    "format": "image-native",
+    "previews": [
+      "HhR317Cx/0.webp",
+      "HhR317Cx/1.webp",
+      "HhR317Cx/2.webp",
+      "HhR317Cx/3.webp",
+      "HhR317Cx/4.webp",
+      "HhR317Cx/dense.webp"
+    ]
+  },
+  {
+    "id": "I84oH000",
+    "name": "Notebook",
+    "genre": "seminar",
+    "visual_language": "journal_figure",
+    "desc": "White ruled-notebook canvas with red margin line, punch holes, handwritten headings and yellow/green highlighter strokes",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "academic",
+      "playful"
+    ],
+    "source": "I84oH000/style.md",
+    "format": "image-native",
+    "previews": [
+      "I84oH000/0.webp",
+      "I84oH000/1.webp",
+      "I84oH000/2.webp",
+      "I84oH000/3.webp",
+      "I84oH000/4.webp",
+      "I84oH000/5.webp",
+      "I84oH000/dense.webp"
+    ]
+  },
+  {
+    "id": "nElhNkug",
+    "name": "Observatory",
+    "genre": "seminar",
+    "visual_language": "journal_figure",
+    "desc": "Deep blue-black radial-gradient canvas with scattered star dots, italic display serif and constellation-line data motifs",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "editorial",
+      "academic",
+      "gradient"
+    ],
+    "source": "nElhNkug/style.md",
+    "format": "image-native",
+    "previews": [
+      "nElhNkug/0.webp",
+      "nElhNkug/1.webp",
+      "nElhNkug/2.webp",
+      "nElhNkug/3.webp",
+      "nElhNkug/4.webp",
+      "nElhNkug/5.webp",
+      "nElhNkug/dense.webp"
+    ]
+  },
+  {
+    "id": "buBjZ6AO",
+    "name": "Outrun",
+    "genre": "brand_pitch",
+    "visual_language": "synthwave",
+    "desc": "Violet-to-orange synthwave sky canvas with glowing pink perspective grid horizon and chrome-effect Orbitron headlines",
+    "aesthetic": "artistic",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "neon",
+      "gradient"
+    ],
+    "source": "buBjZ6AO/style.md",
+    "format": "image-native",
+    "previews": [
+      "buBjZ6AO/0.webp",
+      "buBjZ6AO/1.webp",
+      "buBjZ6AO/2.webp",
+      "buBjZ6AO/3.webp",
+      "buBjZ6AO/4.webp",
+      "buBjZ6AO/5.webp",
+      "buBjZ6AO/dense.webp"
+    ]
+  },
+  {
+    "id": "4wYhQRBX",
+    "name": "Pink Street Style",
+    "genre": "brand_pitch",
+    "visual_language": "flat_illustration",
+    "desc": "Pink canvas with pop deformed thick-line illustrations, white and black text and squishy soft-shape photo trims",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "street",
+      "playful",
+      "illustration"
+    ],
+    "source": "4wYhQRBX/style.md",
+    "format": "image-native",
+    "previews": [
+      "4wYhQRBX/0.webp",
+      "4wYhQRBX/1.webp",
+      "4wYhQRBX/2.webp",
+      "4wYhQRBX/3.webp",
+      "4wYhQRBX/4.webp",
+      "4wYhQRBX/dense.webp"
+    ]
+  },
+  {
+    "id": "Bm0U0xf7",
+    "name": "Polaroid",
+    "genre": "portfolio",
+    "visual_language": "collage",
+    "desc": "Warm-wall canvas with rotated white polaroid cards, colored washi tape strips and Playfair italic captions",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "warm",
+      "editorial",
+      "retro"
+    ],
+    "source": "Bm0U0xf7/style.md",
+    "format": "image-native",
+    "previews": [
+      "Bm0U0xf7/0.webp",
+      "Bm0U0xf7/1.webp",
+      "Bm0U0xf7/2.webp",
+      "Bm0U0xf7/3.webp",
+      "Bm0U0xf7/4.webp",
+      "Bm0U0xf7/dense.webp"
+    ]
+  },
+  {
+    "id": "FeoFsol1",
+    "name": "Pop Retro",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "Saturated magenta and yellow canvas with oversized script typography, dynamic color blocks and high-contrast concert photography",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "retro",
+      "playful",
+      "editorial"
+    ],
+    "source": "FeoFsol1/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "FeoFsol1/0.webp",
+      "FeoFsol1/1.webp",
+      "FeoFsol1/2.webp",
+      "FeoFsol1/3.webp",
+      "FeoFsol1/4.webp",
+      "FeoFsol1/dense.webp"
+    ]
+  },
+  {
+    "id": "9dtOy8Bp",
+    "name": "Prestige Gold",
+    "genre": "investor_pitch",
+    "visual_language": "luxury_minimal",
+    "desc": "Deep-navy canvas with old-gold ethereal light curves, thin gold borders, serif headlines and golden-hour architectural photography",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "luxe",
+      "editorial",
+      "photo"
+    ],
+    "source": "9dtOy8Bp/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "9dtOy8Bp/0.webp",
+      "9dtOy8Bp/1.webp",
+      "9dtOy8Bp/2.webp",
+      "9dtOy8Bp/3.webp",
+      "9dtOy8Bp/4.webp",
+      "9dtOy8Bp/dense.webp"
+    ]
+  },
+  {
+    "id": "1cPwvMlw",
+    "name": "Prime Noir",
+    "genre": "brand_pitch",
+    "visual_language": "luxury_minimal",
+    "desc": "Matte-black canvas with deep-burgundy tonal shadows, delicate white botanical corner illustrations and Cinzel classical caps",
+    "aesthetic": "editorial",
+    "tone": "dark",
+    "energy": "restrained",
+    "mood": [
+      "luxe",
+      "editorial",
+      "photo"
+    ],
+    "source": "1cPwvMlw/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "1cPwvMlw/0.webp",
+      "1cPwvMlw/1.webp",
+      "1cPwvMlw/2.webp",
+      "1cPwvMlw/3.webp",
+      "1cPwvMlw/4.webp",
+      "1cPwvMlw/dense.webp"
+    ]
+  },
+  {
+    "id": "u25YVICm",
+    "name": "Project Launch",
+    "genre": "workshop",
+    "visual_language": "hand_drawn",
+    "desc": "White canvas with deep-blue/orange/magenta color blocks, sketchy hand-drawn people doodles and rough underline strokes",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "hand_drawn",
+      "illustration"
+    ],
+    "source": "u25YVICm/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "u25YVICm/0.webp",
+      "u25YVICm/1.webp",
+      "u25YVICm/2.webp",
+      "u25YVICm/3.webp",
+      "u25YVICm/4.webp",
+      "u25YVICm/dense.webp"
+    ]
+  },
+  {
+    "id": "YidHU7Xn",
+    "name": "Royal Blue Red Watercolor",
+    "genre": "portfolio",
+    "visual_language": "watercolor",
+    "desc": "Wet-watercolor canvas in royal-blue and red washes with flowing artistic strokes for expressive layouts",
+    "aesthetic": "artistic",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "hand_drawn",
+      "editorial",
+      "warm"
+    ],
+    "source": "YidHU7Xn/style.md",
+    "format": "image-native",
+    "previews": [
+      "YidHU7Xn/0.webp",
+      "YidHU7Xn/1.webp",
+      "YidHU7Xn/2.webp",
+      "YidHU7Xn/3.webp",
+      "YidHU7Xn/4.webp",
+      "YidHU7Xn/dense.webp"
+    ]
+  },
+  {
+    "id": "SM1Slxrj",
+    "name": "Scholars Journal",
+    "genre": "seminar",
+    "visual_language": "journal_figure",
+    "desc": "Grayish parchment canvas with deep-indigo engraved line art of botanical and architectural subjects and slab serif headings",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "academic",
+      "editorial",
+      "illustration"
+    ],
+    "source": "SM1Slxrj/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "SM1Slxrj/0.webp",
+      "SM1Slxrj/1.webp",
+      "SM1Slxrj/2.webp",
+      "SM1Slxrj/3.webp",
+      "SM1Slxrj/4.webp",
+      "SM1Slxrj/dense.webp"
+    ]
+  },
+  {
+    "id": "hU5uCnYE",
+    "name": "Science Sketch",
+    "genre": "seminar",
+    "visual_language": "hand_drawn",
+    "desc": "Light-cream canvas with clean indigo doodles filled in sunflower yellow, graph paper accents and Schoolbell handwriting",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "academic",
+      "illustration"
+    ],
+    "source": "hU5uCnYE/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "hU5uCnYE/0.webp",
+      "hU5uCnYE/1.webp",
+      "hU5uCnYE/2.webp",
+      "hU5uCnYE/3.webp",
+      "hU5uCnYE/4.webp",
+      "hU5uCnYE/dense.webp"
+    ]
+  },
+  {
+    "id": "K6jAFyBM",
+    "name": "Scrapbook",
+    "genre": "workshop",
+    "visual_language": "collage",
+    "desc": "Warm-cream paper canvas with rotated taped cards, washi strips, Fraunces serif headlines and Caveat annotation captions",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "hand_drawn",
+      "warm",
+      "editorial"
+    ],
+    "source": "K6jAFyBM/style.md",
+    "format": "image-native",
+    "previews": [
+      "K6jAFyBM/0.webp",
+      "K6jAFyBM/1.webp",
+      "K6jAFyBM/2.webp",
+      "K6jAFyBM/3.webp",
+      "K6jAFyBM/4.webp",
+      "K6jAFyBM/5.webp",
+      "K6jAFyBM/dense.webp"
+    ]
+  },
+  {
+    "id": "7yneKgr9",
+    "name": "Sports Athletic Energy",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "Asphalt-black canvas with bolt-lime and neon-orange accents, extra-bold italic gothic headlines and jersey-style stencil numbers",
+    "aesthetic": "playful",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "energetic",
+      "neon",
+      "editorial"
+    ],
+    "source": "7yneKgr9/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "7yneKgr9/0.webp",
+      "7yneKgr9/1.webp",
+      "7yneKgr9/2.webp",
+      "7yneKgr9/3.webp",
+      "7yneKgr9/4.webp",
+      "7yneKgr9/dense.webp"
+    ]
+  },
+  {
+    "id": "vKWThA9U",
+    "name": "Street Custom",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "Soft-cream canvas with electric-blue and bright-orange brush strokes, organic blob image masks and Fraunces serif headlines",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "street",
+      "editorial",
+      "playful"
+    ],
+    "source": "vKWThA9U/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "vKWThA9U/0.webp",
+      "vKWThA9U/1.webp",
+      "vKWThA9U/2.webp",
+      "vKWThA9U/3.webp",
+      "vKWThA9U/4.webp",
+      "vKWThA9U/dense.webp"
+    ]
+  },
+  {
+    "id": "t6BS2Trx",
+    "name": "Studio / Mockup / Premium",
+    "genre": "keynote",
+    "visual_language": "product_showcase",
+    "desc": "White studio-floor canvas with photorealistic device mockups, ultra-bold headlines and one purple or yellow accent per page",
+    "aesthetic": "tech",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "photo",
+      "minimal",
+      "luxe"
+    ],
+    "source": "t6BS2Trx/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "t6BS2Trx/0.webp",
+      "t6BS2Trx/1.webp",
+      "t6BS2Trx/2.webp",
+      "t6BS2Trx/3.webp",
+      "t6BS2Trx/4.webp",
+      "t6BS2Trx/dense.webp"
+    ]
+  },
+  {
+    "id": "iKFaMZnt",
+    "name": "Summer Collage",
+    "genre": "brand_pitch",
+    "visual_language": "magazine_editorial",
+    "desc": "White high-key canvas with vibrant summer photo collages, condensed all-caps sans and flowing handwritten script accents",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "photo",
+      "editorial",
+      "warm"
+    ],
+    "source": "iKFaMZnt/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "iKFaMZnt/0.webp",
+      "iKFaMZnt/1.webp",
+      "iKFaMZnt/2.webp",
+      "iKFaMZnt/3.webp",
+      "iKFaMZnt/4.webp",
+      "iKFaMZnt/5.webp",
+      "iKFaMZnt/dense.webp"
+    ]
+  },
+  {
+    "id": "ee9EMIEu",
+    "name": "Tech Art Neon",
+    "genre": "keynote",
+    "visual_language": "constructivist",
+    "desc": "Warm-gray beige canvas with neon-yellow geometric shapes, monochrome cut-out portraits and architectural draft-line grids",
+    "aesthetic": "artistic",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "neon",
+      "architectural",
+      "editorial"
+    ],
+    "source": "ee9EMIEu/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "ee9EMIEu/0.webp",
+      "ee9EMIEu/1.webp",
+      "ee9EMIEu/2.webp",
+      "ee9EMIEu/3.webp",
+      "ee9EMIEu/4.webp",
+      "ee9EMIEu/dense.webp"
+    ]
+  },
+  {
+    "id": "3JyGysqo",
+    "name": "Tech Pitch",
+    "genre": "investor_pitch",
+    "visual_language": "neon_tech",
+    "desc": "Matte-black canvas with neon-lime accents, grayscale industrial photography, bold white sans and thin lime line charts",
+    "aesthetic": "tech",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "techno",
+      "neon",
+      "photo",
+      "minimal"
+    ],
+    "source": "3JyGysqo/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "3JyGysqo/0.webp",
+      "3JyGysqo/1.webp",
+      "3JyGysqo/2.webp",
+      "3JyGysqo/3.webp",
+      "3JyGysqo/4.webp",
+      "3JyGysqo/dense.webp"
+    ]
+  },
+  {
+    "id": "jMwECcGp",
+    "name": "The Seasons",
+    "genre": "brand_pitch",
+    "visual_language": "organic_natural",
+    "desc": "Off-white canvas with deep-olive and terracotta accents, macro botanical photography, stadium-shaped masks and Playfair serif",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "photo",
+      "warm"
+    ],
+    "source": "jMwECcGp/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "jMwECcGp/0.webp",
+      "jMwECcGp/1.webp",
+      "jMwECcGp/2.webp",
+      "jMwECcGp/3.webp",
+      "jMwECcGp/4.webp",
+      "jMwECcGp/5.webp",
+      "jMwECcGp/dense.webp"
+    ]
+  },
+  {
+    "id": "TFxj98rU",
+    "name": "Travel Pulse",
+    "genre": "brand_pitch",
+    "visual_language": "poster_type",
+    "desc": "White canvas with charcoal diagonal striped patterns, vibrant yellow accents, dotted airplane paths and circular info badges",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "editorial",
+      "photo",
+      "corporate"
+    ],
+    "source": "TFxj98rU/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "TFxj98rU/0.webp",
+      "TFxj98rU/1.webp",
+      "TFxj98rU/2.webp",
+      "TFxj98rU/3.webp",
+      "TFxj98rU/4.webp",
+      "TFxj98rU/dense.webp"
+    ]
+  },
+  {
+    "id": "UbjIb0Mq",
+    "name": "Urban Jungle",
+    "genre": "investor_pitch",
+    "visual_language": "organic_natural",
+    "desc": "Soft-beige canvas with moss-green accents, Monstera leaf overlays, ultra-rounded photo containers and clean geometric sans",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "minimal",
+      "corporate"
+    ],
+    "source": "UbjIb0Mq/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "UbjIb0Mq/0.webp",
+      "UbjIb0Mq/1.webp",
+      "UbjIb0Mq/2.webp",
+      "UbjIb0Mq/3.webp",
+      "UbjIb0Mq/4.webp",
+      "UbjIb0Mq/dense.webp"
+    ]
+  },
+  {
+    "id": "uM7PKLTE",
+    "name": "Urban Ribbon",
+    "genre": "consulting_report",
+    "visual_language": "poster_type",
+    "desc": "Charcoal and beige canvas with 3D-folded ribbon overlays, diagonal parallelogram slices and golden-hour cityscape photography",
+    "aesthetic": "corporate",
+    "tone": "dark",
+    "energy": "bold",
+    "mood": [
+      "corporate",
+      "photo",
+      "editorial"
+    ],
+    "source": "uM7PKLTE/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "uM7PKLTE/0.webp",
+      "uM7PKLTE/1.webp",
+      "uM7PKLTE/2.webp",
+      "uM7PKLTE/3.webp",
+      "uM7PKLTE/4.webp",
+      "uM7PKLTE/5.webp",
+      "uM7PKLTE/dense.webp"
+    ]
+  },
+  {
+    "id": "MQu7e3ii",
+    "name": "Vibrant Agency",
+    "genre": "brand_pitch",
+    "visual_language": "flat_illustration",
+    "desc": "White canvas with large rounded orange bubble shapes, wavy dividers, high-radius cards and studio-style monochromatic photography",
+    "aesthetic": "playful",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "playful",
+      "warm",
+      "photo"
+    ],
+    "source": "MQu7e3ii/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "MQu7e3ii/0.webp",
+      "MQu7e3ii/1.webp",
+      "MQu7e3ii/2.webp",
+      "MQu7e3ii/3.webp",
+      "MQu7e3ii/4.webp",
+      "MQu7e3ii/5.webp",
+      "MQu7e3ii/dense.webp"
+    ]
+  },
+  {
+    "id": "aD76xzPi",
+    "name": "Vintage Charm",
+    "genre": "brand_pitch",
+    "visual_language": "collage",
+    "desc": "Soft-pastel-pink canvas with torn paper edges, dusty-rose bows and ribbons, vintage floral illustrations and washi tape strips",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "warm",
+      "retro",
+      "editorial"
+    ],
+    "source": "aD76xzPi/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "aD76xzPi/0.webp",
+      "aD76xzPi/1.webp",
+      "aD76xzPi/2.webp",
+      "aD76xzPi/3.webp",
+      "aD76xzPi/4.webp",
+      "aD76xzPi/dense.webp"
+    ]
+  },
+  {
+    "id": "teeHeZSG",
+    "name": "Vision Board",
+    "genre": "workshop",
+    "visual_language": "collage",
+    "desc": "Warm-cream crumpled paper canvas with torn edges, translucent tape strips, extra-bold sans headlines and marker-style handwritten notes",
+    "aesthetic": "editorial",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "hand_drawn",
+      "warm",
+      "editorial"
+    ],
+    "source": "teeHeZSG/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "teeHeZSG/0.webp",
+      "teeHeZSG/1.webp",
+      "teeHeZSG/2.webp",
+      "teeHeZSG/3.webp",
+      "teeHeZSG/4.webp",
+      "teeHeZSG/5.webp",
+      "teeHeZSG/dense.webp"
+    ]
+  },
+  {
+    "id": "yhkRDPts",
+    "name": "Visual Discovery",
+    "genre": "brand_pitch",
+    "visual_language": "bento_grid",
+    "desc": "Clean-white canvas with vibrant red accents, high-radius rounded photo cards, subtle drop shadows and grid-based distribution",
+    "aesthetic": "minimal",
+    "tone": "light",
+    "energy": "bold",
+    "mood": [
+      "photo",
+      "minimal",
+      "corporate"
+    ],
+    "source": "yhkRDPts/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "yhkRDPts/0.webp",
+      "yhkRDPts/1.webp",
+      "yhkRDPts/2.webp",
+      "yhkRDPts/3.webp",
+      "yhkRDPts/4.webp",
+      "yhkRDPts/dense.webp"
+    ]
+  },
+  {
+    "id": "YIIxob1G",
+    "name": "Whimsical Animation",
+    "genre": "portfolio",
+    "visual_language": "gouache",
+    "desc": "Soft-cream canvas with painterly gouache-texture nature backgrounds, pill-shaped containers and minimalist four-point star accents",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "illustration",
+      "playful"
+    ],
+    "source": "YIIxob1G/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "YIIxob1G/0.webp",
+      "YIIxob1G/1.webp",
+      "YIIxob1G/2.webp",
+      "YIIxob1G/3.webp",
+      "YIIxob1G/4.webp",
+      "YIIxob1G/dense.webp"
+    ]
+  },
+  {
+    "id": "TA8pBEfV",
+    "name": "Yoga Glow",
+    "genre": "seminar",
+    "visual_language": "flat_illustration",
+    "desc": "Off-white sage canvas with chalky-textured cloud outlines, flat minimalist yoga pose illustrations and grainy paper texture",
+    "aesthetic": "organic",
+    "tone": "light",
+    "energy": "restrained",
+    "mood": [
+      "organic",
+      "illustration",
+      "minimal"
+    ],
+    "source": "TA8pBEfV/style.yaml",
+    "format": "image-native",
+    "previews": [
+      "TA8pBEfV/0.webp",
+      "TA8pBEfV/1.webp",
+      "TA8pBEfV/2.webp",
+      "TA8pBEfV/3.webp",
+      "TA8pBEfV/4.webp",
+      "TA8pBEfV/dense.webp"
+    ]
+  }
+]
