@@ -1,0 +1,576 @@
+Backend/feed_refresh.py
+  s_02958fef471b35::t_bbf5cb0d71b03c 1-5,7-13,15-35,40-55,58-62,65-73,75-83,88-92
+  s_02958fef471b35::t_9f8b385308c073 63-64,74,84-87
+  s_02958fef471b35::t_f28be437608930 14,56-57
+  s_02958fef471b35::t_393e861e9f6b7b 6,36-39
+Sources/MeetingViews.swift
+  s_76e4231da9b57e::t_2b663b18218e4c 12,20-22,25,27,32-40,43-49
+  s_b14f272eb161b5::t_d1e08b941e072d 50,63-88,99-100,145-147
+scripts/setup-image-edit.sh
+  s_e0a2c4dde3696d::t_346f33b12e8bc7 1-15
+tests/CalendarScheduleTests.swift
+  s_02958fef471b35::t_5dbf70434279e9 48-54
+  s_b14f272eb161b5::t_8ca6ce9879989a 17-21
+scripts/build.sh
+  s_76e4231da9b57e::t_c16beaa3188b39 4-5,12,15-22,25-26,28-29,31,34-35
+Backend/feed_collection.py
+  s_02958fef471b35::t_393e861e9f6b7b 32,229,235,237-242
+  s_02958fef471b35::t_bf00600f546c2e 1-31,33-86,88,90-102,105-114,118,120-141,143-186,191-201,203-208,217-219,224-225,233-234,236,243-257,259-260
+  s_02958fef471b35::t_ca093d3a9d8ae9 221-223
+  s_02958fef471b35::t_9f8b385308c073 202,210,213-216,220,226-228,230-232,258
+  s_02958fef471b35::t_d97bf9456afcb3 87,89
+  s_02958fef471b35::t_f28be437608930 103
+  s_02958fef471b35::t_59074a8cc15c0f 115-117,119,142
+  s_02958fef471b35::t_d8bf39fce15aca 209,211-212
+  s_02958fef471b35::t_4e67fd154e4321 104,187-190
+Backend/register_capabilities.py
+  s_02958fef471b35::t_ca093d3a9d8ae9 23-34,37-40,42,44-45,52-53,60
+  s_02958fef471b35::t_9f8b385308c073 35-36,41
+  s_02958fef471b35::t_2622aabe14aa7a 46-51
+  s_76e4231da9b57e::t_4b87cea1e1f08b 12-15
+Sources/UpdatePermissionReset.swift
+  s_76e4231da9b57e::t_2b663b18218e4c 7-9,18-20,24
+scripts/sign-local.py
+  s_76e4231da9b57e::t_c16beaa3188b39 1-8,10-26,31,37-57,59-62,64-72,74-78
+  s_76e4231da9b57e::t_64e5b8b6bb2df5 9,27-30,32-36,63,73
+  s_76e4231da9b57e::t_96818ab643827c 58
+tests/FeedScheduleTests.swift
+  s_02958fef471b35::t_74bf47c77c0d45 20-24
+tests/test_feed_worker.py
+  s_02958fef471b35::t_ca093d3a9d8ae9 32-33
+  s_02958fef471b35::t_77bde3e96ca605 1-31,34-77
+Backend/feed_policy.py
+  s_02958fef471b35::t_437bd4feea81f9 23,36-39
+Sources/FeedViews.swift
+  s_02958fef471b35::t_c9e43b40fae22d 9,17-22,69
+  s_02958fef471b35::t_7fce6f61f444ce 23-28,42-43,122-125
+  s_02958fef471b35::t_e158004c615c55 40-41
+Sources/TelosApp.swift
+  s_02958fef471b35::t_3b9a16c539d0ae 915-917,923,926-930
+  s_02958fef471b35::t_8205dc9f02c170 543-544,793,804-808,813-815,882-889,900-901,925,1053-1057,1082
+  s_02958fef471b35::t_8b6b69babdfe93 862-869,911-913,919-922,924
+  s_02958fef471b35::t_4b855474ea8005 914,918
+Sources/CalendarSchedule.swift
+  s_02958fef471b35::t_4b855474ea8005 17-21,48,50,53,55-56
+scripts/feed-collector-service.py
+  s_02958fef471b35::t_8747f86f4b116d 1-50
+tests/KeyDisplayTests.swift
+  s_02958fef471b35::t_c200d8c8b98ab9 26,28-29,31-32,34,36,38-55,57-58,60-62
+  s_02958fef471b35::t_0d6173b1fe5528 25,27,30,33,35,37
+  s_02958fef471b35::t_aa89abf37443e8 56,59
+  s_02958fef471b35::t_8205dc9f02c170 1-24,63-64
+tests/test_feed_policy.py
+  s_02958fef471b35::t_74bf47c77c0d45 38
+tests/MeetingLifecycleTests.swift
+  s_76e4231da9b57e::t_d1923031558cfc 28-32,37-38
+  s_b14f272eb161b5::t_3ccde187c5b3a2 48-49,51-52,64,69,74
+tests/test_feed_collection.py
+  s_02958fef471b35::t_67abcb1f7b7c43 88-89
+  s_02958fef471b35::t_2622aabe14aa7a 149-160
+  s_02958fef471b35::t_74bf47c77c0d45 1-83,97-137,146-148,161-169
+  s_02958fef471b35::t_4e67fd154e4321 138-145
+  s_02958fef471b35::t_393e861e9f6b7b 84-87,90-96
+Sources/FeedStore.swift
+  s_02958fef471b35::t_7fce6f61f444ce 17-32,45-46,96-98,106
+Backend/feeds.py
+  s_02958fef471b35::t_437bd4feea81f9 21,25,37-38,98,104-107,121,149-152,154-156
+  s_02958fef471b35::t_67abcb1f7b7c43 139-140
+  s_02958fef471b35::t_7fce6f61f444ce 59-62
+  s_02958fef471b35::t_393e861e9f6b7b 39-40
+  s_02958fef471b35::t_f28be437608930 128,131-132
+Sources/FeedSchedule.swift
+  s_02958fef471b35::t_7fce6f61f444ce 6-7,11-13
+Sources/LocalImageEditor.swift
+  s_e0a2c4dde3696d::t_a8e3aedfd699b9 1-88
+Sources/MeetingSessionManager.swift
+  s_76e4231da9b57e::t_d1923031558cfc 272-273
+  s_76e4231da9b57e::t_2b663b18218e4c 11-16,69,74,76-77,81,90,92,95-118,130,138,156,163,166,176,296-298
+  s_b14f272eb161b5::t_2de3fb459406b5 178,183,197-199,206-209,254,257,266,295,300
+Backend/worker.py
+  s_02958fef471b35::t_d97bf9456afcb3 10,13,70,111-115,193-196,201-211,235
+  s_02958fef471b35::t_2622aabe14aa7a 231
+  s_02958fef471b35::t_ca093d3a9d8ae9 7-8,106,134-137,200,213
+  s_76e4231da9b57e::t_0fac2cb606e0be 72-73,81,107,116,125-128,138,140-141,197,212,214,222,224,237,240,242-246,261-266,269-272,292-294
+Sources/StatusActivityIndicator.swift
+  s_02958fef471b35::t_4b855474ea8005 84-85,89,92,101-109,115-116,130-131,138-142
+  s_02958fef471b35::t_b995b5c9e4dc89 134-137
+  s_02958fef471b35::t_8b6b69babdfe93 65-80,117,121
+  s_02958fef471b35::t_010a5170caea02 64
+  s_b14f272eb161b5::t_ae5b4f36a6b700 81-83,118,120,122,143,147
+Backend/local_image_edit.py
+  s_e0a2c4dde3696d::t_58a8aca5569d64 1-56,62-102,105-107,109-145
+  s_e0a2c4dde3696d::t_17ba96a0bc7bc5 57-61,103-104,108
+tests/DictationTests.swift
+  s_76e4231da9b57e::t_590ea41185346b 22-25,38-45
+Sources/KeyDisplay.swift
+  s_02958fef471b35::t_f867a59ef6a4ba 43-44,46-53,58,143-145,164,169,178-179,181,183-190,192,214-220,222-225,235,250
+  s_02958fef471b35::t_c200d8c8b98ab9 195
+  s_02958fef471b35::t_0d6173b1fe5528 40-42,45,54-57,59-62,91,175-177,180,182
+  s_02958fef471b35::t_8205dc9f02c170 1-39,63-90,92-142,146-163,165-168,170-174,191,193-194,196-213,221,226-234,236-249,251-259
+README.md
+  s_02958fef471b35::t_642cc528b55085 77,108-109,135-148,150-161,378
+  s_02958fef471b35::t_f867a59ef6a4ba 200
+  s_02958fef471b35::t_4b855474ea8005 71,128
+  s_02958fef471b35::t_0d6173b1fe5528 197,201,284
+  s_02958fef471b35::t_34b4608af2b499 11-23,67-70,72-76,78-107,120,122,406-427
+Sources/DictationController.swift
+  s_76e4231da9b57e::t_ff1a152f9f9cc9 60-61,130-138,193-195,203-206,213,221,226
+  s_76e4231da9b57e::t_8907d0e0eb5207 59,95-97,125,127-128,153,163,165,225,227,306,308,358-362,449
+  s_76e4231da9b57e::t_b29d8946ef8933 19-21,27-37,56-58,85,88-92,120-123,126,129,140,147-152,154-155,190-192,196-202,207-212,214-220,222-224,229,235-259,271-275,278-279,281-285,287,289,291,294,299-300,305,307,312,324,330-331,339,429-431,440-441,443
+  s_76e4231da9b57e::t_590ea41185346b 180-189,377,404
+tests/StatusActivityTests.swift
+  s_02958fef471b35::t_8b6b69babdfe93 65,69,71-78,82-86,88-89
+  s_02958fef471b35::t_010a5170caea02 46,79-81,90
+  s_02958fef471b35::t_5dbf70434279e9 44-45,47,52,58-64,66-68,70,87,92-101,103-106
+  s_b14f272eb161b5::t_fe38603346114c 48-51,91,107-117
+Backend/approval_policy.py
+  s_76e4231da9b57e::t_9d6abaf9601253 1-31
+Backend/capabilities.py
+  s_76e4231da9b57e::t_dbfad23b73de3f 23,28-32,46-50,142-147,175
+Backend/image-edit-requirements.txt
+  s_e0a2c4dde3696d::t_fac6a05fb3ad9c 1-57
+Backend/mac_bridge.py
+  s_76e4231da9b57e::t_d80d2e05aa995e 3-4,49,51,63-66,192
+Backend/meeting_understanding.py
+  s_b14f272eb161b5::t_cbb914b2cefa6b 6,9,31,50-57,69,72,75-76
+Backend/presentation_asset_svg.mjs
+  s_76e4231da9b57e::t_b1855b459582e1 1-6
+Backend/presentation_assets.py
+  s_76e4231da9b57e::t_c5f0fa852fce60 1-142
+Backend/presentation_builder.mjs
+  s_76e4231da9b57e::t_949e2083378a1e 1-109
+Backend/presentation_styles.py
+  s_76e4231da9b57e::t_51145b7bd3f9a4 1-116
+Backend/presentations.py
+  s_76e4231da9b57e::t_abf23797f8d3f7 1-174
+Backend/screenshot_annotation.py
+  s_ccda276adf2ab7::t_d1728225ee4d3d 1-63
+Backend/skills/presentations/SKILL.md
+  s_76e4231da9b57e::t_71bed763212478 1-41
+Backend/style_library/0NRRfmWY/style.yaml
+  s_76e4231da9b57e::t_565abf365d13dd 1-38
+Backend/style_library/11lQdoRF/style.yaml
+  s_76e4231da9b57e::t_1535faff6fb6eb 1-57
+Backend/style_library/18CfuFyH/style.md
+  s_76e4231da9b57e::t_fb0fda6f9685e9 1-56
+Backend/style_library/1ScfdzQV/style.yaml
+  s_76e4231da9b57e::t_3de792d6446b0d 1-243
+Backend/style_library/1WcTGeIc/style.md
+  s_76e4231da9b57e::t_ae36edc92ae527 1-2
+Backend/style_library/1cPwvMlw/style.yaml
+  s_76e4231da9b57e::t_c3466ca309d6a4 1-39
+Backend/style_library/1tNBY3YD/style.yaml
+  s_76e4231da9b57e::t_1a12cd84cc9796 1-173
+Backend/style_library/31YO9XTx/style.yaml
+  s_76e4231da9b57e::t_a369f34f836af2 1-38
+Backend/style_library/3CHRSkMs/style.md
+  s_76e4231da9b57e::t_7dce420405e2bc 1-63
+Backend/style_library/3JyGysqo/style.yaml
+  s_76e4231da9b57e::t_6d438c98e48bb0 1-39
+Backend/style_library/3R0cmpfr/style.yaml
+  s_76e4231da9b57e::t_b2f443b33109c0 1-64
+Backend/style_library/41mvRHDw/style.yaml
+  s_76e4231da9b57e::t_eafbe3ce611059 1-203
+Backend/style_library/48Z9H1At/style.md
+  s_76e4231da9b57e::t_7f9f6a71028146 1-2
+Backend/style_library/4hzB3lz1/style.yaml
+  s_76e4231da9b57e::t_7ebae688e46c60 1-38
+Backend/style_library/4wYhQRBX/style.md
+  s_76e4231da9b57e::t_17084626e51b28 1-6
+Backend/style_library/5GZr0Ari/style.md
+  s_76e4231da9b57e::t_8309349acffd84 1-2
+Backend/style_library/5vZkT1p0/style.yaml
+  s_76e4231da9b57e::t_f8d462c64748b3 1-38
+Backend/style_library/60BZxqXG/style.yaml
+  s_76e4231da9b57e::t_68922294d12cb5 1-44
+Backend/style_library/6KpNYGXO/style.md
+  s_76e4231da9b57e::t_230745c0486211 1-2
+Backend/style_library/6WRiToVn/style.yaml
+  s_76e4231da9b57e::t_ff40d0a57b8bf0 1-43
+Backend/style_library/6iWlKRjP/style.yaml
+  s_76e4231da9b57e::t_2d5983d5355f4d 1-160
+Backend/style_library/7eCJEvt3/style.yaml
+  s_76e4231da9b57e::t_e46650c4bed5b8 1-38
+Backend/style_library/7uSzPEO2/style.md
+  s_76e4231da9b57e::t_0b336d52dd6bea 1-2
+Backend/style_library/7yneKgr9/style.yaml
+  s_76e4231da9b57e::t_856574a9147c36 1-36
+Backend/style_library/86SQrh5w/style.md
+  s_76e4231da9b57e::t_3d1f5a83dbb79f 1-2
+Backend/style_library/9dtOy8Bp/style.yaml
+  s_76e4231da9b57e::t_a8af64d243acab 1-38
+Backend/style_library/AUXs2IOR/style.md
+  s_76e4231da9b57e::t_214b2fdfe01724 1-2
+Backend/style_library/ApAhzbPc/style.md
+  s_76e4231da9b57e::t_ce7c3c975d46ea 1
+Backend/style_library/Bm0U0xf7/style.md
+  s_76e4231da9b57e::t_728290dc09c222 1
+Backend/style_library/C8RNeJa1/style.yaml
+  s_76e4231da9b57e::t_8248fce9f83f54 1-38
+Backend/style_library/CCpt9TKU/style.yaml
+  s_76e4231da9b57e::t_e806b6dc454309 1-191
+Backend/style_library/CW6kJrhZ/style.yaml
+  s_76e4231da9b57e::t_de74cb881671c2 1-165
+Backend/style_library/CuEEUrFy/style.md
+  s_76e4231da9b57e::t_f82dac787ecc5d 1-2
+Backend/style_library/DBQgBaD3/style.yaml
+  s_76e4231da9b57e::t_26754d2ad90787 1-42
+Backend/style_library/E2dyIRpT/style.yaml
+  s_76e4231da9b57e::t_4af2ddc0466f67 1-45
+Backend/style_library/EAMxiurM/style.yaml
+  s_76e4231da9b57e::t_ed876c269a378d 1-36
+Backend/style_library/EDBe3JLq/style.yaml
+  s_76e4231da9b57e::t_0d7a0065bb7883 1-84
+Backend/style_library/F31mX6fO/style.md
+  s_76e4231da9b57e::t_e78b9b9b3cd581 1-2
+Backend/style_library/FeoFsol1/style.yaml
+  s_76e4231da9b57e::t_1329cb03f3de41 1-38
+Backend/style_library/FilbYa2o/style.yaml
+  s_76e4231da9b57e::t_625640a3f76bcc 1-224
+Backend/style_library/G0eurRbb/style.md
+  s_76e4231da9b57e::t_6b502d3da74531 1-2
+Backend/style_library/G1k2Q0kO/style.yaml
+  s_76e4231da9b57e::t_f8906a67c636ec 1-38
+Backend/style_library/GLM76O18/style.yaml
+  s_76e4231da9b57e::t_6fe45bf8cf4d78 1-40
+Backend/style_library/H8uXouRd/style.md
+  s_76e4231da9b57e::t_ae9a95bf910914 1-2
+Backend/style_library/HBdi5jjx/style.md
+  s_76e4231da9b57e::t_0d80e5e066b65a 1-2
+Backend/style_library/HhR317Cx/style.md
+  s_76e4231da9b57e::t_a3bc0ebe087378 1-113
+Backend/style_library/I84oH000/style.md
+  s_76e4231da9b57e::t_49dde80c50d4ad 1
+Backend/style_library/IUz8CmTR/style.yaml
+  s_76e4231da9b57e::t_fe12c7c0821885 1-40
+Backend/style_library/J1sryHEo/style.md
+  s_76e4231da9b57e::t_b9ce4a00cb22cd 1-2
+Backend/style_library/JbpDOz7h/style.yaml
+  s_76e4231da9b57e::t_2130e2c660d3d9 1-157
+Backend/style_library/Jwpub2Cp/style.yaml
+  s_76e4231da9b57e::t_c1add292073860 1-185
+Backend/style_library/K6jAFyBM/style.md
+  s_76e4231da9b57e::t_23d4da7684545f 1
+Backend/style_library/MQu7e3ii/style.yaml
+  s_76e4231da9b57e::t_9bd881bd6a2030 1-87
+Backend/style_library/MeD0SaIX/style.md
+  s_76e4231da9b57e::t_fa483e2aad0ac9 1-2
+Backend/style_library/NOGjoMRR/style.yaml
+  s_76e4231da9b57e::t_0b13ce7e2032b4 1-115
+Backend/style_library/Nlnxa0Kn/style.yaml
+  s_76e4231da9b57e::t_1a3eb2a2a577c7 1-35
+Backend/style_library/Nt8VmtdA/style.md
+  s_76e4231da9b57e::t_d128e149acf2d6 1-22
+Backend/style_library/Nx1QoJtX/style.yaml
+  s_76e4231da9b57e::t_d076f831a1ef04 1-38
+Backend/style_library/OmV4VZGR/style.md
+  s_76e4231da9b57e::t_c11c1a1111faf3 1-2
+Backend/style_library/OqbUHMeB/style.md
+  s_76e4231da9b57e::t_1ce19410abb1e0 1-2
+Backend/style_library/PDEGfISq/style.md
+  s_76e4231da9b57e::t_f52e8bbf7cb3e6 1-2
+Backend/style_library/PFQIMRa0/style.yaml
+  s_76e4231da9b57e::t_b7a20604c0af97 1-44
+Backend/style_library/PYClxCEx/style.md
+  s_76e4231da9b57e::t_d97caccae950fd 1-2
+Backend/style_library/PfSLcshR/style.yaml
+  s_76e4231da9b57e::t_bcb1e91a38570c 1-87
+Backend/style_library/PiOWlVJz/style.md
+  s_76e4231da9b57e::t_e4fec794c8591a 1
+Backend/style_library/PvI0ioy8/style.yaml
+  s_76e4231da9b57e::t_af3bdd30687c77 1-82
+Backend/style_library/QGvxVOHQ/style.yaml
+  s_76e4231da9b57e::t_8752d342e7a2df 1-38
+Backend/style_library/QJ1EegX7/style.yaml
+  s_76e4231da9b57e::t_a749408b5e9287 1-183
+Backend/style_library/QsuDJvF6/style.yaml
+  s_76e4231da9b57e::t_165ce023dfd77b 1-38
+Backend/style_library/RTTSTGzQ/style.yaml
+  s_76e4231da9b57e::t_47e0435210594d 1-43
+Backend/style_library/RkhDAx93/style.md
+  s_76e4231da9b57e::t_46b57580f57651 1-2
+Backend/style_library/S5BYFAT6/style.md
+  s_76e4231da9b57e::t_bf55f37b239ad0 1-2
+Backend/style_library/S8Z5Fv2V/style.md
+  s_76e4231da9b57e::t_a2826af6ae5ad2 1
+Backend/style_library/SGT6FBOj/style.yaml
+  s_76e4231da9b57e::t_462f0e16aa5ac6 1-206
+Backend/style_library/SM1Slxrj/style.yaml
+  s_76e4231da9b57e::t_268e227af5981f 1-42
+Backend/style_library/SOURCE.md
+  s_76e4231da9b57e::t_dd6eab7971e44b 1-42
+Backend/style_library/SRFpqgIh/style.yaml
+  s_76e4231da9b57e::t_a7c9b9ffcd4849 1-38
+Backend/style_library/Sb5wFPGA/style.md
+  s_76e4231da9b57e::t_4d58b25e09c53c 1
+Backend/style_library/ShrvmWfV/style.yaml
+  s_76e4231da9b57e::t_8bc387d0452359 1-219
+Backend/style_library/TA8pBEfV/style.yaml
+  s_76e4231da9b57e::t_72fd63fc7f0ea0 1-38
+Backend/style_library/TFxj98rU/style.yaml
+  s_76e4231da9b57e::t_2ca33073bc47c6 1-39
+Backend/style_library/UMJD6tBv/style.md
+  s_76e4231da9b57e::t_c1771cdefbd5e7 1-2
+Backend/style_library/UY29HFco/style.yaml
+  s_76e4231da9b57e::t_4c10a4845436c9 1-183
+Backend/style_library/UbjIb0Mq/style.yaml
+  s_76e4231da9b57e::t_10af682f53caf9 1-38
+Backend/style_library/V8vlxIxr/style.yaml
+  s_76e4231da9b57e::t_b2f4b096583f32 1-127
+Backend/style_library/VQ97vmGA/style.md
+  s_76e4231da9b57e::t_1aa98c3f11f817 1-2
+Backend/style_library/VYeFPtUP/style.md
+  s_76e4231da9b57e::t_eda73eebde4634 1-2
+Backend/style_library/VemtZBkr/style.md
+  s_76e4231da9b57e::t_b1c5c01021e798 1
+Backend/style_library/WkmAgmg9/style.yaml
+  s_76e4231da9b57e::t_c3137107352704 1-38
+Backend/style_library/X368DfSh/style.md
+  s_76e4231da9b57e::t_b931f687aa10ff 1-2
+Backend/style_library/XfhHNrdp/style.md
+  s_76e4231da9b57e::t_8631152c5bce8d 1
+Backend/style_library/YFGxv2Zw/style.yaml
+  s_76e4231da9b57e::t_3680592d856b68 1-39
+Backend/style_library/YIIxob1G/style.yaml
+  s_76e4231da9b57e::t_763bd71e96f98a 1-36
+Backend/style_library/YVGYOuG7/style.yaml
+  s_76e4231da9b57e::t_63b00050349b95 1-220
+Backend/style_library/YidHU7Xn/style.md
+  s_76e4231da9b57e::t_e2d45bfcbbd3c2 1-6
+Backend/style_library/Z3U9LeT3/style.yaml
+  s_76e4231da9b57e::t_aee0eba90c960c 1-46
+Backend/style_library/ZIpXZOJz/style.yaml
+  s_76e4231da9b57e::t_5a5e280715d3e7 1-36
+Backend/style_library/ZWPBJD9l/style.yaml
+  s_76e4231da9b57e::t_1a95140afd429f 1-38
+Backend/style_library/aD76xzPi/style.yaml
+  s_76e4231da9b57e::t_878c126f94d8ad 1-44
+Backend/style_library/aHJxaPu1/style.yaml
+  s_76e4231da9b57e::t_f9896132eec119 1-45
+Backend/style_library/aPCI4B6R/style.yaml
+  s_76e4231da9b57e::t_6997fc67c036cd 1-82
+Backend/style_library/aRlwmmwR/style.yaml
+  s_76e4231da9b57e::t_3145e5eb594f26 1-75
+Backend/style_library/be5xhTa1/style.md
+  s_76e4231da9b57e::t_1ce285f5cfd0d0 1-2
+Backend/style_library/buBjZ6AO/style.md
+  s_76e4231da9b57e::t_ad55b1633cf8f1 1
+Backend/style_library/cTbuBl70/style.yaml
+  s_76e4231da9b57e::t_15c077aba0e86b 1-78
+Backend/style_library/catalog.json
+  s_76e4231da9b57e::t_9477c7d6b595ac 1-3855
+Backend/style_library/e8Dm5N5g/style.md
+  s_76e4231da9b57e::t_6fa75dd941a483 1-2
+Backend/style_library/eJ1WiPGf/style.yaml
+  s_76e4231da9b57e::t_0124eeccaffe4d 1-42
+Backend/style_library/ee9EMIEu/style.yaml
+  s_76e4231da9b57e::t_7c9ae1851e8961 1-57
+Backend/style_library/gBNy6pQ0/style.md
+  s_76e4231da9b57e::t_adb1febbb98f9b 1-2
+Backend/style_library/gNJY64An/style.yaml
+  s_76e4231da9b57e::t_97e548d4893947 1-58
+Backend/style_library/gUysfZAC/style.md
+  s_76e4231da9b57e::t_5f890b6ee8f734 1-2
+Backend/style_library/ggXgGVo4/style.md
+  s_76e4231da9b57e::t_94dc15e95753df 1-69
+Backend/style_library/h5K7knHz/style.md
+  s_76e4231da9b57e::t_97cf37b63f178f 1-73
+Backend/style_library/hU5uCnYE/style.yaml
+  s_76e4231da9b57e::t_c17f4ecfa65ed4 1-38
+Backend/style_library/hUOIxSkD/style.md
+  s_76e4231da9b57e::t_ebd91512f91afb 1-2
+Backend/style_library/iF6nDxzY/style.yaml
+  s_76e4231da9b57e::t_9cf905e71cf316 1-214
+Backend/style_library/iKFaMZnt/style.yaml
+  s_76e4231da9b57e::t_839dc3747b97bc 1-76
+Backend/style_library/im0BoaEA/style.yaml
+  s_76e4231da9b57e::t_6aa5c6ef008b68 1-168
+Backend/style_library/j2s0xyoG/style.yaml
+  s_76e4231da9b57e::t_a17102097f51bf 1-39
+Backend/style_library/jJ8KdWpo/style.yaml
+  s_76e4231da9b57e::t_1d23b62dcd5d88 1-157
+Backend/style_library/jMwECcGp/style.yaml
+  s_76e4231da9b57e::t_174ee6d0e59638 1-78
+Backend/style_library/jVwKWaLK/style.yaml
+  s_76e4231da9b57e::t_5f03bc1c7defe1 1-58
+Backend/style_library/jXomr8Jj/style.yaml
+  s_76e4231da9b57e::t_5e3cb849b8d492 1-178
+Backend/style_library/kBPhi0zD/style.yaml
+  s_76e4231da9b57e::t_9166af3b962ee8 1-224
+Backend/style_library/kaeyCtls/style.yaml
+  s_76e4231da9b57e::t_76c7a23c0ba3ff 1-38
+Backend/style_library/ktFQgo28/style.yaml
+  s_76e4231da9b57e::t_27c6fd92d9f3cc 1-42
+Backend/style_library/kxSvDxo0/style.yaml
+  s_76e4231da9b57e::t_3d60e5c79db3c0 1-81
+Backend/style_library/la4BpyO5/style.md
+  s_76e4231da9b57e::t_d30e8408fb821a 1-2
+Backend/style_library/mSH24WNN/style.md
+  s_76e4231da9b57e::t_f8f39a0e6fd62a 1-2
+Backend/style_library/nElhNkug/style.md
+  s_76e4231da9b57e::t_b23eb8af54f97c 1
+Backend/style_library/nrSLuDKD/style.yaml
+  s_76e4231da9b57e::t_5b3b20bb120ed7 1-219
+Backend/style_library/nsvGrXIj/style.md
+  s_76e4231da9b57e::t_0cf125ee11c1d3 1-2
+Backend/style_library/pDwcRW61/style.yaml
+  s_76e4231da9b57e::t_c1577956dfba2a 1-61
+Backend/style_library/plk6qz7d/style.yaml
+  s_76e4231da9b57e::t_66a94656f1854f 1-38
+Backend/style_library/ptADcuA4/style.yaml
+  s_76e4231da9b57e::t_cae7b7cee97927 1-87
+Backend/style_library/qAcKEsPO/style.md
+  s_76e4231da9b57e::t_40fbef28a3429f 1-2
+Backend/style_library/qVmjaAuA/style.md
+  s_76e4231da9b57e::t_038a289da2b266 1-2
+Backend/style_library/rbY4sY00/style.yaml
+  s_76e4231da9b57e::t_50bb5de667fc7f 1-195
+Backend/style_library/sGsYSO2z/style.md
+  s_76e4231da9b57e::t_bfec4f67edb2b2 1-20
+Backend/style_library/t6BS2Trx/style.yaml
+  s_76e4231da9b57e::t_200e658ac87b9f 1-71
+Backend/style_library/tHnmLRmP/style.md
+  s_76e4231da9b57e::t_a4b38da64e5fc1 1-2
+Backend/style_library/tTJoLDYD/style.md
+  s_76e4231da9b57e::t_c056f821078ac6 1-2
+Backend/style_library/teeHeZSG/style.yaml
+  s_76e4231da9b57e::t_7192d93c5c191e 1-77
+Backend/style_library/thfYdaqL/style.md
+  s_76e4231da9b57e::t_8d4b814677b0d1 1-2
+Backend/style_library/tuVGyEMP/style.md
+  s_76e4231da9b57e::t_03a278a350d635 1
+Backend/style_library/u25YVICm/style.yaml
+  s_76e4231da9b57e::t_360a775a913f1a 1-38
+Backend/style_library/uM7PKLTE/style.yaml
+  s_76e4231da9b57e::t_7fd747dc995fb1 1-87
+Backend/style_library/uu2GmD9M/style.md
+  s_76e4231da9b57e::t_6be21bc1459d7a 1-35
+Backend/style_library/vKWThA9U/style.yaml
+  s_76e4231da9b57e::t_0ebe8e9a828f55 1-38
+Backend/style_library/vXPDT3Xy/style.md
+  s_76e4231da9b57e::t_0d913e3e095682 1-2
+Backend/style_library/wqZu6oUA/style.yaml
+  s_76e4231da9b57e::t_cc31b26f62a672 1-43
+Backend/style_library/ySUMWqpJ/style.yaml
+  s_76e4231da9b57e::t_89431d50f69290 1-180
+Backend/style_library/yh8g2L65/style.yaml
+  s_76e4231da9b57e::t_d65ce652871c0f 1-101
+Backend/style_library/yhkRDPts/style.yaml
+  s_76e4231da9b57e::t_a82ae6cf30fb71 1-42
+Backend/style_library/zRo3aTtG/style.md
+  s_76e4231da9b57e::t_da5ecaf421d4f7 1-2
+Backend/style_library/zv857Vl1/style.yaml
+  s_76e4231da9b57e::t_946488386338d8 1-38
+Sources/MeetingModels.swift
+  s_b14f272eb161b5::t_b815f0c896e15c 45
+Sources/MeetingMonitor.swift
+  s_b14f272eb161b5::t_c95e31f9933c60 4,14-15,17,19-22,26,37,41-42,52-55,58,61-79
+Sources/MeetingUnderstanding.swift
+  s_b14f272eb161b5::t_028d87f01efe4e 4-5,26
+Sources/ScreenshotAnnotation.swift
+  s_ccda276adf2ab7::t_6cd7f61d8ed43f 1-177
+Sources/ScreenshotController.swift
+  s_b14f272eb161b5::t_545f7092b29d58 5,12,51,55-62,75-85
+Sources/ScreenshotEditor.swift
+  s_a2b9cd6160448d::t_d5ffea66e7feca 1-540
+Sources/ScreenshotPaperKit.swift
+  s_a2b9cd6160448d::t_ad3668b9080ef9 1-564
+Sources/TaskStore.swift
+  s_b14f272eb161b5::t_9f7852eac7c106 93,233,237,275-278,432,437
+docs/videos/telos-intro-bilingual.srt
+  s_02958fef471b35::t_17249697acd8a4 1-94
+docs/videos/telos-intro-en.srt
+  s_02958fef471b35::t_a645cfad23a2b7 1-75
+docs/videos/telos-intro-narration.txt
+  s_02958fef471b35::t_b6d692fb63bf30 1-56
+docs/videos/telos-intro-zh-original.srt
+  s_02958fef471b35::t_f289e0a6c0c60e 1-159
+docs/videos/telos-intro-zh-translated.srt
+  s_02958fef471b35::t_3b233ba669b7e8 1-75
+scripts/configure-presentations.py
+  s_76e4231da9b57e::t_0f45509a478934 1-14
+scripts/setup.sh
+  s_76e4231da9b57e::t_bfc85a68a49ebb 20
+scripts/test-paperkit-screenshot.sh
+  s_a2b9cd6160448d::t_37060ea193e085 1-14
+tests/MeetingTests.swift
+  s_b14f272eb161b5::t_bb3eff26484910 16-28,48-53,68
+tests/PaperKitScreenshotTests.swift
+  s_a2b9cd6160448d::t_534b7ac2a52cda 1-156
+tests/ScreenshotAnnotationTests.swift
+  s_ccda276adf2ab7::t_0b7e79bd6a77be 1-53
+tests/ScreenshotTests.swift
+  s_b14f272eb161b5::t_eaa21e8161bde0 7-18
+tests/test_approval_policy.py
+  s_76e4231da9b57e::t_584f4a60631dee 1-43
+tests/test_capabilities.py
+  s_76e4231da9b57e::t_871da52f0623b4 55,63-68
+tests/test_local_image_edit.py
+  s_e0a2c4dde3696d::t_3a51003d9d460d 1-32
+tests/test_meeting_understanding.py
+  s_b14f272eb161b5::t_f8aecaabec1271 52-85
+tests/test_presentation_assets.py
+  s_76e4231da9b57e::t_4437b44944b4f8 1-48
+tests/test_presentation_styles.py
+  s_76e4231da9b57e::t_f0c03347a90ae0 1-44
+tests/test_presentations.py
+  s_76e4231da9b57e::t_19bab4d188eae1 1-39
+tests/test_screenshot_annotation.py
+  s_ccda276adf2ab7::t_135327b6e7b9b1 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8bd932476b073392cafccc9f4f3f4071b6555a8b",
+  "prompts": {},
+  "sessions": {
+    "s_02958fef471b35": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a100d5-39eb-73d2-90bb-14ec6ffe9451",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "unknown"
+    },
+    "s_76e4231da9b57e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1190a-0719-7bb2-a781-5d38ba46ba35",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    },
+    "s_a2b9cd6160448d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0fcfc-af17-7c41-b19d-8bde913739fe",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    },
+    "s_b14f272eb161b5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d346-38ce-7c72-adce-5b5aba58aba9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    },
+    "s_ccda276adf2ab7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f306-6def-7993-9a6b-52703461dff8",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    },
+    "s_e0a2c4dde3696d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f32b-ae9f-7843-bd07-27611679642a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
