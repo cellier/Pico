@@ -19,11 +19,14 @@ private final class MeetingAnalysisProcess: @unchecked Sendable {
     func cancel() { lock.lock(); defer { lock.unlock() }; cancelled = true; if process.isRunning { process.terminate() } }
 }
 enum MeetingUnderstanding {
-    static func analyze(_ session: MeetingSession, dataDir: URL) async throws -> MeetingAnalysisResult {
+    static func analysisInput(_ session: MeetingSession) throws -> Data {
         let encoder = JSONEncoder()
-        let transcript = try JSONSerialization.jsonObject(with: encoder.encode(session.transcript))
+        let transcript = try JSONSerialization.jsonObject(with: encoder.encode(session.transcript.filter { $0.excludedFromEvidence != true }))
         let formatter = ISO8601DateFormatter(); formatter.timeZone = .current
-        let input = try JSONSerialization.data(withJSONObject: ["transcript": transcript, "started": formatter.string(from: session.startTime), "ended": session.endTime.map { formatter.string(from: $0) } ?? "", "meeting_title": session.title, "provider": session.provider])
+        return try JSONSerialization.data(withJSONObject: ["transcript": transcript, "started": formatter.string(from: session.startTime), "ended": session.endTime.map { formatter.string(from: $0) } ?? "", "meeting_title": session.title, "provider": session.provider])
+    }
+    static func analyze(_ session: MeetingSession, dataDir: URL) async throws -> MeetingAnalysisResult {
+        let input = try analysisInput(session)
         guard let python = BundledRuntime.python(),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/meeting_understanding.py") else { throw CocoaError(.fileNoSuchFile) }
         let holder = MeetingAnalysisProcess()
@@ -41,6 +44,6 @@ enum MeetingUnderstanding {
         return try await withTaskCancellationHandler(operation: { try await work.value }, onCancel: { holder.cancel(); work.cancel() })
     }
     static func verified(_ evidence: TranscriptEvidence, in session: MeetingSession) -> Bool {
-        session.transcript.contains { $0.id == evidence.segmentID && $0.isFinal && !$0.text.isEmpty && !evidence.text.isEmpty && $0.text.contains(evidence.text) && $0.startTime == evidence.startTime && $0.endTime == evidence.endTime }
+        session.transcript.contains { $0.id == evidence.segmentID && $0.excludedFromEvidence != true && $0.isFinal && !$0.text.isEmpty && !evidence.text.isEmpty && $0.text.contains(evidence.text) && $0.startTime == evidence.startTime && $0.endTime == evidence.endTime }
     }
 }

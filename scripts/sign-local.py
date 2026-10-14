@@ -5,7 +5,7 @@ This identity is local to this checkout. Public releases need Developer ID signi
 Never replace a missing/corrupt keychain silently: doing so would invalidate TCC grants.
 """
 import os
-import secrets
+import json
 import shlex
 import subprocess
 import sys
@@ -19,58 +19,43 @@ if identity:
     sys.exit(0)
 
 directory = root / ".runtime" / "local-signing"
-directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+if not directory.is_dir():
+    raise RuntimeError("Signing is not configured. Select an existing identity with TELOS_CODESIGN_IDENTITY; builds never create keychains.")
 keychain = directory / "Telos.keychain-db"
 password_file = directory / "keychain-password"
+active = directory / "active-keychain.json"
+if active.exists():
+    settings = json.loads(active.read_text())
+    for field in ("keychain", "password_file"):
+        name = settings[field]
+        if not isinstance(name, str) or Path(name).name != name or name in ("", ".", ".."):
+            raise RuntimeError("Invalid active signing keychain configuration")
+    keychain = directory / settings["keychain"]
+    password_file = directory / settings["password_file"]
+    if not keychain.is_file() or not password_file.is_file():
+        raise RuntimeError("Active signing keychain or credential missing; restore the saved identity")
 
 def run(args):
-    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Local signing timed out during " + " ".join(args[:2]) + "; no retry performed.") from None
     if result.returncode:
-        raise RuntimeError("Local signing failed during " + " ".join(args[:2]) + "; restore the signing identity if needed.")
+        detail = result.stderr.decode(errors="replace").strip()
+        for index, arg in enumerate(args[:-1]):
+            if arg in ("-p", "-P", "-k"):
+                detail = detail.replace(str(args[index + 1]), "[redacted]")
+        raise RuntimeError("Local signing failed during " + " ".join(args[:2]) + ": " + detail[:500])
     return result.stdout
 
-def register_keychain():
-    chains = shlex.split(run(["security", "list-keychains", "-d", "user"]).decode())
-    if str(keychain) not in chains:
-        run(["security", "list-keychains", "-d", "user", "-s", *chains, str(keychain)])
-
-if not password_file.exists():
-    if keychain.exists():
-        raise RuntimeError("Existing signing keychain has no password file; restore the signing backup.")
-    password_file.write_text(secrets.token_urlsafe(32))
-    password_file.chmod(0o600)
-    (directory / "certificate.conf").write_text("""[req]
-distinguished_name=dn
-x509_extensions=extensions
-prompt=no
-[dn]
-CN=Telos Local Development
-[extensions]
-basicConstraints=critical,CA:FALSE
-keyUsage=critical,digitalSignature
-extendedKeyUsage=critical,codeSigning
-""")
-    password = password_file.read_text()
-    run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes", "-x509", "-days", "3650",
-         "-config", str(directory / "certificate.conf"), "-keyout", str(directory / "private.key"),
-         "-out", str(directory / "certificate.pem")])
-    (directory / "private.key").chmod(0o600)
-    run(["openssl", "pkcs12", "-export", "-inkey",
-         str(directory / "private.key"), "-in", str(directory / "certificate.pem"), "-out",
-         str(directory / "identity.p12"), "-passout", "file:" + str(password_file)])
-    (directory / "identity.p12").chmod(0o600)
-    run(["security", "create-keychain", "-p", password, str(keychain)])
-    register_keychain()
-    run(["security", "unlock-keychain", "-p", password, str(keychain)])
-    run(["security", "import", str(directory / "identity.p12"), "-k", str(keychain),
-         "-P", password, "-T", "/usr/bin/codesign"])
-    run(["security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s",
-         "-k", password, str(keychain)])
-
+if not password_file.is_file():
+    raise RuntimeError("Signing credential missing; restore it explicitly. Build will not create a new identity.")
 password = password_file.read_text()
 if not keychain.exists():
     raise RuntimeError("Signing keychain is missing; restore it instead of creating a new identity.")
-register_keychain()
+chains = shlex.split(run(["security", "list-keychains", "-d", "user"]).decode())
+if str(keychain) not in chains:
+    raise RuntimeError("Configured signing keychain is not registered; build will not change the system search list.")
 run(["security", "unlock-keychain", "-p", password, str(keychain)])
 fingerprint = run(["openssl", "x509", "-in", str(directory / "certificate.pem"), "-noout",
                    "-fingerprint", "-sha1"]).decode().strip().split("=")[-1].replace(":", "")

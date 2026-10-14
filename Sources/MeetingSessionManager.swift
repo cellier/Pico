@@ -35,10 +35,65 @@ import Combine
     private var persistTimer: Timer?
     private var dirty = false
     private var analysisIDs = Set<UUID>()
+    private var ownerSpeechEnabled = true
+    private var agentAudioIntervals: [UUID: [MeetingAgentAudioInterval]] = [:]
     var repository: MeetingRepository { MeetingRepository(directory: store!.dataDir.appendingPathComponent("meetings")) }
     init(store: TaskStore, detector: any MeetingDetecting = ZoomMeetingAdapter(), makeSpeech: (() -> any MeetingTranscribing)? = nil, makeCapture: (() -> any MeetingAudioCapturing)? = nil) {
         self.store = store; self.detector = detector; self.makeSpeech = makeSpeech; self.makeCapture = makeCapture
     }
+    private lazy var audioHub = MeetingAudioHub(factory: { [weak self] in
+        if let capture = self?.makeCapture?() { return capture }
+        if #available(macOS 26, *) { return MeetingAudioCapture() }
+        preconditionFailure("Meeting audio requires macOS 26")
+    })
+    lazy var pico = PicoMeetingController(dataDir: store!.dataDir, connectMeeting: { [weak self] observation, microphone in
+        guard let self else { throw CancellationError() }
+        return try await self.connectPico(observation, microphone: microphone)
+    }, makeCapture: { [weak self] in
+        guard let self else { preconditionFailure("Meeting manager was released") }
+        return self.audioHub.lease()
+    }, onOwnerSpeechChanged: { [weak self] enabled in self?.changeOwnerSpeech(enabled) }, handoff: { [weak self] record in self?.importPico(record) })
+    private func changeOwnerSpeech(_ enabled: Bool) {
+        let wasEnabled = ownerSpeechEnabled; ownerSpeechEnabled = enabled
+        guard let id = activeID, let session = store?.meetings[id] else { audioHub.setOwnerSpeechEnabled(enabled); return }
+        let boundary = max(0, Date().timeIntervalSince(session.startTime))
+        audioHub.setOwnerSpeechEnabled(enabled, minimumTime: enabled && !wasEnabled ? boundary : nil)
+        var intervals = agentAudioIntervals[id] ?? []
+        if enabled {
+            if let last = intervals.indices.last, intervals[last].end == nil { intervals[last].end = boundary }
+        } else if intervals.last?.end != nil || intervals.isEmpty {
+            intervals.append(MeetingAgentAudioInterval(start: boundary))
+        }
+        agentAudioIntervals[id] = intervals
+    }
+    private func connectPico(_ observation: MeetingObservation, microphone: String) async throws -> (UUID, Date) {
+        guard !finishing, !shuttingDown else { throw BailianMeetingTranscription.problem("Meeting is being saved; wait and try again.") }
+        if activeID == nil { suppressedPID = nil; captureFailure = nil; begin(observation) }
+        await starting?.value
+        guard let id = activeID, let session = store?.meetings[id], session.status == .recording else {
+            throw BailianMeetingTranscription.problem(captureFailure ?? "Meeting transcription could not start.")
+        }
+        try await audioHub.chooseMicrophone(microphone)
+        return (id, session.startTime)
+    }
+    private func importPico(_ record: PicoMeetingRecord) {
+        guard let store, let id = record.meetingID, var session = store.meetings[id] else {
+            setupMessage = "Pico activity is saved locally, but is not linked to a meeting. No duplicate task was created."
+            return
+        }
+        var records = session.picoRecords ?? []
+        records.removeAll { $0.id == record.id }; records.append(record); session.picoRecords = records
+        do {
+            try repository.save(session); store.meetings[id] = session; updateTask(session)
+            if session.status == .completed || session.status == .interrupted { analyze(id) }
+            else if activeID == id && record.ended != nil && !finishing { endByUser() }
+        } catch { setupMessage = "Pico activity could not be attached to the meeting; its local record is preserved." }
+    }
+    #if TELOS_TEST
+    func attachPicoForTesting(_ record: PicoMeetingRecord) { importPico(record) }
+    func joinPicoForTesting(_ observation: MeetingObservation) async throws -> UUID { try await connectPico(observation, microphone: "fixture").0 }
+    func audioLeaseForTesting() -> MeetingAudioLease { audioHub.lease() }
+    #endif
     func start() {
         guard timer == nil else { return }
         refreshAccessState()
@@ -54,7 +109,7 @@ import Combine
                 }
                 if session.analysisStatus == "analyzing" { session.analysisStatus = "failed" }
                 store?.meetings[session.id] = session
-                if store?.tasks.contains(where: { $0.meetingID == session.id }) != true { addTask(session) }
+                if store?.tasks.contains(where: { $0.meetingID == session.id }) != true && (!session.transcript.isEmpty || !(session.picoRecords ?? []).isEmpty) { addTask(session) }
                 updateTask(session)
             }
         } catch { setupMessage = "Could not read saved meetings: \(error.localizedDescription)" }
@@ -69,7 +124,7 @@ import Combine
         guard !preparing, !repairingAccess, activeID == nil else { return }
         guard #available(macOS 26, *) else { setupMessage = "Meeting transcription requires macOS 26 or later."; return }
         enabled = true; UserDefaults.standard.set(true, forKey: "TelosMeetingsEnabled")
-        preparing = true; setupMessage = "Preparing on-device speech…"
+        preparing = true; setupMessage = BailianMeetingProtocol.enabled ? "Preparing Bailian cloud transcription…" : "Preparing on-device speech…"
         Task {
             defer { preparing = false; refreshAccessState() }
             let mic = await AVCaptureDevice.requestAccess(for: .audio)
@@ -81,7 +136,10 @@ import Combine
                 openPermissionSettings("Privacy_Accessibility"); return
             }
             do {
-                if locale == "mixed" {
+                if BailianMeetingProtocol.enabled {
+                    let engine = BailianMeetingTranscription()
+                    try await engine.start(localeID: locale); await engine.finish()
+                } else if locale == "mixed" {
                     let engine = LocalMeetingTranscription()
                     try await engine.start(localeID: locale); await engine.finish()
                 } else { try await MeetingTranscription.prepareAssets(localeID: locale) }
@@ -153,13 +211,13 @@ import Combine
     private func poll() {
         refreshAccessState()
         if !enabled { writeDiagnostic(signal: "disabled") }
-        guard enabled, !preparing, !repairingAccess, !shuttingDown, !polling, !finishing, starting == nil else { return }
+        guard (enabled || activeID != nil), !preparing, !repairingAccess, !shuttingDown, !polling, !finishing, starting == nil else { return }
         polling = true
         Task {
             let detector = self.detector
             let observation = await Task.detached(priority: .utility) { detector.observe() }.value
             polling = false
-            guard enabled, !shuttingDown else { return }
+            guard enabled || activeID != nil, !shuttingDown else { return }
             if activeID == nil && accessReady && !preparing && suppressedPID == nil && captureFailure == nil {
                 switch observation.signal {
                 case .joined: setupMessage = "Zoom meeting detected. Starting transcription…"
@@ -173,7 +231,23 @@ import Combine
         }
     }
     func receive(_ observation: MeetingObservation, at now: Date) async {
-        guard enabled, !preparing, !repairingAccess, !shuttingDown, !finishing, starting == nil else { return }
+        guard (enabled || activeID != nil), !preparing, !repairingAccess, !shuttingDown, !finishing, starting == nil else { return }
+        if activeID != nil, pico.active {
+            if observation.signal == .ended || (observation.signal == .absent && observation.pid == 0) {
+                // A readable Zoom home screen or a missing Zoom process is a definite exit.
+                // Stop the agent now, not after recording debounce with an earlier endTime.
+                await finish(endedAt: now)
+                debouncer.reset()
+                return
+            }
+            if observation.signal == .absent {
+                // Zoom still exists, but this complete UI snapshot lacks meeting controls.
+                // Silence the agent immediately while retaining ordinary capture debounce.
+                // A later joined snapshot must not restart speech without the user's choice.
+                pico.pauseForMeetingUncertainty()
+            }
+            // Unknown includes inaccessible or minimized UI: it is not an exit or takeover.
+        }
         if suppressedPID != nil {
             if (observation.signal == .absent || observation.signal == .ended) { suppressedPID = nil; debouncer.reset() }
             else { return }
@@ -206,22 +280,31 @@ import Combine
         let rawTitle = observation.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = ["zoom", "zoom meeting", "zoom workplace", "会议", "zoom 会议", ""].contains(rawTitle.lowercased())
             ? "Zoom Meeting · " + Date().formatted(date: .abbreviated, time: .shortened) : rawTitle
-        let session = MeetingSession(title: title, locale: locale, processID: observation.pid)
+        let session = MeetingSession(transcriptionEngine: BailianMeetingProtocol.enabled ? "Bailian · " + BailianMeetingProtocol.model + " · Cloud audio" : (locale == "mixed" ? "Local Qwen · On this Mac" : "Apple Speech · On this Mac"), title: title, locale: locale, processID: observation.pid)
         do { try repository.save(session) } catch { setupMessage = "Could not save meeting: \(error.localizedDescription)"; debouncer.reset(); return }
         store.meetings[session.id] = session; activeID = session.id; lastAudio = .distantPast; captureFailure = nil
-        addTask(session)
+        agentAudioIntervals[session.id] = ownerSpeechEnabled ? [] : [MeetingAgentAudioInterval(start: 0)]
         starting = Task { [weak self] in
             guard let self else { return }
             do {
+                try Task.checkCancellation()
                 let speech: any MeetingTranscribing
                 if let makeSpeech { speech = makeSpeech() }
+                else if BailianMeetingProtocol.enabled { speech = BailianMeetingTranscription() }
                 else if session.locale == "mixed" { speech = LocalMeetingTranscription() }
                 else { speech = MeetingTranscription() }
-                let audio: any MeetingAudioCapturing = makeCapture?() ?? MeetingAudioCapture()
+                let audio: any MeetingAudioCapturing = audioHub.lease()
                 transcriber = speech; capture = audio
+                if let cloud = speech as? BailianMeetingTranscription {
+                    cloud.onStatus = { [weak self] text in Task { @MainActor in
+                        guard let self, self.activeID == session.id else { return }
+                        self.setupMessage = text; self.store?.meetings[session.id]?.notice = text; self.dirty = true
+                    } }
+                }
                 speech.onSegment = { [weak self] segment in await MainActor.run {
                     guard let self, self.activeID == session.id else { return }
-                    self.store?.meetings[session.id]?.update(segment); self.dirty = true
+                    let classified = MeetingAudioAttribution.classified(segment, agentIntervals: self.agentAudioIntervals[session.id] ?? [])
+                    self.store?.meetings[session.id]?.update(classified); self.dirty = true
                 } }
                 let reportError: (String) -> Void = { [weak self] text in Task { @MainActor in
                     guard let self, self.activeID == session.id else { return }
@@ -239,7 +322,10 @@ import Combine
                 try Task.checkCancellation()
                 store.meetings[session.id]?.status = .recording
                 dirty = true; flush()
-                if let updated = store.meetings[session.id] { updateTask(updated) }
+                if let updated = store.meetings[session.id] {
+                    if !store.tasks.contains(where: { $0.meetingID == session.id }) { addTask(updated) }
+                    updateTask(updated)
+                }
                 starting = nil
             } catch {
                 starting = nil
@@ -254,6 +340,7 @@ import Combine
     func finish(interrupted: Bool = false, notice: String? = nil, endedAt: Date? = nil) async {
         guard let id = activeID, !finishing, let store else { return }
         finishing = true
+        if pico.active { pico.finish() }
         let captureEndedAt = endedAt ?? Date()
         if let starting { starting.cancel(); await starting.value; self.starting = nil }
         store.meetings[id]?.status = .finishing
@@ -269,6 +356,7 @@ import Combine
         dirty = true; flush()
         if let session = store.meetings[id] { updateTask(session) }
         activeID = nil; capture = nil; transcriber = nil; finishing = false
+        agentAudioIntervals[id] = nil
         refreshAccessState()
         writeDiagnostic(signal: interrupted ? "capture_failed" : "finished")
         if !interrupted && ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil { analyze(id) }
@@ -306,6 +394,7 @@ import Combine
         }
     }
     func shutdown() async {
+        pico.shutdown()
         shuttingDown = true
         timer?.invalidate(); persistTimer?.invalidate()
         let pendingAnalysis = Array(analysisTasks.values)

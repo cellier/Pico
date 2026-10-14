@@ -36,7 +36,10 @@ final class FileChip: NSTextAttachmentCell {
     }
 }
 @MainActor final class ComposerDraft: ObservableObject {
-    @Published var content = NSAttributedString(string: "")
+    @Published var content = NSAttributedString(string: "") {
+        didSet { cachedCompactHeight = nil }
+    }
+    private var cachedCompactHeight: CGFloat?
     @Published var error: String?
     @Published var isHovered = false
     @Published var isFocused = false
@@ -48,11 +51,15 @@ final class FileChip: NSTextAttachmentCell {
     weak var editor: AttachmentTextView?
     private let staging = FileManager.default.temporaryDirectory.appendingPathComponent("TelosDraft-" + UUID().uuidString)
     var compactLayoutHeight: CGFloat {
-        let storage = NSTextStorage(attributedString: content)
-        let layout = NSLayoutManager(); let container = NSTextContainer(size: NSSize(width: 260, height: 10000))
+        if let cachedCompactHeight { return cachedCompactHeight }
+        // Only measure enough text to decide the compact/expanded state.
+        let storage = NSTextStorage(attributedString: content.attributedSubstring(from: NSRange(location: 0, length: min(content.length, 2048))))
+        let layout = NSLayoutManager(); let container = NSTextContainer(size: NSSize(width: 260, height: 144))
         container.lineFragmentPadding = 0; layout.addTextContainer(container); storage.addLayoutManager(layout)
         layout.ensureLayout(for: container)
-        return min(144, max(20, ceil(layout.usedRect(for: container).height)))
+        let height = min(144, max(20, ceil(layout.usedRect(for: container).height)))
+        cachedCompactHeight = height
+        return height
     }
     var hasContent: Bool { !content.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     var files: [ComposerFile] {
@@ -124,7 +131,8 @@ final class AttachmentTextView: NSTextView, DictationInputSurfaceProviding {
             guard let self else { return }
             self.measurementQueued = false
             guard let layout = self.layoutManager, let container = self.textContainer else { return }
-            layout.ensureLayout(for: container)
+            // The editor stops growing at 144 points; lay out only that viewport.
+            layout.ensureLayout(forBoundingRect: NSRect(x: 0, y: 0, width: max(1, container.size.width), height: 144), in: container)
             var height = layout.usedRect(for: container).maxY
             if layout.extraLineFragmentTextContainer === container {
                 height = max(height, layout.extraLineFragmentRect.maxY)
@@ -156,8 +164,10 @@ final class AttachmentTextView: NSTextView, DictationInputSurfaceProviding {
         publishEditingState()
     }
     func publishEditingState() {
-        draft?.isComposing = hasMarkedText()
-        draft?.content = NSAttributedString(attributedString: attributedString())
+        if draft?.isComposing != hasMarkedText() { draft?.isComposing = hasMarkedText() }
+        if let draft, !draft.content.isEqual(to: attributedString()) {
+            draft.content = NSAttributedString(attributedString: attributedString())
+        }
         scheduleMeasurement()
     }
     // AppKit validates Paste and routes context-menu/services imports using these types.

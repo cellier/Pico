@@ -71,7 +71,7 @@ struct TaskBoard: View {
     @State private var searching = false
     @State private var taskScrollInitialized = false
     @State private var manageFeeds = false
-    @State private var rects: [String: CGRect] = [:]
+    @State private var composerRect: CGRect?
     @State private var flight: SendFlight?
     @State private var pendingFlight: (String, String, CGRect)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -240,7 +240,8 @@ struct TaskBoard: View {
         }
         .background(TelosTheme.surface).coordinateSpace(name: "taskFlight")
         .onPreferenceChange(RectPreference.self) { values in
-            rects = values
+            // Store only the composer: lazy rows re-estimate their frames every pass, so storing them all never settles.
+            if values["composer"] != composerRect { composerRect = values["composer"] }
             if let pending = pendingFlight, let destination = values[pending.0], destination.height > 0 {
                 flight = SendFlight(text: pending.1, source: pending.2, destination: destination, target: pending.0)
                 pendingFlight = nil
@@ -280,10 +281,10 @@ struct TaskBoard: View {
     }
     func submit() {
         guard draft.hasContent else { return }
-        let text = draft.text, source = rects["composer"]
+        let text = draft.text, source = composerRect
         search = ""; tab = .tasks
         guard let id = store.add(text, files: draft.files) else { return }; draft.clear()
-        if !reduceMotion, let source { pendingFlight = (id.uuidString, text, source) }
+        if !reduceMotion, text.utf16.count <= 2000, let source { pendingFlight = (id.uuidString, text, source) }
     }
     func newFeed() { manageFeeds = false; tab = .tasks; draft.setText("Create a feed for "); NotificationCenter.default.post(name: .init("TelosNewTask"), object: nil) }
 }
@@ -363,7 +364,7 @@ struct TaskDetail: View {
     let todo: Todo
     @StateObject private var ask = ComposerDraft()
     @State private var footerHeight: CGFloat = 80
-    @State private var rects: [String: CGRect] = [:]
+    @State private var composerRect: CGRect?
     @State private var flight: SendFlight?
     @State private var pendingFlight: (String, String, CGRect)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -372,7 +373,7 @@ struct TaskDetail: View {
             ZStack(alignment: .bottom) {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
+                        LazyVStack(alignment: .leading, spacing: 24) {
                             if let meetingID = todo.sourceMeetingID, let evidence = todo.sourceTranscriptEvidence {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Button("From meeting · " + meetingTimestamp(evidence.startTime)) {
@@ -383,11 +384,11 @@ struct TaskDetail: View {
                                 }
                             }
                             ForEach(todo.messages) { message in
-                                messageView(message).progressiveScrollBlur().id(message.id)
+                                messageView(message).id(message.id)
                                     .trackRect(message.id.uuidString, in: "messageFlight")
                                     .opacity(flight?.target == message.id.uuidString || pendingFlight?.0 == message.id.uuidString ? 0 : 1)
                             }
-                            if let stream = store.streams[todo.id], !stream.isEmpty { Text(.init(stream)).font(.system(size: 14)).textSelection(.enabled).progressiveScrollBlur() }
+                            if let stream = store.streams[todo.id], !stream.isEmpty { MessageText(text: stream, markdown: false).font(.system(size: 14)) }
                             if todo.status == "running" && ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil {
                                 HStack(spacing: 8) {
                                     ProgressView().controlSize(.small)
@@ -420,7 +421,8 @@ struct TaskDetail: View {
                 }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
             }.background(TelosTheme.surface).coordinateSpace(name: "messageFlight")
                 .onPreferenceChange(RectPreference.self) { values in
-                    rects = values
+                    // Store only the composer: lazy rows re-estimate their frames every pass, so storing them all never settles.
+                    if values["composer"] != composerRect { composerRect = values["composer"] }
                     if let pending = pendingFlight, let dest = values[pending.0], dest.height > 0 {
                         let target = CGRect(x: max(24, dest.maxX-min(dest.width, 263)), y: min(dest.minY, geometry.size.height-100), width: min(dest.width, 263), height: dest.height)
                         flight = SendFlight(text: pending.1, source: pending.2, destination: target, target: pending.0); pendingFlight = nil
@@ -434,14 +436,14 @@ struct TaskDetail: View {
             HStack { Spacer(minLength: 36); MessageBubble(text: message.text).frame(maxWidth: 300, alignment: .trailing) }
         } else if message.role == "confirmation" {
             Label(message.text, systemImage: "checkmark.shield").font(.system(size: 12)).foregroundStyle(.secondary)
-        } else { Text(.init(message.text)).font(.system(size: 14)).lineSpacing(1).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+        } else { MessageText(text: message.text).font(.system(size: 14)).lineSpacing(1).frame(maxWidth: .infinity, alignment: .leading) }
     }
     var canSend: Bool { ask.hasContent && !["running", "awaiting_approval"].contains(todo.status) }
     func submit() {
         guard canSend else { return }
-        let text = ask.text, source = rects["composer"]
+        let text = ask.text, source = composerRect
         guard store.ask(todo.id, text: text, files: ask.files) else { return }; ask.clear()
-        if !reduceMotion, let source, let id = store.selectedTask?.messages.last?.id { pendingFlight = (id.uuidString, text, source) }
+        if !reduceMotion, text.utf16.count <= 2000, let source, let id = store.selectedTask?.messages.last?.id { pendingFlight = (id.uuidString, text, source) }
     }
 }
 struct ApprovalCard: View {
@@ -483,8 +485,13 @@ struct ApprovalCard: View {
     }
 }
 struct MacAccessView: View {
+    @AppStorage(TaskExecutionPolicy.preference) private var automaticExecution = true
     @AppStorage("TelosVoiceTypingEnabled") private var voiceTypingEnabled = true
     @AppStorage("TelosVoicePolish") private var voicePolish = true
+    @AppStorage(DictationBailianAccount.preference) private var bailianDictation = DictationBailianAccount.saved.endpoint != nil
+    @State private var dictationTester = BailianDictation()
+    @State private var dictationTestMessage: String?
+    @State private var dictationTestRunning = false
     @ObservedObject private var calendar = CalendarStore.shared
     @State private var showProfile = false
     @State private var apiKey = ""
@@ -536,6 +543,10 @@ struct MacAccessView: View {
                 }
             }
             Divider()
+            Toggle("Automatic execution", isOn: $automaticExecution).font(.system(size: 14, weight: .medium))
+            Text("Complete typed and spoken requests without approval clicks, including app actions, scripts and requested sends or changes. Ask only when essential information is missing. You can stop a task at any time. Changes apply to the next task or retry.").font(.system(size: 13)).foregroundStyle(.secondary)
+            Text("macOS permissions, sign-in and identity verification may still need your confirmation. Background feeds only collect and organize information.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Divider()
             Text("Telos uses macOS Harness to read and operate apps for your tasks. Relevant app text and requested screenshots are sent to DeepSeek for processing.").font(.system(size: 14))
             Text("Web search, opening websites, files and skills work without Mac control permissions.").font(.system(size: 13)).foregroundStyle(.secondary)
             MeetingSettingsView(manager: store.meetingManager)
@@ -543,24 +554,46 @@ struct MacAccessView: View {
             KeyDisplaySettingsView()
             Divider()
             Toggle("Voice typing · Hold left mouse", isOn: $voiceTypingEnabled).font(.system(size: 14, weight: .medium))
-            Text("Hold still in an editable text field for 0.55 seconds. Speak after the tone, then release to insert. Chinese, English and mixed speech are processed locally. Dragging cancels; password fields are excluded.").font(.system(size: 13)).foregroundStyle(.secondary)
-            Toggle("Polish voice text with DeepSeek", isOn: $voicePolish)
-            Text("Audio stays on this Mac. When polishing is on, the transcript is sent to your configured AI provider to remove filler words and improve structure. If unavailable, the original transcript is used.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text("Hold still in an editable text field for 0.55 seconds. Speak after the tone, then release to insert. Dragging cancels; password fields are excluded. Automatic insertion does not appear in the keystroke display.").font(.system(size: 13)).foregroundStyle(.secondary)
+            BailianSettingsView(settings: BailianSettings(directory: store.dataDir))
+            Toggle("Bailian voice typing · Chinese + English", isOn: $bailianDictation)
+            Text("Uses your existing Bailian voice account and Qwen Audio 3.1 ASR Flash for Chinese, English and mixed speech. Held recordings are sent to Bailian and billed by usage. If Bailian is unavailable, Telos automatically recognizes on this Mac without polishing. Turn off to always recognize locally.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text(DictationBailianAccount.saved.endpoint == nil ? "Save your Bailian key and workspace above to enable cloud recognition." : "Bailian region and workspace are configured. Test below to check key access and recognition.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Button(dictationTestRunning ? "Testing recognition…" : "Test Bailian recognition") {
+                guard let sample = Bundle.main.url(forResource: "dictation-mixed-check", withExtension: "wav") else { return }
+                dictationTestRunning = true; dictationTestMessage = nil
+                dictationTester.transcribe(sample) { result in
+                    dictationTestRunning = false
+                    switch result {
+                    case .success(let text): dictationTestMessage = text.isEmpty ? "No speech recognized." : text
+                    case .failure(let error): dictationTestMessage = (error as NSError).code == URLError.userAuthenticationRequired.rawValue
+                        ? "Bailian key unavailable. Save your Bailian API key above. Hold-to-talk will use local recognition until access is restored."
+                        : "Bailian test failed (code: \((error as NSError).code)). Hold-to-talk will use local recognition."
+                    }
+                }
+            }.disabled(dictationTestRunning)
+            Text("Tests a fixed Chinese-English sample using your Bailian quota. No microphone recording or text insertion.").font(.system(size: 12)).foregroundStyle(.secondary)
+            if let dictationTestMessage { Text(dictationTestMessage).font(.system(size: 13)).textSelection(.enabled) }
+            Toggle("Polish local voice text with DeepSeek", isOn: $voicePolish).disabled(bailianDictation)
+            Text("Local mode keeps audio on this Mac. Optional DeepSeek polishing sends only the transcript. Cloud recognition inserts its result directly, without another rewrite.").font(.system(size: 12)).foregroundStyle(.secondary)
             Button("Enable microphone & global typing") { (NSApp.delegate as? AppDelegate)?.dictation.requestPermissions() }
             Text("Screenshot · Option+A").font(.system(size: 14, weight: .medium))
             Text(store.screenshotShortcutStatus).font(.system(size: 13)).foregroundStyle(.secondary)
             Button("Take Screenshot") { (NSApp.delegate as? AppDelegate)?.takeScreenshot() }
+            Text("Screen Recording · Option+R").font(.system(size: 14, weight: .medium))
+            Text(store.recordingShortcutStatus).font(.system(size: 13)).foregroundStyle(.secondary)
+            Button("Record Screen") { (NSApp.delegate as? AppDelegate)?.recordScreen() }
             Button("Soul, Memory & Skills") { store.loadProfile(); showProfile = true }
             Text(store.macAccess).font(.system(size: 14)).textSelection(.enabled)
-            Text("App reading and basic navigation are automatic. Approve a work plan once for its listed preparation steps. Sending, deleting, purchasing and permission changes still need final confirmation. You can deny or stop at any point.").font(.system(size: 13)).foregroundStyle(.secondary)
+            Text("Grant missing system access here once. Telos keeps existing grants across updates and checks again when you return from System Settings.").font(.system(size: 13)).foregroundStyle(.secondary)
             HStack {
                 Button("Accessibility") {
                     let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                    _ = AXIsProcessTrustedWithOptions(options)
+                    if !AXIsProcessTrusted() { _ = AXIsProcessTrustedWithOptions(options) }
                     settings("Privacy_Accessibility")
                 }
                 Button("Screen Recording") {
-                    _ = CGRequestScreenCaptureAccess()
+                    if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
                     settings("Privacy_ScreenCapture")
                 }
             }
@@ -583,6 +616,9 @@ struct MacAccessView: View {
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
             .onExitCommand { if showProfile { showProfile = false } else { onClose() } }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                store.checkMacAccess(); calendar.refresh(); KeyDisplayController.shared.refresh()
+            }
             .onAppear {
                 do { apiKey = try ProviderSettings(directory: store.dataDir).apiKey() }
                 catch { apiError = true; apiMessage = "Could not read the local API configuration." }
@@ -744,9 +780,17 @@ final class PanelHostingView: NSHostingView<StatusPanelRoot> {
         if !shown { group.timingFunction = CAMediaTimingFunction(controlPoints: 0.45, 0, 0.85, 0.65) }
         layer.add(group, forKey: "panelPresentation")
     }
+    private var lastMaskBounds = CGRect.null
+    private var lastMaskAnchor: CGFloat = -1
+    private var lastMaskFlipped = false
+    private var lastMaskScale: CGFloat = 0
     override func layout() {
         super.layout()
         guard let layer else { return }
+        let scale = window?.backingScaleFactor ?? 2
+        let anchor = rootView.presentation.anchorX
+        guard lastMaskBounds != bounds || lastMaskAnchor != anchor || lastMaskFlipped != layer.isGeometryFlipped || lastMaskScale != scale else { return }
+        lastMaskBounds = bounds; lastMaskAnchor = anchor; lastMaskFlipped = layer.isGeometryFlipped; lastMaskScale = scale
         let outline = StatusPanelOutline(anchorX: rootView.presentation.anchorX).path(in: bounds).cgPath
         CATransaction.begin(); CATransaction.setDisableActions(true)
         outlineMask.frame = bounds
@@ -790,8 +834,10 @@ final class TelosWindow: NSWindow {
     var store: TaskStore!
     var statusItem: NSStatusItem!
     private let screenshots = ScreenshotController()
+    private let recordings = ScreenRecordingController()
     private var screenshotEditor: ScreenshotEditor?
     let dictation = DictationController()
+    private var companion: CompanionBridge?
     private var activityIndicator: StatusActivityIndicator?
     private var activitySubscriptions = Set<AnyCancellable>()
     private var outsideClickMonitor: Any?
@@ -875,9 +921,29 @@ final class TelosWindow: NSWindow {
         }
         else if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil { showPanel() }
         makeMenu()
+        #if TELOS_DIAGNOSTICS
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil, let output = ProcessInfo.processInfo.environment["TELOS_MEETING_DIAGNOSTICS"] {
+            Task { await PicoMeetingDiagnostics.run(output: URL(fileURLWithPath: output)) }
+        }
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil, let output = ProcessInfo.processInfo.environment["TELOS_AUDIO_ROUTE_DIAGNOSTICS"] {
+            Task { await PicoAudioRouteDiagnostics.run(output: URL(fileURLWithPath: output)) }
+        }
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil, let output = ProcessInfo.processInfo.environment["TELOS_RECORDING_DIAGNOSTICS"] {
+            Task { await ScreenRecordingDiagnostics.run(output: URL(fileURLWithPath: output)) }
+        }
+        #endif
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "pico-meeting" { store.meetingManager.pico.show() }
+        #if TELOS_DIAGNOSTICS
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "recording", let output = ProcessInfo.processInfo.environment["TELOS_RECORDING_SNAPSHOTS"] {
+            Task { await ScreenRecordingDiagnostics.snapshots(recordings, output: URL(fileURLWithPath: output)) }
+        }
+        #endif
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "recording", ProcessInfo.processInfo.environment["TELOS_RECORDING_SNAPSHOTS"] == nil { recordings.start() }
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil,
            ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] == nil {
             dictation.start()
+            companion = CompanionBridge(store:store,transcribe:{ [weak self] url, reply in self?.dictation.transcribeCompanion(url,reply:reply) },cancel:{ [weak self] in self?.dictation.cancelCompanion() },show:{ [weak self] id in self?.store.selected=id; self?.showPanel() })
+            companion?.showMeeting = { [weak self] in self?.store.meetingManager.pico.show() }
             store.meetingManager.start()
             screenshots.captured = { [weak self] image in
                 guard let self else { return }
@@ -895,6 +961,12 @@ final class TelosWindow: NSWindow {
             screenshots.failed = { [weak self] message in self?.store.error = message; self?.showPanel() }
             if screenshots.register() != noErr {
                 store.screenshotShortcutStatus = "Option+A is unavailable. Another app may be using it. Change that app's shortcut and restart Telos; Take Screenshot is still available in the menu."
+            }
+            // Recording hides the panel so it is neither captured nor dismissed by the selection overlay.
+            recordings.prepare = { [weak self] in self?.hidePanel() }
+            recordings.failed = { [weak self] message in self?.store.error = message; self?.showPanel() }
+            if recordings.register() != noErr {
+                store.recordingShortcutStatus = "Option+R is unavailable. Another app may be using it. Record Screen is still available in the menu."
             }
         }
         // App updates retain existing permissions. macOS requests any required
@@ -952,6 +1024,8 @@ final class TelosWindow: NSWindow {
             settings.target = self
             let screenshot = menu.addItem(withTitle: "Take Screenshot — ⌥A", action: #selector(takeScreenshot), keyEquivalent: "")
             screenshot.target = self
+            let recording = menu.addItem(withTitle: "Record Screen — ⌥R", action: #selector(recordScreen), keyEquivalent: "")
+            recording.target = self
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Telos", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             statusItem.menu = menu; statusItem.button?.performClick(nil); statusItem.menu = nil
@@ -1039,7 +1113,7 @@ final class TelosWindow: NSWindow {
         }
     }
     private func dismissFromOutside() {
-        guard !screenshots.isSelecting else { return }
+        guard !screenshots.isSelecting, !recordings.isSelecting else { return }
         // A native file chooser owns a separate window; do not hide its composer underneath it.
         guard !NSApp.windows.contains(where: { $0 is NSSavePanel && $0.isVisible }) else { return }
         hidePanel()
@@ -1069,6 +1143,7 @@ final class TelosWindow: NSWindow {
         main.addItem(editItem); NSApp.mainMenu = main
     }
     @objc func takeScreenshot() { screenshots.start() }
+    @objc func recordScreen() { recordings.start() }
     @objc func searchTasks() { NotificationCenter.default.post(name: .init("TelosSearch"), object: nil) }
     @objc func newTask() { showPanel(); NotificationCenter.default.post(name: .init("TelosNewTask"), object: nil) }
     private var finishingMeetingsOnQuit = false
@@ -1076,10 +1151,10 @@ final class TelosWindow: NSWindow {
         guard store != nil, ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil else { return .terminateNow }
         guard !finishingMeetingsOnQuit else { return .terminateLater }
         finishingMeetingsOnQuit = true
-        Task { await store.meetingManager.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
+        Task { await recordings.finishBeforeQuit(); await store.meetingManager.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
-    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); dictation.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
+    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 #if !TELOS_TEST

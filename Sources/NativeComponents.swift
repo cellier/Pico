@@ -51,7 +51,7 @@ struct Composer: View {
 struct MessageBubble: View {
     var text: String
     var body: some View {
-        Text(text).font(.system(size: 14)).lineSpacing(2).textSelection(.enabled)
+        MessageText(text: text, markdown: false).font(.system(size: 14)).lineSpacing(2)
             .padding(.horizontal, 14).padding(.vertical, 9)
             .background(TelosTheme.shade(0.93, 0.23), in: RoundedRectangle(cornerRadius: 19))
             .overlay(alignment: .bottomTrailing) {
@@ -96,7 +96,7 @@ struct FlightOverlay: View {
     var finished: () -> Void
     @State private var progress: CGFloat = 0
     var body: some View {
-        MessageBubble(text: flight.text).lineLimit(2)
+        MessageBubble(text: String(flight.text.prefix(240))).lineLimit(2)
             .modifier(FlightMotion(progress: progress, source: flight.source, destination: flight.destination))
             .allowsHitTesting(false).accessibilityHidden(true)
             .onAppear {

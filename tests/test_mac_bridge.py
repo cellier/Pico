@@ -65,6 +65,21 @@ class FakeMac:
     def key(self,*args,**kwargs):self.calls.append((args,kwargs))
     def permissions(self):return {}
 class ActionTests(unittest.TestCase):
+    def test_automatic_task_executes_multiple_observed_actions_without_waiting(self):
+        with tempfile.TemporaryDirectory() as d:
+            events=[]; mac=FakeMac()
+            def emit(kind, **data): events.append(kind)
+            def wait(_): self.fail('Automatic task must not wait for approval')
+            bridge=MacBridge(d,d,emit,ApprovalGate(emit,wait,auto_approve=True),mac)
+            for _ in range(2):
+                obs=bridge.observe({'app':'Fixture'})
+                result=bridge.action({'app':'Fixture','kind':'key','key':'return',
+                                     'observation_id':obs['observation_id'],'reason':'Requested fixture action'})
+                self.assertEqual(result['status'],'executed')
+            self.assertEqual(len(mac.calls),2)
+            self.assertEqual(events.count('auto_approved'),2)
+            self.assertNotIn('approval',events)
+
     def setup_bridge(self,d,decision,mutate=False):
         events=[];pending={}; mac=FakeMac()
         def emit(kind,**data):

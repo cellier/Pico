@@ -14,3 +14,7 @@ __pycache__/
 /config.json
 *.log
 /dist/
+
+# Personal meeting preparation stays local; keep the reusable architecture doc.
+/docs/meeting-packs/*
+!/docs/meeting-packs/MEETING-ARCHITECTURE.md

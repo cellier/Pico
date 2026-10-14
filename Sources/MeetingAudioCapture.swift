@@ -14,11 +14,13 @@ protocol MeetingAudioCapturing: AnyObject {
 /// Zoom process audio is independent of the physical speaker/headphone route.
 @available(macOS 26, *)
 final class MeetingAudioCapture: NSObject, MeetingAudioCapturing, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    var captureLocalMicrophone = true
     private var stream: SCStream?
     private let queue = DispatchQueue(label: "Telos.meeting.audio")
     private var config = SCStreamConfiguration()
     private var deviceListener: AudioObjectPropertyListenerBlock?
     private var inputAddress = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    private var chosenMicrophone: String?
     private var epoch: Double = 0
     private var lastActivity = Date.distantPast
     var onBuffer: ((AVAudioPCMBuffer, SpeakerSource, Double) -> Void)?
@@ -32,12 +34,12 @@ final class MeetingAudioCapture: NSObject, MeetingAudioCapturing, SCStreamOutput
         config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
         config.capturesAudio = true; config.excludesCurrentProcessAudio = true
         config.sampleRate = 48000; config.channelCount = 1
-        config.captureMicrophone = true
-        config.microphoneCaptureDeviceID = AVCaptureDevice.default(for: .audio)?.uniqueID
+        config.captureMicrophone = captureLocalMicrophone
+        config.microphoneCaptureDeviceID = chosenMicrophone ?? AVCaptureDevice.default(for: .audio)?.uniqueID
         let filter = SCContentFilter(display: display, including: apps, exceptingWindows: [])
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
-        try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue)
+        if captureLocalMicrophone { try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
         // No screen frames, raw audio files, or recordings are retained.
         epoch = CMClockGetTime(CMClockGetHostTimeClock()).seconds - elapsed
         self.stream = stream
@@ -46,13 +48,18 @@ final class MeetingAudioCapture: NSObject, MeetingAudioCapturing, SCStreamOutput
             guard let self else { return }
             Task { [weak self] in
                 guard let self, let stream = self.stream else { return }
-                self.config.microphoneCaptureDeviceID = AVCaptureDevice.default(for: .audio)?.uniqueID
+                self.config.microphoneCaptureDeviceID = self.chosenMicrophone ?? AVCaptureDevice.default(for: .audio)?.uniqueID
                 do { try await stream.updateConfiguration(self.config) }
                 catch { self.onError?("Microphone switch failed: \(error.localizedDescription)") }
             }
         }
         deviceListener = listener
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &inputAddress, queue, listener)
+    }
+    func chooseMicrophone(_ uid: String) async throws {
+        chosenMicrophone = uid
+        config.microphoneCaptureDeviceID = uid
+        if let stream { try await stream.updateConfiguration(config) }
     }
     func stop() async {
         if let listener = deviceListener { AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &inputAddress, queue, listener); deviceListener = nil }

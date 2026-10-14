@@ -46,6 +46,26 @@ struct DictationActivation {
     private var deadline: Task<Void, Never>?
     private var recorder: AVAudioRecorder?
     private let engine = DictationEngine()
+    private let cloudDictation = BailianDictation()
+    private lazy var recognition = DictationRecognition(cloud: cloudDictation, local: engine)
+    private var companionGestureUntil = Date.distantPast
+    @objc private func companionGesture(_ note: Notification) {
+        let down=note.userInfo?["down"] as? Bool ?? false
+        companionGestureUntil=Date().addingTimeInterval(down ? 1.5:0.2)
+        // Pet owns this pointer gesture. Do not arm global text-field dictation.
+        arm?.invalidate();hold.cancel();attemptedTarget=false
+        if recorder == nil {hud?.orderOut(nil)}
+    }
+    private var companionBusy = false
+    func transcribeCompanion(_ url: URL, reply: @escaping ([String:Any])->Void) {
+        guard recorder == nil, !busy, !companionBusy else {reply(["error":"Dictation is active"]);return}
+        companionBusy = true
+        engine.transcribe(url,polish:false) { [weak self] value in
+            if value["stage"] == nil {self?.companionBusy=false}
+            reply(value)
+        }
+    }
+    func cancelCompanion() { if companionBusy {engine.cancel();companionBusy=false} }
     private var audioURL: URL?
     private var target: Target?
     private var hud: NSPanel?
@@ -69,6 +89,7 @@ struct DictationActivation {
     }
     func start() {
         guard localMonitor == nil else { return }
+        DistributedNotificationCenter.default().addObserver(self,selector:#selector(companionGesture(_:)),name:Notification.Name("local.original.sprout.gesture"),object:"local.original.sprout")
         engine.warm()
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseUp, .leftMouseDragged, .keyDown]
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
@@ -114,6 +135,7 @@ struct DictationActivation {
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
     }
     private func handle(_ event: NSEvent, local: Bool) {
+        guard !companionBusy, Date() >= companionGestureUntil else {return}
         guard enabled, UserDefaults.standard.object(forKey: "TelosVoiceTypingEnabled") == nil || UserDefaults.standard.bool(forKey: "TelosVoiceTypingEnabled") else { cancel(); return }
         switch event.type {
         case .leftMouseDown:
@@ -140,7 +162,7 @@ struct DictationActivation {
             let started = Date(); var activated = false; var activation = DictationActivation()
             let timer = Timer(timeInterval: 0.04, repeats: true) { [weak self] timer in
                 MainActor.assumeIsolated {
-                    guard let self else { timer.invalidate(); return }
+                    guard let self else { timer.invalidate(); return };guard Date() >= self.companionGestureUntil else {timer.invalidate();return}
                     guard NSEvent.pressedMouseButtons & 1 != 0 else { self.localMouseReleased(); return }
                     self.hold.move(NSEvent.mouseLocation)
                     guard self.hold.origin != nil else { self.cancel(); return }
@@ -335,16 +357,34 @@ struct DictationActivation {
         let length = recorder.currentTime; recorder.stop(); self.recorder = nil
         deadline?.cancel(); deadline = nil
         guard length > 0.3 else { cancel(); return }
-        show("Transcribing on your Mac…")
-        recordDiagnostic("transcribing")
+        let useCloud = DictationBailianAccount.enabled
         let polish = UserDefaults.standard.object(forKey: "TelosVoicePolish") == nil || UserDefaults.standard.bool(forKey: "TelosVoicePolish")
-        engine.transcribe(audioURL, polish: polish) { [weak self] value in
+        diagnostic["recognizer"] = useCloud ? "bailian" : "local"
+        recognition.transcribe(audioURL, useCloud: useCloud, polish: polish, stage: { [weak self] stage in
             guard let self else { return }
-            if value["stage"] as? String == "polishing" { self.show("Tidying your words…"); return }
-            if let text = value["text"] as? String, !text.isEmpty { self.deliver(text) }
-            else { self.show(value["error"] as? String ?? "No speech detected", dismiss: true) }
+            switch stage {
+            case .cloud: self.show("Transcribing with Bailian…")
+            case .local: self.show("Transcribing on your Mac…")
+            case .polishing: self.show("Tidying your words…")
+            case .fallback(let error):
+                let error = error as NSError
+                self.diagnostic["cloud_error_domain"] = error.domain
+                self.diagnostic["cloud_error_code"] = error.code
+                self.diagnostic["recognizer"] = "local_fallback"
+                self.show("Bailian unavailable — recognizing on your Mac…")
+            }
+            self.recordDiagnostic("transcribing")
+        }, completion: { [weak self] value in
+            guard let self else { return }
+            if let text = value["text"] as? String, !text.isEmpty {
+                self.recordDiagnostic("recognized")
+                self.deliver(text)
+            } else {
+                self.recordDiagnostic(value["error"] == nil ? "no_speech" : "recognition_failed")
+                self.show(value["error"] as? String ?? "No speech detected", dismiss: true)
+            }
             self.cleanupAudio(); self.busy = false; self.deadline?.cancel(); self.deadline = nil
-        }
+        })
         guard busy else { return }
         deadline = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 90_000_000_000)
@@ -407,6 +447,7 @@ struct DictationActivation {
         }
         insertionPending = true; insertionID = UUID(); let token = insertionID
         down.flags = .maskCommand; up.flags = .maskCommand
+        TelosKeyboardEvent.markDictationPaste(down); TelosKeyboardEvent.markDictationPaste(up)
         down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
         Task { [weak self] in
             for _ in 0..<5 {
@@ -446,10 +487,12 @@ struct DictationActivation {
     }
     private func cleanupAudio() { if let audioURL { try? FileManager.default.removeItem(at: audioURL) }; audioURL = nil; target = nil }
     func cancel() {
+        recognition.cancel()
+        cloudDictation.cancel()
         attemptedTarget = false
         insertionID = UUID(); insertionPending = false
         hold.cancel(); arm?.invalidate(); arm = nil; deadline?.cancel(); deadline = nil
-        if busy && recorder == nil { engine.stop() } else { engine.cancel() }
+        if !companionBusy { if busy && recorder == nil { engine.stop() } else { engine.cancel() } }
         recorder?.stop(); recorder = nil
         cleanupAudio(); busy = false; hud?.orderOut(nil)
     }

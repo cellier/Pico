@@ -21,7 +21,7 @@ import AppKit
         precondition(!indicator.iconView.isFlipped)
         precondition(values.last == -2 * Double.pi)
         precondition(zip(values, values.dropFirst()).allSatisfy { $1 <= $0 })
-        precondition(button.image == nil)
+        precondition(button.image != nil)
         precondition(indicator.iconView.hitTest(.zero) == nil)
         indicator.iconView.layoutSubtreeIfNeeded()
         precondition(indicator.iconView.rotationLayer.anchorPoint == CGPoint(x: 0.5, y: 0.5))
@@ -33,19 +33,29 @@ import AppKit
         precondition(indicator.iconView.layer?.animation(forKey: key) == nil)
         indicator.update(count: 1, reduceMotion: false)
         precondition(indicator.iconView.rotationLayer.animationKeys()?.count == 1)
+        // Layer removal must not orphan the existing timer or create a second one.
+        indicator.iconView.rotationLayer.removeAllAnimations()
+        for _ in 0..<8 { indicator.update(count: 1, reduceMotion: false) }
         indicator.update(count: 1, reduceMotion: true)
         precondition(indicator.iconView.rotationLayer.animation(forKey: key) == nil)
-        precondition(indicator.iconView.superview === button)
+        precondition(indicator.iconView.superview === indicator.contentView)
         indicator.update(count: 1, reduceMotion: false)
         precondition(indicator.iconView.rotationLayer.animation(forKey: key) != nil)
         indicator.update(count: 0, reduceMotion: false)
         precondition(indicator.iconView.rotationLayer.animation(forKey: key) == nil)
-        precondition(button.toolTip == "Telos" && button.image == nil && indicator.iconView.superview === button)
+        let stoppedCount = indicator.renderedImageCount
+        RunLoop.main.run(until: Date().addingTimeInterval(0.35))
+        precondition(indicator.renderedImageCount == stoppedCount, "Idle icon must not keep rendering from an orphaned timer")
+        precondition(button.toolTip == "Telos" && button.image != nil && indicator.iconView.superview === indicator.contentView)
+        precondition(button.subviews.isEmpty, "Status items must not snapshot custom subviews")
+        let rendered = indicator.renderedImageCount
+        for _ in 0..<100 { indicator.update(count: 0, reduceMotion: false) }
+        precondition(indicator.renderedImageCount == rendered, "Unchanged status must reuse its image")
         let allDay = CalendarMenuText(time: "All-day", title: "调休")
         let allDayWidth = indicator.setEvent(allDay)
         precondition(allDayWidth >= 80)
         button.setFrameSize(NSSize(width: allDayWidth, height: 24)); indicator.layout()
-        precondition(button.subviews.compactMap { $0 as? NSTextField }.allSatisfy { !$0.isHidden }, "Short all-day labels must stay visible")
+        precondition(indicator.contentView.subviews.compactMap { $0 as? NSTextField }.allSatisfy { !$0.isHidden }, "Short all-day labels must stay visible")
         precondition(StatusActivityIndicator.eventWidth(textWidth: 31, availableWidth: 320, thickness: 24) == 80)
         let sample = CalendarMenuText(time: "Tomorrow 9:00 AM", title: "1on1 meeting with 抗")
         let width = indicator.setEvent(sample)
@@ -56,7 +66,7 @@ import AppKit
         precondition(indicator.iconFrame.minX == 5 && indicator.iconFrame.width == 16)
         precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 8, y: 8))
         precondition(button.toolTip?.contains(sample.title) == true)
-        let labels = button.subviews.compactMap { $0 as? NSTextField }
+        let labels = indicator.contentView.subviews.compactMap { $0 as? NSTextField }
         let timeLabel = labels.first { $0.stringValue == sample.time }!
         let titleLabel = labels.first { $0.stringValue == sample.title }!
         precondition(button.isFlipped ? timeLabel.frame.maxY <= titleLabel.frame.minY
@@ -77,7 +87,7 @@ import AppKit
         precondition(compact == NSStatusBar.system.thickness)
         button.setFrameSize(NSSize(width: compact, height: 24)); indicator.layout()
         precondition(indicator.iconFrame.minX >= 0 && indicator.iconFrame.maxX <= compact)
-        precondition(button.subviews.compactMap { $0 as? NSTextField }.allSatisfy { $0.isHidden })
+        precondition(indicator.contentView.subviews.compactMap { $0 as? NSTextField }.allSatisfy { $0.isHidden })
         let screen = NSRect(x: 0, y: 0, width: 1512, height: 982)
         let right = NSRect(x: 850, y: 950, width: 662, height: 32)
         let wide = StatusActivityIndicator.availableWidth(screenFrame: screen, topRightArea: nil, itemFrame: nil)

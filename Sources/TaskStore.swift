@@ -41,6 +41,10 @@ struct Todo: Codable, Identifiable {
     var sourceMeetingID: UUID?
     var sourceSuggestionID: UUID?
     var sourceTranscriptEvidence: TranscriptEvidence?
+    var voiceRequestID: String?
+    var voicePhase: String?
+    var voiceLanguage: String?
+    var voicePhaseEvents: [String]?
     var dueDate: String?
 }
 struct MemoryNote: Decodable, Identifiable {
@@ -91,6 +95,7 @@ final class WorkerRun: @unchecked Sendable {
     @Published var macAccess = "Checking Mac access…"
     @Published var showMacAccess = false
     @Published var screenshotShortcutStatus = "Drag to capture a region. Press Space to select a window, then click. Escape cancels. The screenshot opens for local AI editing; type or hold to speak, then copy or save PNG."
+    @Published var recordingShortcutStatus = "Click to record a screen, press Space to pick a window, or drag an area. Escape cancels. Choose microphone, camera and system audio, then Start Recording. The video is saved to the Desktop and copied. In a text field, Option+R still types ®."
     @Published var permissionResetNotice: String?
     @Published var soul = ""
     @Published var memoryNotes: [MemoryNote] = []
@@ -152,10 +157,10 @@ final class WorkerRun: @unchecked Sendable {
             return message
         } catch { try? FileManager.default.removeItem(at: batch); throw error }
     }
-    @discardableResult func add(_ text: String, files: [ComposerFile] = []) -> UUID? {
+    @discardableResult func add(_ text: String, files: [ComposerFile] = [], voiceRequestID: String? = nil, voiceLanguage: String? = nil) -> UUID? {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty || !files.isEmpty else { return nil }
-        var todo = Todo(title: "New task")
+        var todo = Todo(title: "New task"); todo.voiceRequestID = voiceRequestID; todo.voiceLanguage = voiceLanguage; todo.voicePhase = "thinking"
         do { todo.messages = [try attachmentMessage(value, files: files, task: todo.id)] }
         catch { self.error = "Could not attach files: \(error.localizedDescription)"; return nil }
         tasks.insert(todo, at: 0); completed = false; save()
@@ -230,11 +235,14 @@ final class WorkerRun: @unchecked Sendable {
         // A dedicated reader drains the pipe through EOF before observing exit.
         do {
             try run.process.run()
-            var request: [String: Any] = ["task_id": id.uuidString, "prompt": prompt, "new": new, "auto_approve": tasks.first(where: { $0.id == id })?.feedID == nil]
+            let task = tasks.first(where: { $0.id == id })
+            var request: [String: Any] = ["task_id": id.uuidString, "prompt": prompt, "new": new]
+            for (key, value) in TaskExecutionPolicy.requestOptions(feedID: task?.feedID, voiceRequestID: task?.voiceRequestID) { request[key] = value }
+            if let language = tasks.first(where: { $0.id == id })?.voiceLanguage { request["voice_language"] = language }
             if let feedID = tasks.first(where: { $0.id == id })?.feedID { request["feed_id"] = feedID }
             let data = try JSONSerialization.data(withJSONObject: request)
             try input.fileHandleForWriting.write(contentsOf: data + Data([10]))
-            // Keep stdin open for task-creation acknowledgements and interactive Feed approvals.
+            // Keep stdin open for task-creation acknowledgements and optional manual approvals.
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 while true {
                     let chunk = output.fileHandleForReading.availableData
@@ -292,6 +300,13 @@ final class WorkerRun: @unchecked Sendable {
                     $0.summary = "Continuing after your decision…"
                 }
             }
+        case "phase":
+            guard let phase=e.status, ["thinking","working"].contains(phase) else{return}
+            mutate(id) { todo in
+                todo.voicePhase=phase
+                if todo.voiceRequestID != nil, todo.voicePhaseEvents?.last != phase {todo.voicePhaseEvents=Array(((todo.voicePhaseEvents ?? [])+[phase]).suffix(40))}
+            }
+        case "tool": break
         case "title": mutate(id) { $0.title = e.text ?? $0.title }
         case "status": mutate(id) { if $0.approval == nil { $0.summary = e.text ?? "Working…" } }
         case "delta": streams[id, default: ""] += e.text ?? ""
@@ -398,6 +413,13 @@ final class WorkerRun: @unchecked Sendable {
         }
     }
     private func loadPreview(_ mode: String) {
+        // Read-only stress preview of a copied task store; never starts workers or saves.
+        if mode == "longtext" {
+            selected = tasks.max(by: { a, b in
+                (a.messages.map { $0.text.utf16.count }.max() ?? 0) < (b.messages.map { $0.text.utf16.count }.max() ?? 0)
+            })?.id
+            return
+        }
         guard ["single", "list", "search", "detail", "approval", "feed", "input", "multiline", "completed", "meeting", "meeting-live"].contains(mode) else { tasks = []; return }
         let titles = mode == "detail" ? ["Preparing Your Workspace", "Connecting Your Accounts", "Syncing Your Data", "Configuring Preferences", "Building Your Dashboard", "Checking Permissions"] : ["Kickoff", "Requirements Review", "Design Output", "Core Development", "QA & Validation", "Internal Acceptance", "Canary Release", "Full Rollout"]
         let descriptions = mode == "detail" ? ["Setting up the essentials for a smooth experience.", "Securely linking your tools and services.", "Bringing your latest information into one place.", "Applying your settings across the workspace.", "Organizing key insights for quick access.", "Verifying access to keep everything secure."] : ["Confirmed requirements and set up the project plan, ready to move into development.", "Completed requirements review and clarified key scenarios and boundary conditions.", "Completed interaction and visual drafts, awaiting confirmation from product and engineering.", "Building core modules and implementing key features.", "Running functional tests and compatibility checks, fixing issues as they are found.", "Conducting internal acceptance checks to confirm functionality, experience, and performance.", "Completed canary release and monitoring live performance and user feedback.", "Completed full rollout and moved into maintenance and continuous iteration."]

@@ -11,11 +11,71 @@ class MeetingUnderstandingTests(unittest.TestCase):
         self.segments = [self.me, self.others, self.discussion]
     def task(self, segment, **kwargs):
         return dict(title='Send updated deck',description='Send the revised deck',owner='me',kind='commitment',confidence=.97,segment_id=segment['id'],quote=segment['text'],due_phrase='tomorrow', **kwargs)
+    def test_pico_generated_promises_are_not_owner_evidence(self):
+        import json
+        from types import SimpleNamespace
+        calls = []
+        def completion(**kwargs):
+            calls.append(json.loads(kwargs['messages'][1]['content']))
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{}'))])
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=completion)))
+        generated = dict(self.me, text='[pico] I will send the deck tomorrow.')
+        other = dict(self.others, text='[other] I enjoy hiking.')
+        analyze({'provider':'Pico · Zoom','started':'2026-10-13','transcript':[generated, other]}, client, 'test')
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([s['text'] for s in calls[0]['transcript']], ['[other] I enjoy hiking.'])
     def test_commitment_and_evidence(self):
         result = validate({'tasks':[self.task(self.me)]}, self.segments, '2026-09-27T10:00:00+08:00')['suggestions']
         self.assertEqual(len(result),1)
         self.assertEqual(result[0]['dueDate'],'2026-09-28')
         self.assertEqual(result[0]['evidence']['startTime'],10.)
+    def test_excluded_transition_cannot_support_any_output(self):
+        excluded = dict(self.me, excludedFromEvidence=True)
+        point = {'text': 'The owner committed to sending the deck.', 'segment_id': excluded['id'], 'quote': excluded['text']}
+        raw = {'title': 'Send deck', 'tasks': [self.task(excluded)], 'summary': [point], 'decisions': [point]}
+        result = validate(raw, [excluded], '2026-09-27')
+        self.assertEqual(result['suggestions'], [])
+        self.assertEqual(result['summary'], [])
+        self.assertEqual(result['decisions'], [])
+        self.assertIsNone(result['title'])
+        self.assertEqual(excluded['text'], self.me['text'])
+        self.assertTrue(excluded['excludedFromEvidence'])
+    def test_unset_false_and_null_evidence_flag_preserve_legacy_behavior(self):
+        for flag in ('missing', False, None):
+            with self.subTest(flag=flag):
+                segment = dict(self.me)
+                if flag != 'missing': segment['excludedFromEvidence'] = flag
+                point = {'text': 'The revised deck will be sent.', 'segment_id': segment['id'], 'quote': segment['text']}
+                result = validate({'tasks': [self.task(segment)], 'summary': [point], 'decisions': [point]}, [segment], '2026-09-27')
+                self.assertEqual(len(result['suggestions']), 1)
+                self.assertEqual(len(result['summary']), 1)
+                self.assertEqual(len(result['decisions']), 1)
+    def test_excluded_input_never_reaches_model_or_returned_evidence(self):
+        import json
+        from types import SimpleNamespace
+        calls = []
+        excluded = dict(self.me, excludedFromEvidence=True)
+        point = {'text': 'The owner promised a deck.', 'segment_id': excluded['id'], 'quote': excluded['text']}
+        def completion(**kwargs):
+            calls.append(json.loads(kwargs['messages'][1]['content']))
+            fabricated = {'title': 'Deck promise', 'tasks': [self.task(excluded)], 'summary': [point], 'decisions': [point]}
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(fabricated)))])
+        client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=completion)))
+        transcript = [excluded, self.others]
+        result = analyze({'transcript': transcript, 'started': '2026-09-27', 'provider': 'Zoom'}, client, 'test')
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([s['id'] for s in calls[0]['transcript']], [self.others['id']])
+        self.assertNotIn(excluded['text'], json.dumps(calls, ensure_ascii=False))
+        self.assertEqual(result['suggestions'], [])
+        self.assertEqual(result['summary'], [])
+        self.assertEqual(result['decisions'], [])
+        self.assertEqual(len(transcript), 2, 'Filtering evidence must not erase the raw transcript')
+    def test_all_excluded_transcript_does_not_call_model(self):
+        result = analyze({'transcript': [dict(self.me, excludedFromEvidence=True)], 'started': '2026-09-27'}, None, 'test')
+        self.assertEqual(result['suggestions'], [])
+        self.assertEqual(result['summary'], [])
+        self.assertEqual(result['decisions'], [])
+        self.assertIsNone(result['title'])
     def test_no_invented_evidence_or_deadline(self):
         item = self.task(self.me); item['quote'] = 'Invented sentence'
         self.assertFalse(validate({'tasks':[item]}, self.segments, '2026-09-27')['suggestions'])

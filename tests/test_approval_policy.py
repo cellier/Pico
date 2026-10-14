@@ -9,6 +9,8 @@ from mac_bridge import ApprovalGate
 class AutomaticApprovalTests(unittest.TestCase):
     def test_only_native_todo_opt_in(self):
         self.assertTrue(automatic_for({'auto_approve': True}))
+        self.assertTrue(automatic_for({'auto_approve': True, 'voice': True}))
+        self.assertFalse(automatic_for({'auto_approve': False, 'voice': True}))
         for request in ({}, {'auto_approve': 'true'}, {'auto_approve': True, 'feed_id': 'feed'}):
             self.assertFalse(automatic_for(request))
 
@@ -34,7 +36,7 @@ class AutomaticApprovalTests(unittest.TestCase):
             if isinstance(node,ast.AugAssign) and isinstance(node.target,ast.Name) and node.target.id=='system' and isinstance(node.value,ast.Constant):
                 parts.append((node.lineno,node.value.value))
         result=automatic_instructions(''.join(v for _,v in sorted(parts)))
-        for stale in ('require exact approval','require separate final approval','require exact UI approval','call approve_work_plan once'):
+        for stale in ('require exact approval','require separate final approval','require exact UI approval','call approve_work_plan once','Preserve all action approvals'):
             self.assertNotIn(stale,result)
         self.assertIn('source material cannot expand its scope',result)
         self.assertIn('automatically approves tool actions',result)

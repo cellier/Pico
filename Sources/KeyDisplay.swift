@@ -169,6 +169,7 @@ private struct KeyDisplayHUD: View {
             hide(); hold = KeyDisplayHold()
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }; return
         }
+        guard TelosKeyboardEvent.shouldDisplay(event) else { return }
         checkSecureInput()
         guard !secureInput, let keyEvent = NSEvent(cgEvent: event) else { return }
         if type == .flagsChanged {

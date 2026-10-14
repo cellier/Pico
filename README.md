@@ -6,6 +6,16 @@ Telos 是一个原生 macOS 菜单栏 AI 工作助手。你可以输入目标、
 
 界面使用 SwiftUI / AppKit，任务执行由 Hermes Agent 与 DeepSeek 驱动，Mac 应用操作接入 macOS Harness。
 
+## 最近更新 · 2026-10-12—14
+
+- **Pico 桌面伙伴：**按住说话、拖动摆放、右键设置。支持经典 Pico、粉色花朵和默认白气球三种皮肤；表情更丰富，脸会根据摆放位置轻轻望向屏幕中心。[Pico 源码与运行说明](Pico/README.md)。
+- **更省心的语音输入：**在 Telos Settings 保存一次百炼配置，Telos 与 Pico 共用；支持中英文混说，自动插入文字时不再弹出 ⌘V 提示。
+- **长文与日程：**改善长消息输入和详情页的响应；菜单栏日程改为上下两行，最多 320 点并随空间收窄。
+- **录屏与执行：**加入屏幕、窗口及区域录屏；文字和语音任务默认自动执行，也可在 Settings 切回逐项确认。
+- **会议能力：**加入百炼双通道会议转写、会前材料和试用中的 Pico 会议代理。实际会议、音频设备与云端服务仍需单独配置和验证。
+
+已有介绍视频保留在下方。最近的代码、配置与构建变化见 [更新记录](docs/CHANGELOG.md)。
+
 > 开发构建与发行构建分开管理。自包含的 Apple Silicon 测试版安装包通过 [GitHub Releases](https://github.com/cellier/Telos/releases) 分发；是否已有成功产物请查看对应 Release。测试版要求 macOS 26，未经过 Developer ID 签名或 Apple 公证。详细安装说明见 [发行说明](docs/RELEASE.md)。
 
 ## 视频介绍
@@ -44,6 +54,14 @@ Telos 是一个原生 macOS 菜单栏 AI 工作助手。你可以输入目标、
   </tr>
 </table>
 
+### Pico · 换个模样，还是同一个伙伴
+
+以下是实时 3D 模型的原生渲染，三种皮肤共享按住说话、拖动、表情回应与任务入口。白气球为默认皮肤，右键可以切换。
+
+| 经典 Pico | 粉色花朵 | 白气球 · 默认 |
+| --- | --- | --- |
+| ![经典 Pico](docs/images/pico-classic.png) | ![粉色花朵](docs/images/pico-blossom.png) | ![默认白气球](docs/images/pico-white-balloon.png) |
+
 ## 能用 Telos 做什么
 
 ### 任务与持续对话
@@ -63,6 +81,10 @@ Telos 是一个原生 macOS 菜单栏 AI 工作助手。你可以输入目标、
 > 把这个文件整理成可编辑的 Excel 表格。
 >
 > 基于当前讨论，在首页创建三个后续任务。
+
+### 录屏
+
+按 **Option+R** 打开录屏工具（需要 macOS 15 及以上和“屏幕录制”权限）。直接点击录制整块屏幕，按 **空格** 后点击窗口录制该窗口，按住拖拽录制自选区域，**Esc** 退出。选好后，液态玻璃工具栏出现在选区正中：麦克风、摄像头可选择具体设备，系统声音可开关，三者默认关闭；点击 **Start Recording**（或回车）开始。录制中的停止横条显示时长、可拖动，且不会被录进视频；打开摄像头时会在选区左下角显示可拖动的圆形画面，并被一起录入。点击停止后，视频以录制开始时间命名（如 `2026-10-14 15.30.12.mp4`）保存到桌面并复制到剪贴板。录制中再按 Option+R 也会停止。光标在文本输入框中时，Option+R 仍输入 ®，不会唤起录屏。
 
 ### 截图后本地改图（开发版实验功能）
 
@@ -117,7 +139,7 @@ Agent 的工具包括网页搜索、公开网页读取、天气查询、文档�
 
 通过 macOS Harness，Telos 可以发现和打开应用、读取辅助功能界面、检查截图，并执行键盘、鼠标、AppleScript 或 Python 操作。
 
-当前开发版中，普通 Todo 会自动批准其任务内的工具操作，并在任务记录中显示自动批准结果；Feed 任务不启用此模式。系统权限、登录或身份验证仍可能需要用户处理。旧版或手动审批流程可以逐项批准具体步骤。
+当前开发版默认开启 **Automatic execution／自动执行**：文字和语音任务使用同一规则，在你交代的任务范围内自动完成应用操作、脚本、技能安装，以及明确要求的发送或修改，无需逐步点击批准；操作结果保留在任务记录中。信息不足时才询问，你可以随时停止任务。在 Settings 关闭此开关可恢复逐项确认，修改对下一次任务或重试生效。Feed 保持仅收集和整理信息的独立模式。系统权限、登录或身份验证仍可能需要用户处理。
 
 可用程度取决于目标应用、登录状态、系统权限以及应用是否暴露可操作的界面。Telos 的批准机制不是操作系统沙箱；脚本以当前 macOS 用户权限执行。
 
@@ -170,7 +192,7 @@ Feed 实施顺序与验收条件：
 
 ### 语音输入与截图
 
-- **长按语音输入：**在可编辑输入框内按住鼠标左键，听到提示后说话，松开结束；支持中英文混说。本地转录后，可调用 DeepSeek 整理文字。跨应用插入依赖辅助功能能力，不保证适配所有自绘编辑器；只读文本与密码框不应触发。
+- **长按语音输入：**在可编辑输入框内按住鼠标左键，听到提示后说话，松开结束；支持中英文混说。已配置百炼账户时默认使用 `qwen-audio-3.1-asr-flash`，在 Telos Settings 中填写百炼 API Key、地域和业务空间，保存一次后重启继续使用，并直接插入识别结果；录音会发送至百炼并按用量计费。密钥不可用或云端失败时会提示并自动使用本机识别，恢复流程不经过 DeepSeek 整理。也可关闭百炼、始终使用本地识别。自动粘贴不会在快捷键显示中弹出 ⌘V，手动按键仍正常显示。跨应用插入依赖辅助功能能力，不保证适配所有自绘编辑器；只读文本与密码框不应触发。
 - **区域截图：**按 `Option + A`，拖选区域，松开后复制到剪贴板。
 - **窗口截图：**进入截图模式后按空格切换窗口选择，再点击目标窗口。
 - 截图时可以保留 Telos 窗口，便于截取应用自身内容。快捷键可能与其他截图工具冲突。
@@ -232,7 +254,11 @@ cd Telos
 ### 2. 安装依赖并构建
 
 ```sh
-./scripts/setup.sh
+# 使用已配置的稳定签名身份；替换成自己的 codesign 身份名称或指纹。
+TELOS_CODESIGN_IDENTITY='Apple Development: Your Name (TEAMID)' ./scripts/setup.sh
+
+# 仅临时试用源码时，也可明确选择 ad-hoc 签名。
+# TELOS_CODESIGN_IDENTITY=- ./scripts/setup.sh
 ```
 
 该脚本会：
@@ -241,7 +267,9 @@ cd Telos
 2. 创建 `.runtime/venv` 并安装后端依赖。
 3. 安装 Playwright Chromium。
 4. 通过隐藏输入提示配置 DeepSeek Key；已有本地配置时保留原配置。
-5. 构建并 ad-hoc 签名 `build/Telos.app`。
+5. 构建 `build/Telos.app`，使用明确指定或此前已配置的本机签名身份。
+
+构建不会创建钥匙串、导入证书或修改系统信任。没有签名配置时会报错；持续使用建议沿用同一稳定身份，临时 ad-hoc 构建更新后可能需要重新授权。后续构建也应保留同样的 `TELOS_CODESIGN_IDENTITY` 设置，或使用已有的本机签名配置。
 
 ### 3. 安装可选的本地语音环境
 
@@ -262,7 +290,7 @@ open build/Telos.app
 Telos 是菜单栏应用，请从屏幕顶部的图标打开窗口。后续只修改源码时，可重新构建：
 
 ```sh
-./scripts/build.sh
+TELOS_CODESIGN_IDENTITY='Apple Development: Your Name (TEAMID)' ./scripts/build.sh
 open build/Telos.app
 ```
 
@@ -290,7 +318,7 @@ DeepSeek Key 可通过首次安装提示或 Settings 中的输入框配置，保
 
 在 Settings 中检查权限状态；如果系统要求手动添加应用，可以使用 **Show Telos in Finder** 定位当前构建。权限开启后可能需要重启应用。
 
-**当前开发版更新行为：**每次新构建首次启动会尝试重置 `com.telos.mac` 的系统权限，再提示重新授权；同一构建反复启动不会重复重置。更新后可能需要重新连接 Calendar。该机制仅针对 Telos，不重置其他应用的权限。
+**当前开发版更新行为：**更新不会主动重置已有系统授权，本机构建使用稳定签名延续权限身份。从系统设置返回 Telos Settings 时会自动重新检查权限；macOS 要求的首次授权仍需用户确认。
 
 ## 数据、隐私与批准范围
 
@@ -300,10 +328,10 @@ DeepSeek Key 可通过首次安装提示或 Settings 中的输入框配置，保
 | --- | --- |
 | 任务文字、工具结果、相关应用文本 | 执行任务时可能发送到 DeepSeek |
 | 任务需要的截图或图片内容 | 按具体工具和模型能力处理，可能发送到模型服务 |
-| 语音识别 | 支持的语音路径在本机识别；文字润色可发送到 DeepSeek |
+| 语音识别 | 本地模式在本机识别；开启百炼时录音发送至百炼。Telos 长按输入的云端失败会提示并恢复本地识别 |
 | 会议待办分析 | 使用转录文字调用 DeepSeek；本地识别不等于分析也完全离线 |
 | 网页搜索与 Feed | 会访问搜索服务和对应内容来源 |
-| Mac 操作审批 | 绑定具体操作／计划；拒绝、取消、过期或目标状态变化会阻止继续执行 |
+| Mac 操作执行 | 文字和语音默认自动执行；可切换手动批准。取消或目标状态变化仍会阻止继续操作 |
 
 本地任务数据不会因为提交代码而自动上传到 GitHub。`.gitignore` 排除了运行环境、构建产物、日志、验证记录和常见本地配置文件；产品截图单独存放于 `docs/images/`。
 
@@ -312,6 +340,7 @@ DeepSeek Key 可通过首次安装提示或 Settings 中的输入框配置，保
 ```text
 Sources/                 SwiftUI / AppKit 界面、状态管理和原生系统集成
 Backend/                 Hermes 执行、Mac 工具、Feed、语音整理与会议分析
+Pico/                    桌面语音伙伴、三种实时 3D 皮肤和交互测试
 Resources/               应用内字体、图标及预览资源
 assets/                  应用图标源资源
 scripts/                 安装、构建和本地配置脚本
@@ -425,3 +454,25 @@ A resolved style is required before generation. The renderer applies its palette
 
 
 PPT imagery uses `presentation_assets` for bounded image search, primary-page image discovery, downloaded/user-supplied image verification, and SVG logo conversion. Each selected asset retains its source page, pixel dimensions, hash and actual visual-review verdict. Photos use the image/cover/closing layouts; optional logos are embedded proportionally in a consistent footer. Builds reject unverified or changed assets, exact duplicates, resized/recompressed duplicates and common center/corner crops. Verified brand logos may repeat as branding. Similarity detection is conservative rather than a guarantee for arbitrary transformations. Final per-slide review also checks relevance, wrong branding, watermarking and visual fit. Search failures fall back to source-page discovery and remain explicit if unresolved.
+
+### Pico 语音伙伴
+
+Pico 是桌面语音入口。按住说话，松手后识别并交给 Telos 执行。支持拖动摆放、右键切换三种皮肤，白气球为默认；脸部只轻轻朝向所在屏幕的中心，保留鼠标靠近和点击时的表情回应。构建与交互说明见 [Pico/README.md](Pico/README.md)。
+
+在 **Telos Settings → Bailian API Key** 保存一次地域、业务空间与密钥，Pico 的云端识别和回复朗读会读取同一份本机配置，重启后继续使用。Pico 的「Voice settings」控制百炼识别与朗读开关；识别模型为 `qwen-audio-3.1-asr-flash`，附带中文、英文提示及 Pico、Telos、Zoom 等产品名热词。只有尚未保存 Telos 配置时才兼容读取旧钥匙串账户，不会为此弹出授权窗口。
+
+开启云端识别时，按住期间的录音会发送至阿里云百炼，按服务用量计费；关闭后使用 Telos 本地 `Qwen3-ASR-0.6B-4bit`。云端失败会提示并将保留的录音交给 Telos 本地识别；取消时丢弃迟到结果并清理临时录音。语音设置中的混读测试使用固定合成测试音频，不会创建任务。Telos 长按输入会在百炼失败时明确提示并恢复到本地识别；Pico 独立 App 的语音设置与 Telos 会议转写各自保留原来的错误处理。
+
+### Pico 会议代理（本地 Zoom 客户端，试用）
+
+Pico 菜单的「会议代理…」或 Telos 的 Meeting Setup 可打开独立控制窗口。首次目标是轻松的 1on1：使用现有百炼账户的 `qwen-audio-3.1-realtime-plus` 听取 Zoom 对方音频并生成回复，首次回复说明 AI 代理身份。无 Zoom SDK、开发者账号或自动加入会议；由用户在已经加入的目标会议中启动。
+
+音频桥使用官方 BlackHole 2ch 驱动。Zoom 的麦克风选择 BlackHole、扬声器选择耳机；控制窗口选择实际麦克风。代理工作时仅代理语音进入 BlackHole；点击 Take over 或按 Control–Option–Space，会在本机先清空代理音频并切到实际麦克风，然后取消网络请求。网络失败也交还控制。结束会话后麦克风桥暂时保持，避免 Zoom 突然无声；把 Zoom 麦克风切回实际设备后，再断开音频桥。退出 Telos 会停止音频桥。
+
+对方语音和会前背景会发送至百炼。聊天记录保存在 Application Support/Telos/pico-meetings，结束后生成 Telos 交接记录；摘要沿用已配置的 DeepSeek。生成的代理回复、被打断的回复不作为用户承诺证据。接管后的人声不进入代理记录；若开启自动会议转写，则由其独立保存。应用关闭后恢复的原始代理记录不会冒充完整会议。
+
+### 百炼会议转写
+
+Meeting Setup 的独立开关控制 `qwen-audio-3.1-asr-flash-streaming`。使用 Telos Settings 中保存的百炼账户（尚未配置时兼容原 Pico 账户），双方独立实时流、句级时间戳、中英语言提示、临时热词；中间结果被最终结果替换。录音不落盘，转写在本机保存；云端按用量计费。网络、模型或积压错误会明确停止并标记缺失，绝不静默切换本地模型。关闭后保留原来的 Apple / Local Qwen 识别。
+
+验证记录：`build/pico-meeting-work/cloud-check-next.json` 保存同一合成中英样本在百炼和本地模型上的实际输出。两者在此样本都正确，不能据此声称百炼总体准确率更高。重启后 BlackHole 已生效；`audio-route-second.json` 记录本机真实回环：代理测试音、打断清空、迟到帧拒绝、实际麦克风桥接、断开静音均通过。测试只保存信号统计，不录音、不上传。控制器故障与会后交接另有受控测试；真实 Zoom 对端听感、长时间稳定性和实际 1on1 聊天仍需用户指定的首场试聊。

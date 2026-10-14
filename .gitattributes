@@ -1,0 +1,3 @@
+# Keep upstream and generated code intact; focus GitHub diffs on authored source.
+Pico/vendor/** linguist-vendored -whitespace
+Pico/assets/index.html linguist-generated -whitespace

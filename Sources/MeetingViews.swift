@@ -7,16 +7,22 @@ func meetingTimestamp(_ seconds: Double) -> String {
 struct MeetingSettingsView: View {
     @ObservedObject var manager: MeetingSessionManager
     @AppStorage("TelosMeetingLanguage") private var language = "mixed"
+    @AppStorage("TelosBailianMeetingsEnabled") private var bailian = DictationBailianAccount.saved.endpoint != nil
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Button("Open Pico meeting companion…") { manager.pico.show() }
+            Button("Bailian API key…") { BailianCredentialWindow.shared.show() }
             Text("Meeting Setup").font(.system(size: 14, weight: .medium))
-            Text("Detect Zoom meetings and transcribe your microphone and Zoom audio separately on this Mac, including when using headphones. Audio recordings are not kept. After a meeting, the transcript is sent to your configured DeepSeek provider to suggest tasks. Nothing becomes a todo until you confirm.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text("Detect Zoom meetings and transcribe your microphone and Zoom audio separately, including when using headphones. Audio recordings are not kept. After a meeting, the transcript is sent to your configured DeepSeek provider to suggest tasks. Nothing becomes a todo until you confirm.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Toggle("Bailian meeting transcription · Chinese + English", isOn: $bailian).disabled(manager.capturing || manager.preparing)
+            Text(bailian ? "Audio is streamed to your Pico Bailian account for continuous transcription. Cloud usage is billed by your provider. Connection errors are shown; there is no silent local fallback." : "Audio recognition stays on this Mac.").font(.system(size: 12)).foregroundStyle(.secondary)
             Picker("Meeting language", selection: $language) {
                 Text("Chinese + English · Local Qwen").tag("mixed")
                 Text("Chinese · Apple").tag("zh-CN")
                 Text("English · Apple").tag("en-US")
-            }.disabled(manager.enabled || manager.preparing)
-            Text("Apple provides streaming partial results for the selected language. Local Qwen handles mixed Chinese and English in short chunks. Both stay on this Mac. Requires macOS 26.").font(.system(size: 12)).foregroundStyle(.secondary)
+            }.disabled(bailian || manager.enabled || manager.preparing)
+            if bailian { Text("实际转写模型：" + BailianMeetingProtocol.model).font(.system(size: 12)).foregroundStyle(.secondary) }
+            Text(bailian ? "Continuous Bailian ASR with separate local and remote speaker channels and sentence timestamps. Requires macOS 26." : "Apple provides streaming partial results for the selected language. Local Qwen handles mixed Chinese and English in short chunks. Both stay on this Mac. Requires macOS 26.").font(.system(size: 12)).foregroundStyle(.secondary)
             accessRow("Accessibility · Detect Zoom meetings", ready: manager.accessibilityReady, pane: "Privacy_Accessibility")
             accessRow("Screen & System Audio Recording", ready: manager.screenAudioReady, pane: "Privacy_ScreenCapture")
             accessRow("Microphone · Your voice", ready: manager.microphoneReady, pane: "Privacy_Microphone")
@@ -63,6 +69,7 @@ struct MeetingDetailView: View {
                     Text(session.title).font(serif(28)).textSelection(.enabled).id("meetingOverview")
                     VStack(alignment: .leading, spacing: 6) {
                         Text(session.provider).font(.system(size: 13, weight: .medium))
+                        if let engine = session.transcriptionEngine { Text(engine).font(.system(size: 12)).foregroundStyle(.secondary) }
                         Text("Started · " + session.startTime.formatted(date: .abbreviated, time: .shortened))
                         if let ended = session.endTime {
                             Text("Ended · " + ended.formatted(date: .abbreviated, time: .shortened))
@@ -130,14 +137,29 @@ struct MeetingDetailView: View {
                         Text("Transcript").font(.system(size: 16, weight: .semibold))
                         Spacer()
                         if running { Toggle("Follow", isOn: $follow).toggleStyle(.checkbox).font(.system(size: 12)) }
-                        Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(session.transcript.map { "[\(meetingTimestamp($0.startTime))] \($0.speakerSource == .me ? "Me" : "Others"): \($0.text)" }.joined(separator: "\n"), forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(HoverButtonStyle()).help("Copy full transcript")
+                        Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(session.transcript.map { "[\(meetingTimestamp($0.startTime))] \($0.excludedFromEvidence == true ? "Uncertain switch-boundary audio" : $0.speakerSource == .me ? "Me" : "Others"): \($0.text)" }.joined(separator: "\n"), forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(HoverButtonStyle()).help("Copy full transcript")
                     }
                     if session.transcript.isEmpty { Text(running ? "Waiting for speech…" : "No speech was transcribed.").foregroundStyle(.secondary) }
                     ForEach(session.transcript) { segment in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("\(meetingTimestamp(segment.startTime)) · \(segment.speakerSource == .me ? "Me" : "Others")\(segment.isFinal ? "" : " · transcribing")").font(.system(size: 12)).foregroundStyle(.secondary)
+                            Text("\(meetingTimestamp(segment.startTime)) · \(segment.excludedFromEvidence == true ? "来源待确认 · 接管边界音频" : segment.speakerSource == .me ? "Me" : "Others")\(segment.isFinal ? "" : " · transcribing")").font(.system(size: 12)).foregroundStyle(.secondary)
+                            if segment.excludedFromEvidence == true { Text("保留原始转写，不用于摘要、决定或任务证据。").font(.system(size: 12)).foregroundStyle(.secondary) }
                             Text(segment.text).font(.system(size: 14)).textSelection(.enabled)
                         }.id(segment.id).progressiveScrollBlur()
+                    }
+                    if let records = session.picoRecords, !records.isEmpty {
+                        Divider()
+                        DisclosureGroup("Pico 活动与讲解记录") {
+                            Text("正式 transcript 由上方语音识别生成。以下保留代理的生成内容、打断与连接事件；生成内容不代表完整播出或用户承诺。").font(.system(size: 12)).foregroundStyle(.secondary)
+                            ForEach(records, id: \.id) { record in
+                                ForEach(record.turns.filter { $0.role != "other" }) { turn in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(turn.role == "pico" ? (turn.delivery == "locally_rendered" ? "Pico · 本机已播放" : "Pico · 生成回复") : turn.role == "pico_interrupted" ? "Pico · 播放被打断" : "会话事件").font(.system(size: 12)).foregroundStyle(.secondary)
+                                        Text(turn.text).font(.system(size: 13)).textSelection(.enabled)
+                                    }.padding(.vertical, 4)
+                                }
+                            }
+                        }
                     }
                     Color.clear.frame(height: 30).id("transcriptBottom")
                 }.padding(.horizontal, 24).padding(.top, 44).padding(.bottom, 20).frame(maxWidth: .infinity, alignment: .leading)

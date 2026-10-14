@@ -27,7 +27,8 @@ def due_date(phrase, quote, started):
     return None  # Ambiguous date language stays in evidence; never guessed.
 
 def validate(raw, segments, started):
-    by_id = {s['id'].lower(): s for s in segments if s.get('isFinal')}
+    # Transition-contaminated utterances remain in the raw log, but cannot support conclusions.
+    by_id = {s['id'].lower(): s for s in segments if s.get('isFinal') and s.get('excludedFromEvidence') is not True}
     result = {'suggestions': [], 'decisions': [], 'summary': []}
     def evidence(item):
         segment = by_id.get(str(item.get('segment_id', '')).lower())
@@ -58,7 +59,10 @@ def validate(raw, segments, started):
     return result
 
 def analyze(request, client, model):
-    segments = [s for s in request['transcript'] if s.get('isFinal')]
+    is_pico = request.get('provider', '').startswith('Pico')
+    # Generated agent speech is context, not evidence of an owner's commitment.
+    segments = [s for s in request['transcript'] if s.get('isFinal') and s.get('excludedFromEvidence') is not True
+                and (not is_pico or s['text'].startswith('[other] '))]
     chunks, current, size = [], [], 0
     for segment in segments:
         cost = len(segment['text']) + 120
@@ -69,7 +73,7 @@ def analyze(request, client, model):
     output = {'suggestions': [], 'decisions': [], 'summary': [], 'title': None}
     seen = set()
     for chunk in chunks:
-        response = client.chat.completions.create(model=model, messages=[{'role':'system','content':PROMPT}, {'role':'user','content':json.dumps({'meeting_date':request['started'],'meeting_title':request.get('meeting_title','Zoom meeting'),'ended':request.get('ended'),'transcript':chunk},ensure_ascii=False)}],
+        response = client.chat.completions.create(model=model, messages=[{'role':'system','content':PROMPT + (' This is a casual conversation with an AI representative. Summarize what the other person actually said for the owner; unknown owner context remains unknown. Do not infer owner promises or decisions.' if is_pico else '')}, {'role':'user','content':json.dumps({'meeting_date':request['started'],'meeting_title':request.get('meeting_title','Zoom meeting'),'ended':request.get('ended'),'transcript':chunk},ensure_ascii=False)}],
             response_format={'type':'json_object'}, max_tokens=6000, extra_body={'thinking':{'type':'disabled'}})
         data = validate(json.loads(response.choices[0].message.content), chunk, request['started'])
         if not output['title'] and data['title']: output['title'] = data['title']
