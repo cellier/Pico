@@ -29,6 +29,18 @@ struct ScreenshotPaperElement {
     var underline = false
     var alignment:NSTextAlignment = .left
     var lineSpacing:CGFloat = 0
+    /// Tag-style text draws on a rounded fill; arrows remember which corner they start from.
+    var fill:NSColor? = nil
+    var lineFromMaxX = false
+    var lineFromMaxY = true
+    var tagPadding:CGSize { CGSize(width:ceil(fontSize*0.3),height:ceil(fontSize*0.12)) }
+    var renderOutset:CGFloat {
+        if isText, fill != nil { return max(tagPadding.width,tagPadding.height)+8 }
+        if case .shape(.line) = content { return 16 }
+        return 8
+    }
+    var lineStart:CGPoint { CGPoint(x:lineFromMaxX ? frame.maxX : frame.minX,y:lineFromMaxY ? frame.maxY : frame.minY) }
+    var lineEnd:CGPoint { CGPoint(x:lineFromMaxX ? frame.minX : frame.maxX,y:lineFromMaxY ? frame.minY : frame.maxY) }
     func font(scale: CGFloat = 1) -> NSFont {
         let size = fontSize * scale
         var traits: NSFontTraitMask = []
@@ -40,7 +52,7 @@ struct ScreenshotPaperElement {
     }
     var isText:Bool { if case .text = content {return true};return false }
     func hasSameAppearance(as other:Self)->Bool {
-        guard frame.size == other.frame.size, color == other.color, fontSize == other.fontSize,
+        guard frame.size == other.frame.size, color == other.color, fill == other.fill, lineFromMaxX == other.lineFromMaxX, lineFromMaxY == other.lineFromMaxY, fontSize == other.fontSize,
               fontFamily == other.fontFamily, bold == other.bold, italic == other.italic, underline == other.underline, alignment == other.alignment, lineSpacing == other.lineSpacing else {return false}
         switch (content,other.content) {
         case (.text(let a),.text(let b)): return a == b
@@ -56,6 +68,10 @@ struct ScreenshotPaperElement {
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = alignment
             paragraph.lineSpacing = lineSpacing
+            if let fill {
+                let pad=tagPadding
+                value.insertNewShape(configuration:ShapeConfiguration(type:.roundedRectangle,fillColor:fill.cgColor,strokeColor:nil,lineWidth:0),frame:frame.insetBy(dx:-pad.width,dy:-pad.height))
+            }
             let attributed = NSAttributedString(string:text,attributes:[.font:font(),.foregroundColor:color,.paragraphStyle:paragraph,.underlineStyle:underline ? NSUnderlineStyle.single.rawValue : 0])
             // Lay out lines with AppKit, then preserve their exact origins in PaperKit.
             // PaperKit centers a multiline textbox inside its frame; separate tight
@@ -77,7 +93,7 @@ struct ScreenshotPaperElement {
             }
         case .shape(let shape):
             let config = ShapeConfiguration(type:shape,fillColor:nil,strokeColor:color.cgColor,lineWidth:3)
-            if shape == .line { value.insertNewLine(configuration:config,from:CGPoint(x:frame.minX,y:frame.maxY),to:CGPoint(x:frame.maxX,y:frame.minY),endMarker:true) }
+            if shape == .line { value.insertNewLine(configuration:config,from:lineStart,to:lineEnd,endMarker:true) }
             else { value.insertNewShape(configuration:config,frame:frame) }
         case .drawing(let drawing,let original):
             value.append(contentsOf:drawing)
@@ -110,10 +126,16 @@ struct ScreenshotPaperElement {
     private(set) var elements: [ScreenshotPaperElement] = []
     var selectedID: UUID? { didSet { if oldValue != selectedID { editor?.objectWillChange.send() } } }
     var editingID: UUID?
-    var ink: PKInkingTool.InkType = .pen
     var color = NSColor.red
-    enum Tool { case selection, drawing, eraser }
-    var tool = Tool.selection
+    enum Tool: CaseIterable { case selection, pen, marker, eraser, arrow, rectangle, ellipse, text
+        var isDrawing:Bool { self == .pen || self == .marker }
+        /// Tools that create an object from a drag rectangle.
+        var createsObject:Bool { [.arrow,.rectangle,.ellipse,.text].contains(self) }
+    }
+    var tool = Tool.selection {
+        didSet { if oldValue != tool { editor?.objectWillChange.send();view.window?.invalidateCursorRects(for:input) } }
+    }
+    var ink:PKInkingTool.InkType { tool == .marker ? .marker : .pen }
     weak var editor: ScreenshotEditor?
     init(size: CGSize) {
         canvas = CGRect(origin:.zero,size:size)
@@ -168,7 +190,8 @@ struct ScreenshotPaperElement {
             // Render the final geometry once when the gesture ends.
             let original=preview.rendered?.frame.size ?? item.frame.size
             let sx=item.frame.width/max(1,original.width), sy=item.frame.height/max(1,original.height)
-            let rect=item.frame.insetBy(dx:-8*sx,dy:-8*sy)
+            let outset=preview.rendered?.renderOutset ?? item.renderOutset
+            let rect=item.frame.insetBy(dx:-outset*sx,dy:-outset*sy)
             preview.view.frame=CGRect(origin:displayPoint(rect.origin),size:CGSize(width:rect.width*displayScale,height:rect.height*displayScale))
             preview.view.isHidden=item.id == editingID
         }
@@ -210,8 +233,9 @@ struct ScreenshotPaperElement {
         }
     }
     static func renderPreview(_ item:ScreenshotPaperElement) async throws -> NSImage {
-        var local=item;local.frame.origin=CGPoint(x:8,y:8)
-        let size=CGSize(width:ceil(item.frame.width)+16,height:ceil(item.frame.height)+16)
+        let outset=item.renderOutset
+        var local=item;local.frame.origin=CGPoint(x:outset,y:outset)
+        let size=CGSize(width:ceil(item.frame.width)+outset*2,height:ceil(item.frame.height)+outset*2)
         // Preserve Retina quality without allocating a screenshot-sized bitmap per object.
         let scale:CGFloat=min(2,4096/max(size.width,size.height))
         let width=max(1,Int(ceil(size.width*scale))),height=max(1,Int(ceil(size.height*scale)))
@@ -234,26 +258,50 @@ struct ScreenshotPaperElement {
     }
     func waitForPreview() async { await renderTask?.value }
     func endEditing() { input.commitText(); selectedID=nil; input.needsDisplay=true; view.window?.makeFirstResponder(input) }
-    func select() { tool = .selection; input.commitText(); view.window?.makeFirstResponder(input) }
-    func draw(color:NSColor,ink:PKInkingTool.InkType = .pen) { select(); self.color=color;self.ink=ink;tool = .drawing; selectedID=nil;input.needsDisplay=true }
-    func erase() { select();tool = .eraser }
-    func insertText() {
-        select(); checkpoint()
+    func focusCanvas() { input.commitText(); view.window?.makeFirstResponder(input) }
+    func select() { tool = .selection; focusCanvas() }
+    func setTool(_ value:Tool) {
+        focusCanvas();tool=value
+        if value != .selection { selectedID=nil }
+        input.needsDisplay=true
+    }
+    static let tagColor=NSColor.systemRed
+    /// Text defaults to a white-on-red tag. With no origin it is centered on the canvas.
+    func insertText(at origin:CGPoint? = nil) {
+        focusCanvas(); checkpoint()
         let fontSize=min(28,canvas.height*0.1)
         let width=min(ceil(("Text" as NSString).size(withAttributes:[.font:NSFont.systemFont(ofSize:fontSize)]).width)+8,canvas.width*0.7),height=ceil(fontSize*1.3)+4
-        let element=ScreenshotPaperElement(frame:CGRect(x:(canvas.width-width)/2,y:(canvas.height-height)/2,width:width,height:height),content:.text("Text"),color:.black,fontSize:fontSize)
+        var frame=CGRect(x:(canvas.width-width)/2,y:(canvas.height-height)/2,width:width,height:height)
+        if let origin {
+            frame.origin=CGPoint(x:min(max(0,origin.x),max(0,canvas.width-width)),y:min(max(0,origin.y),max(0,canvas.height-height)))
+        }
+        let element=ScreenshotPaperElement(frame:frame,content:.text("Text"),color:.white,fontSize:fontSize,fill:Self.tagColor)
         elements.append(element);selectedID=element.id;rebuild();input.beginText()
     }
-    func insertShape(_ shape:ShapeConfiguration.Shape) {
-        select();checkpoint()
-        let side=min(180,min(canvas.width,canvas.height)*0.4)
-        let element=ScreenshotPaperElement(frame:CGRect(x:(canvas.width-side)/2,y:(canvas.height-side)/2,width:side,height:side),content:.shape(shape),color:color)
+    /// Creates a shape covering the dragged rectangle; arrows point from `start` to `end`.
+    func insertShape(_ shape:ShapeConfiguration.Shape,from start:CGPoint? = nil,to end:CGPoint? = nil) {
+        focusCanvas();checkpoint()
+        var element:ScreenshotPaperElement
+        if let start,let end {
+            let frame=CGRect(x:min(start.x,end.x),y:min(start.y,end.y),width:abs(end.x-start.x),height:abs(end.y-start.y))
+            element=ScreenshotPaperElement(frame:frame,content:.shape(shape),color:color)
+            element.lineFromMaxX=start.x>end.x;element.lineFromMaxY=start.y>end.y
+        } else {
+            let side=min(180,min(canvas.width,canvas.height)*0.4)
+            element=ScreenshotPaperElement(frame:CGRect(x:(canvas.width-side)/2,y:(canvas.height-side)/2,width:side,height:side),content:.shape(shape),color:color)
+        }
         elements.append(element);selectedID=element.id;rebuild()
     }
     func setColor(_ value:NSColor) {
-        color=value
-        guard let i=selectedIndex else { return }
-        input.commitText();checkpoint();elements[i].color=value
+        guard let i=selectedIndex else { color=value;return }
+        input.commitText();checkpoint()
+        if elements[i].isText,elements[i].fill != nil {
+            // Tags recolor their fill and keep the text legible on light fills.
+            elements[i].fill=value
+            elements[i].color=[NSColor.white,.systemYellow].contains(value) ? .black : .white
+            rebuild();return
+        }
+        color=value;elements[i].color=value
         if case .drawing(let drawing,let original) = elements[i].content {
             let strokes=drawing.strokes.map { stroke -> PKStroke in
                 var changed=stroke; changed.ink=PKInk(stroke.ink.inkType,color:value);return changed
@@ -327,6 +375,9 @@ struct ScreenshotPaperElement {
         rebuild()
     }
     func deleteSelection() { guard let i=selectedIndex else {return};checkpoint();elements.remove(at:i);selectedID=nil;rebuild() }
+    func element(at point:CGPoint)->ScreenshotPaperElement? {
+        elements.reversed().first { $0.frame.insetBy(dx:-6/displayScale,dy:-6/displayScale).contains(point) }
+    }
     func addStroke(_ points:[CGPoint]) {
         guard points.count > 1 else {return};checkpoint()
         let width:CGFloat=ink == .marker ? 14 : 3
@@ -398,6 +449,9 @@ private final class ScreenshotPaperBackground:NSImageView {
     private var startingFontSize:CGFloat=28
     private var moving=false
     private var stroke:[CGPoint]=[]
+    /// Current point of a drag that creates an arrow, shape or text.
+    private var creating:CGPoint?
+    private var erasing=false
     override var isFlipped:Bool {true}
     override var acceptsFirstResponder:Bool {true}
     override func acceptsFirstMouse(for event:NSEvent?)->Bool {true}
@@ -432,6 +486,22 @@ private final class ScreenshotPaperBackground:NSImageView {
             session.color.setStroke();let path=NSBezierPath();path.move(to:session.displayPoint(stroke[0]))
             for p in stroke.dropFirst(){path.line(to:session.displayPoint(p))};path.lineWidth=(session.ink == .marker ? 14 : 3)*scale;path.lineCapStyle = .round;path.stroke()
         }
+        if let origin,let creating {drawCreation(from:session.displayPoint(origin),to:session.displayPoint(creating),tool:session.tool,color:session.color)}
+    }
+    private func drawCreation(from a:CGPoint,to b:CGPoint,tool:PaperScreenshotSession.Tool,color:NSColor) {
+        let rect=CGRect(x:min(a.x,b.x),y:min(a.y,b.y),width:abs(b.x-a.x),height:abs(b.y-a.y))
+        let path:NSBezierPath
+        switch tool {
+        case .rectangle: path=NSBezierPath(rect:rect)
+        case .ellipse: path=NSBezierPath(ovalIn:rect)
+        case .arrow:
+            path=NSBezierPath();path.move(to:a);path.line(to:b)
+            let angle=atan2(b.y-a.y,b.x-a.x),head=min(16*scale,hypot(b.x-a.x,b.y-a.y)*0.4)
+            for side in [CGFloat.pi*0.82,-CGFloat.pi*0.82] {path.move(to:b);path.line(to:CGPoint(x:b.x+cos(angle+side)*head,y:b.y+sin(angle+side)*head))}
+        default:
+            NSColor.controlAccentColor.setStroke();let box=NSBezierPath(rect:rect);box.lineWidth=1;box.setLineDash([4,3],count:2,phase:0);box.stroke();return
+        }
+        color.setStroke();path.lineWidth=3*scale;path.lineCapStyle = .round;path.lineJoinStyle = .round;path.stroke()
     }
     private func handles(for item:ScreenshotPaperElement)->[ScreenshotResizeHandle] {
         item.isText ? [.left,.right,.bottomRight] : ScreenshotResizeHandle.allCases
@@ -456,16 +526,20 @@ private final class ScreenshotPaperBackground:NSImageView {
     override func mouseDown(with event:NSEvent) {
         guard let session, session.editor?.busy != true else{return}
         commitText();window?.makeFirstResponder(self)
-        let p=point(event);moving=false;startingFrame=nil;origin=nil
+        let p=point(event);moving=false;startingFrame=nil;origin=nil;creating=nil;erasing=false
         resizeHandle=nil
-        if session.tool == .selection, let item=session.selected, let handle=handle(at:p,item:item) {
+        let tool=session.tool
+        if tool == .selection || tool.createsObject, let item=session.selected, let handle=handle(at:p,item:item) {
             resizeHandle=handle;startingFrame=item.frame;startingFontSize=item.fontSize;origin=p;return
         }
         guard session.canvasBounds.contains(p) else {session.selectedID=nil;needsDisplay=true;return}
         origin=p
-        if session.tool == .drawing {stroke=[p];needsDisplay=true;return}
-        session.selectedID=session.elements.reversed().first { $0.frame.insetBy(dx:-6/scale,dy:-6/scale).contains(p) }?.id
-        if session.tool == .eraser {session.deleteSelection();return}
+        if tool.isDrawing {stroke=[p];needsDisplay=true;return}
+        if tool == .eraser {erasing=true;erase(at:p);return}
+        let hit=session.element(at:p)
+        // Creation tools drag out a new object; pressing on an existing one still selects and moves it.
+        if tool.createsObject, hit == nil {session.selectedID=nil;creating=p;needsDisplay=true;return}
+        session.selectedID=hit?.id
         startingFrame=session.selected?.frame;startingFontSize=session.selected?.fontSize ?? 28;needsDisplay=true
         window?.invalidateCursorRects(for:self)
         if event.clickCount>=2, let item=session.selected, case .text = item.content {beginText()}
@@ -474,7 +548,9 @@ private final class ScreenshotPaperBackground:NSImageView {
         guard let session,let origin else{return}
         let raw=point(event)
         let p=CGPoint(x:min(max(raw.x,0),session.canvasBounds.maxX),y:min(max(raw.y,0),session.canvasBounds.maxY))
-        if session.tool == .drawing {stroke.append(p);needsDisplay=true;return}
+        if session.tool.isDrawing {stroke.append(p);needsDisplay=true;return}
+        if erasing {erase(at:p);return}
+        if creating != nil {creating=p;needsDisplay=true;return}
         guard let original=startingFrame else{return}
         let dx=p.x-origin.x,dy=p.y-origin.y
         guard moving || hypot(dx,dy)*scale >= 3 else {return}
@@ -495,8 +571,26 @@ private final class ScreenshotPaperBackground:NSImageView {
     override func mouseUp(with event:NSEvent) {
         if !stroke.isEmpty {session?.addStroke(stroke);stroke=[];needsDisplay=true}
         if moving {session?.finishTransform()}
-        origin=nil;startingFrame=nil;moving=false;resizeHandle=nil
-        window?.invalidateCursorRects(for:self)
+        if let start=origin,let end=creating {finishCreation(from:start,to:end)}
+        origin=nil;startingFrame=nil;moving=false;resizeHandle=nil;creating=nil;erasing=false
+        needsDisplay=true;window?.invalidateCursorRects(for:self)
+    }
+    private func finishCreation(from start:CGPoint,to end:CGPoint) {
+        guard let session else {return}
+        let dragged=hypot(end.x-start.x,end.y-start.y)*scale >= 4
+        switch session.tool {
+        case .text:
+            let height=ceil(min(28,session.canvasBounds.height*0.1)*1.3)+4
+            session.insertText(at:dragged ? CGPoint(x:min(start.x,end.x),y:min(start.y,end.y)) : CGPoint(x:start.x,y:start.y-height/2))
+        case .arrow where dragged: session.insertShape(.line,from:start,to:end)
+        case .rectangle where dragged: session.insertShape(.rectangle,from:start,to:end)
+        case .ellipse where dragged: session.insertShape(.ellipse,from:start,to:end)
+        default: break
+        }
+    }
+    private func erase(at p:CGPoint) {
+        guard let session,let hit=session.element(at:p) else {return}
+        session.selectedID=hit.id;session.deleteSelection()
     }
     override func keyDown(with event:NSEvent) {
         guard let session else{return}
@@ -521,6 +615,10 @@ private final class ScreenshotPaperBackground:NSImageView {
         editor.isRichText=false;editor.drawsBackground=false;editor.textContainerInset = .zero
         editor.textContainer?.lineFragmentPadding=0;editor.isHorizontallyResizable=false;editor.isVerticallyResizable=true
         editor.font=selected.font(scale:scale);editor.textColor=selected.color
+        if let fill=selected.fill {
+            editor.drawsBackground=true;editor.backgroundColor=fill;editor.insertionPointColor=selected.color
+            editor.wantsLayer=true;editor.layer?.cornerRadius=4*scale
+        }
         let paragraph=NSMutableParagraphStyle();paragraph.alignment=selected.alignment;paragraph.lineSpacing=selected.lineSpacing*scale
         editor.defaultParagraphStyle=paragraph;editor.alignment=selected.alignment
         editor.string=text
@@ -550,6 +648,7 @@ private final class ScreenshotPaperBackground:NSImageView {
         guard let textView,let session else{return}
         let text=textView.string;let height=textView.frame.height/scale
         self.textView=nil;textView.delegate=nil;textView.removeFromSuperview();session.editingID=nil
+        if text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {session.deleteSelection();return}
         if text != textBefore {session.checkpoint();session.replaceText(text,height:height)}else{session.rebuild()}
     }
     func cancelText() {textView?.delegate=nil;textView?.removeFromSuperview();textView=nil;session?.editingID=nil}

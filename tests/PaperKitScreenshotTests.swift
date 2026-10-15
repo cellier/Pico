@@ -147,6 +147,22 @@ import PencilKit
         guard case .text(let plain)=session.selected!.content else {fatalError()}
         precondition(!plain.hasPrefix("• "))
         print("PASS: alignment coordinates, underline/spacing output, reversible list formatting")
+        session.clear();session.insertText(at:CGPoint(x:100,y:300))
+        let tag=session.selected!
+        precondition(tag.fill == PaperScreenshotSession.tagColor && tag.color == .white && tag.frame.origin == CGPoint(x:100,y:300),"Text defaults to a white-on-red tag at the click point")
+        session.endEditing()
+        let tagPNG=try await session.png(background:base,size:size)
+        try tagPNG.write(to:out.appendingPathComponent("tag-text.png"))
+        let tagPixels=NSBitmapImageRep(data:tagPNG)!
+        let tagFill=tagPixels.colorAt(x:Int(tag.frame.minX)+2,y:Int(tag.frame.midY))!.usingColorSpace(.deviceRGB)!
+        precondition(tagFill.redComponent>0.8 && tagFill.greenComponent<0.4,"Tag background must reach PaperKit export")
+        session.clear();session.insertShape(.line,from:CGPoint(x:600,y:100),to:CGPoint(x:200,y:400))
+        let arrow=session.selected!
+        precondition(arrow.frame == CGRect(x:200,y:100,width:400,height:300) && arrow.lineStart == CGPoint(x:600,y:100) && arrow.lineEnd == CGPoint(x:200,y:400),"Arrow keeps the dragged direction")
+        session.insertShape(.ellipse,from:CGPoint(x:300,y:300),to:CGPoint(x:100,y:200))
+        precondition(session.selected!.frame == CGRect(x:100,y:200,width:200,height:100),"Shapes fill the dragged rectangle")
+        try await session.png(background:base,size:size).write(to:out.appendingPathComponent("drag-shapes.png"))
+        print("PASS: tag text default, drag-created arrow direction and shape frame")
         try exported.write(to:out.appendingPathComponent("paperkit-render.png"))
         let bytes = try await markup.dataRepresentation()
         let decoded = try PaperMarkup(dataRepresentation:bytes)

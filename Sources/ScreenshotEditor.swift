@@ -13,8 +13,6 @@ import PaperKit
     @Published var instruction = ""
     @Published var localEdit = true
     @Published var markupMode = true
-    @Published var markupColor = Color.red
-    @Published var drawingSelected = false
     let editUndoManager = UndoManager()
     var markupSession: ScreenshotMarkupSession?
     var canUndo: Bool { editUndoManager.canUndo }
@@ -159,12 +157,6 @@ import PaperKit
             busy = false
         }
     }
-    func save() {
-        guard !busy else { return }
-        let panel = NSSavePanel(); panel.allowedContentTypes = [.png]; panel.nameFieldStringValue = "Telos-edited.png"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        export { [weak self] data in try data.write(to:url,options:.atomic); self?.message = "PNG saved" }
-    }
     private func annotate(_ instruction: String) {
         guard let target, let python = BundledRuntime.python(), let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/screenshot_annotation.py"), let png = ScreenshotRenderer.png(image:image,size:size,annotations:annotations) else { fail("Could not prepare this screenshot."); return }
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("TelosAnnotation-\(UUID().uuidString).png")
@@ -222,12 +214,26 @@ import PaperKit
     private func fail(_ text: String) { cancelWork(); message = text }
     func undo() { guard !busy else { return }; window?.makeFirstResponder(nil); editUndoManager.undo(); objectWillChange.send() }
     func redo() { guard !busy else { return }; window?.makeFirstResponder(nil); editUndoManager.redo(); objectWillChange.send() }
+    /// Copies the marked-up image, saves it to the Desktop as `<time>.png`, then closes.
     func done() {
+        let captured = Date()
         export { [weak self] data in
+            guard let bitmap = NSBitmapImageRep(data:data), let tiff = bitmap.tiffRepresentation else { throw CocoaError(.fileReadCorruptFile) }
+            let item = NSPasteboardItem()
+            guard item.setData(data,forType:.png), item.setData(tiff,forType:.tiff) else { throw CocoaError(.fileWriteUnknown) }
             NSPasteboard.general.clearContents()
-            guard NSPasteboard.general.setData(data,forType:.png) else { throw CocoaError(.fileWriteUnknown) }
-            self?.message = "Image copied"
+            guard NSPasteboard.general.writeObjects([item]) else { throw CocoaError(.fileWriteUnknown) }
+            try data.write(to:Self.desktopURL(for:captured),options:.withoutOverwriting)
+            self?.close()
         }
+    }
+    static func desktopURL(for date: Date, in folder: URL? = nil) -> URL {
+        let desktop = folder ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        let stem = formatter.string(from:date)
+        var url = desktop.appendingPathComponent("\(stem).png"), index = 2
+        while FileManager.default.fileExists(atPath:url.path) { url = desktop.appendingPathComponent("\(stem) \(index).png"); index += 1 }
+        return url
     }
     func close() { window?.close() }
     func windowWillClose(_ notification: Notification) { cancelWork(); speech.stop(); window = nil; closed() }
@@ -254,21 +260,17 @@ private struct ScreenshotEditorView: View {
                 }
                 if !editor.markupMode { ScreenshotCanvas(editor:editor) }
             }.frame(width:geometry.size.width,height:geometry.size.height).clipped()
-            }.padding(.bottom,editor.markupMode ? 44 : 122)
+            }.padding(.bottom,editor.markupMode ? 0 : 122)
             ScrollEdgeFade(top:true).frame(height:96)
             ZStack {
                 ScreenshotWindowDragArea().frame(height:60)
                 HStack {
                     GlassCircle(help:"Close",action:editor.close) { Image(systemName:"xmark").font(.system(size:14,weight:.medium)) }
                     Spacer()
-                    Menu {
-                        Button("Copy Image",action:editor.done).keyboardShortcut(.return,modifiers:.command)
-                        Button("Save PNG…",action:editor.save).keyboardShortcut("s",modifiers:.command)
-                        Divider()
-                        Button(editor.markupMode ? "AI Edit…" : "Back to Markup") { editor.markupMode.toggle() }
-                    } label: {
-                        Text("Done").font(.system(size:14,weight:.medium)).frame(width:72,height:36)
-                    }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().frame(width:72,height:36).inputGlass().disabled(editor.busy)
+                    Button(action:editor.done) {
+                        Text("Done").font(.system(size:14,weight:.medium)).frame(width:72,height:36).contentShape(Capsule())
+                    }.buttonStyle(.plain).help("Copy and save to Desktop (⌘↩)").keyboardShortcut(.return,modifiers:.command)
+                        .inputGlass().disabled(editor.busy)
                 }.padding(.horizontal,12)
                 if #available(macOS 26.0, *), let session = editor.markupSession as? PaperScreenshotSession {
                     ScreenshotMarkupToolbar(editor:editor,session:session)
@@ -278,21 +280,6 @@ private struct ScreenshotEditorView: View {
                let session = editor.markupSession as? PaperScreenshotSession,
                let selected = session.selected, case .text = selected.content {
                 ScreenshotTextInspector(editor:editor,session:session,item:selected)
-            }
-            if #available(macOS 26.0, *), editor.markupMode,
-               let session=editor.markupSession as? PaperScreenshotSession {
-                HStack(spacing:8) {
-                    Button { session.zoom(by:-0.2) } label: { Image(systemName:"minus").frame(width:24,height:28) }
-                        .help("Zoom out").accessibilityLabel("Zoom out").keyboardShortcut("-",modifiers:.command)
-                        .disabled(session.zoom <= 0.25)
-                    Button { session.fitCanvas() } label: { Text("\(Int((session.zoom*100).rounded()))%").monospacedDigit().frame(width:44,height:28) }
-                        .help("Fit canvas (⌘0)").accessibilityLabel("Fit canvas").keyboardShortcut("0",modifiers:.command)
-                    Button { session.zoom(by:0.25) } label: { Image(systemName:"plus").frame(width:24,height:28) }
-                        .help("Zoom in").accessibilityLabel("Zoom in").keyboardShortcut("=",modifiers:.command)
-                        .disabled(session.zoom >= 8)
-                }.font(.system(size:12)).buttonStyle(.plain).padding(.horizontal,6).inputGlass()
-                    .disabled(editor.busy).padding(.trailing,12).padding(.bottom,8)
-                    .frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.bottomTrailing)
             }
             if !editor.markupMode || !editor.message.isEmpty {
             VStack(spacing:8) {
@@ -317,13 +304,13 @@ private struct ScreenshotEditorView: View {
                     .font(.system(size:11)).foregroundStyle(.secondary)
                 }
             }.padding(14).background(RoundedRectangle(cornerRadius:20).fill(.regularMaterial))
-                .padding(12).padding(.bottom,editor.markupMode ? 44 : 0).frame(maxHeight:.infinity,alignment:.bottom)
+                .padding(12).frame(maxHeight:.infinity,alignment:.bottom)
             }
         }
         .foregroundStyle(.black).clipShape(RoundedRectangle(cornerRadius:32))
         .onExitCommand {
             if editor.busy { editor.cancelWork() }
-            else if #available(macOS 26.0, *), editor.markupMode, let session = editor.markupSession as? PaperScreenshotSession { session.endEditing() }
+            else if #available(macOS 26.0, *), editor.markupMode, let session = editor.markupSession as? PaperScreenshotSession { session.endEditing(); session.select() }
         }
     }
 }
@@ -409,39 +396,48 @@ private final class ScreenshotEditingWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     override var undoManager: UndoManager? { editor?.editUndoManager }
+    /// The editor has no Undo buttons or Edit menu, so handle ⌘Z / ⇧⌘Z here. Text fields keep their own shortcuts.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if let editor, event.charactersIgnoringModifiers?.lowercased() == "z", flags == .command || flags == [.command,.shift],
+           !(firstResponder is NSTextView) {
+            if flags.contains(.shift) { editor.redo() } else { editor.undo() }
+            return true
+        }
+        // Zoom stays available by pinch, ⌘-scroll and these shortcuts; the editor shows no zoom controls.
+        if #available(macOS 26.0, *), flags == .command, let session = editor?.markupSession as? PaperScreenshotSession,
+           !(firstResponder is NSTextView), editor?.busy != true {
+            switch event.charactersIgnoringModifiers {
+            case "=", "+": session.zoom(by:0.25); return true
+            case "-": session.zoom(by:-0.2); return true
+            case "0": session.fitCanvas(); return true
+            default: break
+            }
+        }
+        return super.performKeyEquivalent(with:event)
+    }
 }
 
 @available(macOS 26.0, *)
 private struct ScreenshotMarkupToolbar: View {
     @ObservedObject var editor: ScreenshotEditor
     let session: PaperScreenshotSession
-    private func icon(_ name: String, weight: Font.Weight = .medium) -> some View {
-        Image(systemName:name).font(.system(size:14,weight:weight)).frame(width:24,height:24)
-    }
+    private static let tools: [(PaperScreenshotSession.Tool,String,String)] = [
+        (.pen,"scribble.variable","Pen"),(.marker,"pencil.tip","Marker"),(.eraser,"eraser","Eraser"),
+        (.arrow,"arrow.up.left","Arrow"),(.rectangle,"rectangle","Rectangle"),(.ellipse,"circle","Ellipse"),(.text,"character.textbox","Text")]
     var body: some View {
-        HStack(spacing:16) {
-            Button(action:editor.undo) { icon("arrow.uturn.backward") }.help("Undo").keyboardShortcut("z",modifiers:.command)
-            Button(action:editor.redo) { icon("arrow.uturn.forward") }.help("Redo").keyboardShortcut("z",modifiers:[.command,.shift])
-            Menu {
-                Button("Select & Move") { editor.markupMode = true; editor.drawingSelected = false; session.select() }
-                Button("Pen") { editor.markupMode = true; editor.drawingSelected = true; session.draw(color:NSColor(editor.markupColor)) }
-                Button("Marker") { editor.markupMode = true; editor.drawingSelected = true; session.draw(color:NSColor(editor.markupColor),ink:.marker) }
-                Button("Eraser") { editor.markupMode = true; editor.drawingSelected = false; session.erase() }
-            } label: { icon("scribble.variable") }.menuIndicator(.hidden).fixedSize().help("Drawing tools")
-            Menu {
-                Button("Rectangle") { insert(.rectangle) }
-                Button("Ellipse") { insert(.ellipse) }
-                Button("Arrow") { insert(.line) }
-                Button("Speech Bubble") { insert(.chatBubble) }
-                Button("Star") { insert(.star) }
-            } label: { icon("square.on.circle",weight:.semibold) }.menuIndicator(.hidden).fixedSize().help("Shapes")
-            Button { editor.markupMode = true; editor.drawingSelected = false; session.insertText() } label: { icon("character.textbox") }.help("Text")
-
-        }.buttonStyle(.plain).menuStyle(.borderlessButton).foregroundStyle(Color(white:0.10))
-            .padding(.horizontal,16).frame(height:36).inputGlass().disabled(editor.busy)
-    }
-    private func insert(_ shape: PaperKit.ShapeConfiguration.Shape) {
-        editor.markupMode = true; editor.drawingSelected = false; session.insertShape(shape)
+        HStack(spacing:12) {
+            ForEach(Self.tools,id:\.1) { tool,symbol,label in
+                let active = session.tool == tool
+                // Selecting the active tool again returns to select & move.
+                Button { session.setTool(active ? .selection : tool) } label: {
+                    Image(systemName:symbol).font(.system(size:16,weight:.medium)).frame(width:24,height:24)
+                        .foregroundStyle(active ? Color.accentColor : Color(white:0.10))
+                        .background(RoundedRectangle(cornerRadius:8).fill(.black.opacity(active ? 0.08 : 0)).frame(width:32,height:30))
+                        .contentShape(Rectangle())
+                }.help(label).accessibilityLabel(label).accessibilityAddTraits(active ? .isSelected : [])
+            }
+        }.buttonStyle(.plain).padding(.horizontal,12).frame(height:36).inputGlass().disabled(editor.busy)
     }
 }
 
@@ -475,8 +471,8 @@ private struct ScreenshotTextStyleBar: View {
     private static let colors: [(String,NSColor)] = [("Black",.black),("White",.white),("Red",.systemRed),("Orange",.systemOrange),("Yellow",.systemYellow),("Green",.systemGreen),("Blue",.systemBlue),("Purple",.systemPurple)]
     var body: some View {
         HStack(spacing:2) {
-            Button {session.select();showColor.toggle()} label: {
-                Circle().fill(Color(nsColor:item.color)).overlay(Circle().stroke(.gray.opacity(0.3),lineWidth:0.5)).frame(width:18,height:18).frame(width:28,height:30)
+            Button {session.focusCanvas();showColor.toggle()} label: {
+                Circle().fill(Color(nsColor:item.fill ?? item.color)).overlay(Circle().stroke(.gray.opacity(0.3),lineWidth:0.5)).frame(width:18,height:18).frame(width:28,height:30)
             }.accessibilityLabel("Text color").popover(isPresented:$showColor,arrowEdge:.bottom) {
                 LazyVGrid(columns:Array(repeating:GridItem(.fixed(28)),count:4),spacing:10) {
                     ForEach(Array(Self.colors.enumerated()),id:\.offset) { _,entry in
@@ -484,9 +480,9 @@ private struct ScreenshotTextStyleBar: View {
                     }
                 }.buttonStyle(.plain).padding(16)
             }
-            Button {session.select();showStyle.toggle()} label: {Text("Aa").frame(width:30,height:30).background(showStyle ? .black.opacity(0.08) : .clear,in:Circle())}
+            Button {session.focusCanvas();showStyle.toggle()} label: {Text("Aa").frame(width:30,height:30).background(showStyle ? .black.opacity(0.08) : .clear,in:Circle())}
                 .accessibilityLabel("Text style").popover(isPresented:$showStyle,arrowEdge:.bottom) {stylePanel}
-            Button {session.select();showSize.toggle()} label: {Text(item.fontSize,format:.number.precision(.fractionLength(0...1))).monospacedDigit().frame(minWidth:28).frame(height:30)}
+            Button {session.focusCanvas();showSize.toggle()} label: {Text(item.fontSize,format:.number.precision(.fractionLength(0...1))).monospacedDigit().frame(minWidth:28).frame(height:30)}
                 .accessibilityLabel("Font size").popover(isPresented:$showSize,arrowEdge:.bottom) {
                     VStack(spacing:12) {
                         HStack {
