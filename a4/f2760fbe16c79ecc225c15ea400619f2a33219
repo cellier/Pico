@@ -1,0 +1,25 @@
+Sources/ScreenshotPaperKit.swift
+  s_e2da2cb68ca1fe::t_56bd9025ad7ce6 39,95,269,271-272,276,387,491,503,508,587,592,594
+  s_e2da2cb68ca1fe::t_d737f2b212b6c0 270
+tests/PaperKitScreenshotTests.swift
+  s_e2da2cb68ca1fe::t_f14b11aa05dd50 70,73
+  s_e2da2cb68ca1fe::t_56bd9025ad7ce6 124
+Sources/ScreenshotEditor.swift
+  s_e2da2cb68ca1fe::t_56bd9025ad7ce6 426,433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a4f2760fbe16c79ecc225c15ea400619f2a33219",
+  "prompts": {},
+  "sessions": {
+    "s_e2da2cb68ca1fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "97b622b0-20d3-4c8f-9e8d-3b90e952c509",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
