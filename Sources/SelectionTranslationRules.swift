@@ -36,13 +36,15 @@ enum SelectionTranslationLayout {
     static let buttonSize = CGSize(width: 102, height: 32)
     static let panelSize = CGSize(width: 374, height: 528)
 
-    /// Accessibility bounds use a top-left origin. Returns nil when the bounds lie away from where the
-    /// gesture ended: that selection predates the gesture (e.g. a window was dragged).
+    /// Accessibility bounds use a top-left origin. Returns nil when the bounds lie away from both ends of
+    /// the gesture: that selection predates it (e.g. a window was dragged).
     /// Without usable bounds the rect is approximated from the gesture.
     static func selectionRect(accessibility rect: CGRect?, primaryHeight: CGFloat, down: CGPoint, up: CGPoint) -> CGRect? {
         if let rect, rect.width > 0 || rect.height > 0 {
             let flipped = CGRect(x: rect.minX, y: primaryHeight - rect.maxY, width: rect.width, height: rect.height)
-            return flipped.insetBy(dx: -40, dy: -40).contains(up) ? flipped : nil
+            // Some apps report only the first or last line of a multi-line range, so either end may match.
+            let near = flipped.insetBy(dx: -40, dy: -40)
+            return near.contains(up) || near.contains(down) ? flipped : nil
         }
         // The pointer sits on the text line; approximate its top from the gesture.
         let minX = min(down.x, up.x), maxX = max(down.x, up.x)

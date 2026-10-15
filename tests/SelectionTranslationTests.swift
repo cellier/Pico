@@ -16,6 +16,9 @@ import Foundation
         precondition(rect == CGRect(x: 100, y: 660, width: 300, height: 40))
         // Bounds away from the pointer belong to an older selection (e.g. a window was dragged).
         precondition(SelectionTranslationLayout.selectionRect(accessibility: CGRect(x: 900, y: 0, width: 10, height: 10), primaryHeight: 900, down: CGPoint(x: 100, y: 500), up: CGPoint(x: 300, y: 500)) == nil)
+        // Multi-line: the app reports only the first line; the drag ends lines below but started on it.
+        let firstLine = CGRect(x: 100, y: 200, width: 500, height: 20)
+        precondition(SelectionTranslationLayout.selectionRect(accessibility: firstLine, primaryHeight: 900, down: CGPoint(x: 110, y: 690), up: CGPoint(x: 400, y: 560)) != nil)
         // Apps without bounds fall back to the gesture.
         let fallback = SelectionTranslationLayout.selectionRect(accessibility: nil, primaryHeight: 900, down: CGPoint(x: 100, y: 500), up: CGPoint(x: 300, y: 500))!
         precondition(fallback.midX == 200 && fallback.maxY > 500)

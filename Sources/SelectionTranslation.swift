@@ -38,31 +38,64 @@ import SwiftUI
         return current == iBeam
     }
 
-    static func copySelection() async -> String? {
+    /// Some apps (Zoom, Electron) write the pasteboard asynchronously and in several steps, so wait up to
+    /// 0.8 s for the copy to start, then until it settles, before reading. The previous contents are
+    /// restored only if nothing else wrote meanwhile.
+    /// The app's own Copy menu item (⌘C), found through Accessibility. Pressing it reaches the focused
+    /// view the same way the user's ⌘C does, without depending on how the app handles posted key events.
+    static func copyMenuItem(pid: pid_t) -> AXUIElement? {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.25)
+        guard let bar = attribute(app, kAXMenuBarAttribute), CFGetTypeID(bar) == AXUIElementGetTypeID(),
+              let menus = attribute(bar as! AXUIElement, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+        for menu in menus.dropFirst() {
+            guard let submenus = attribute(menu, kAXChildrenAttribute) as? [AXUIElement] else { continue }
+            for submenu in submenus {
+                for item in attribute(submenu, kAXChildrenAttribute) as? [AXUIElement] ?? [] {
+                    guard (attribute(item, kAXMenuItemCmdCharAttribute) as? String)?.lowercased() == "c",
+                          (attribute(item, kAXMenuItemCmdModifiersAttribute) as? Int) == 0 else { continue }
+                    return attribute(item, kAXEnabledAttribute) as? Bool == false ? nil : item
+                }
+            }
+        }
+        return nil
+    }
+
+    static func copySelection(pid: pid_t) async -> String? {
         let pasteboard = NSPasteboard.general
         let saved = pasteboard.pasteboardItems?.map { item in
             item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
         } ?? []
         let before = pasteboard.changeCount
-        guard CGPreflightPostEventAccess(),
-              let source = CGEventSource(stateID: .combinedSessionState),
-              let down = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false) else { return nil }
-        down.flags = .maskCommand; up.flags = .maskCommand
-        TelosKeyboardEvent.markSynthetic(down); TelosKeyboardEvent.markSynthetic(up)
-        down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
-        for _ in 0..<10 where pasteboard.changeCount == before {
-            try? await Task.sleep(nanoseconds: 25_000_000)
+        let pressedMenu = copyMenuItem(pid: pid).map { AXUIElementPerformAction($0, kAXPressAction as CFString) == .success } ?? false
+        if !pressedMenu {
+            guard CGPreflightPostEventAccess(),
+                  let source = CGEventSource(stateID: .combinedSessionState),
+                  let down = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: true),
+                  let up = CGEvent(keyboardEventSource: source, virtualKey: 8, keyDown: false) else { return nil }
+            down.flags = .maskCommand; up.flags = .maskCommand
+            TelosKeyboardEvent.markSynthetic(down); TelosKeyboardEvent.markSynthetic(up)
+            down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
         }
+        let step: UInt64 = 20_000_000
+        var waited = 0
+        while pasteboard.changeCount == before, waited < 40 { try? await Task.sleep(nanoseconds: step); waited += 1 }
         guard pasteboard.changeCount != before else { return nil }
-        let text = pasteboard.string(forType: .string)
-        pasteboard.clearContents()
-        let items = saved.map { entries in
-            let item = NSPasteboardItem()
-            for (type, data) in entries { item.setData(data, forType: type) }
-            return item
+        var last = pasteboard.changeCount, stable = 0
+        for _ in 0..<20 where stable < 3 || pasteboard.string(forType: .string) == nil {
+            try? await Task.sleep(nanoseconds: step)
+            if pasteboard.changeCount == last { stable += 1 } else { last = pasteboard.changeCount; stable = 0 }
         }
-        if !items.isEmpty { pasteboard.writeObjects(items) }
+        let text = pasteboard.string(forType: .string)
+        if pasteboard.changeCount == last {
+            pasteboard.clearContents()
+            let items = saved.map { entries in
+                let item = NSPasteboardItem()
+                for (type, data) in entries { item.setData(data, forType: type) }
+                return item
+            }
+            if !items.isEmpty { pasteboard.writeObjects(items) }
+        }
         return text
     }
 
@@ -78,6 +111,7 @@ import SwiftUI
     private let store: TaskStore
     private var monitors: [Any] = []
     private var downPoint = CGPoint.zero
+    private var downOverText = false
     private var gesture = UUID()
     private var button: NSPanel?
     private var panel: TranslationPanel?
@@ -87,7 +121,9 @@ import SwiftUI
     func start() {
         guard monitors.isEmpty else { return }
         let handlers: [(NSEvent.EventTypeMask, (NSEvent) -> Void)] = [
-            (.leftMouseDown, { [weak self] event in self?.downPoint = Self.screenLocation(event); self?.hideButton() }),
+            (.leftMouseDown, { [weak self] event in
+                self?.downPoint = Self.screenLocation(event); self?.downOverText = SelectionCapture.pointerIsIBeam; self?.hideButton()
+            }),
             (.leftMouseUp, { [weak self] event in self?.mouseUp(event) }),
             ([.rightMouseDown, .otherMouseDown, .keyDown, .scrollWheel], { [weak self] _ in self?.hideButton() }),
         ]
@@ -115,7 +151,8 @@ import SwiftUI
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         let token = UUID(); gesture = token
-        let iBeam = SelectionCapture.pointerIsIBeam
+        // A text drag starts over text; it often ends past the end of a line, where the pointer is an arrow.
+        let iBeam = downOverText || SelectionCapture.pointerIsIBeam
         Task { [weak self] in
             // Let the app finish updating its selection after mouse-up.
             try? await Task.sleep(nanoseconds: 80_000_000)
@@ -126,7 +163,7 @@ import SwiftUI
             let empty = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             // Without bounds there is no proof the selection came from this gesture; trust it only over text.
             if found?.bounds == nil && !iBeam { return }
-            if empty && found?.bounds == nil { text = await SelectionCapture.copySelection() ?? "" }
+            if empty && found?.bounds == nil { text = await SelectionCapture.copySelection(pid: app.processIdentifier) ?? "" }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let primary = NSScreen.screens.first?.frame.height ?? 0
             guard self.gesture == token, !trimmed.isEmpty, trimmed.count <= 8000,
@@ -219,26 +256,26 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
+/// Figma "Translate": 102×32 capsule, native glass with no fill, `translate` 11pt + label 12pt medium.
 struct TranslateButton: View {
     var action: () -> Void
     @State private var shown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let label = HStack(spacing: 4) {
-            Image(systemName: "translate").font(.system(size: 13, weight: .medium))
-            Text("Translate").font(.system(size: 12, weight: .medium))
-        }.foregroundStyle(TelosTheme.primary).padding(.horizontal, 12)
-            .fixedSize().frame(minWidth: SelectionTranslationLayout.buttonSize.width, minHeight: SelectionTranslationLayout.buttonSize.height)
-            .contentShape(Capsule())
+            Image(systemName: "translate").font(.system(size: 11, weight: .medium)).frame(width: 20, height: 16)
+            Text("Translate").font(.system(size: 12, weight: .medium)).lineLimit(1)
+        }.foregroundStyle(.primary).padding(.horizontal, 12).padding(.vertical, 8)
+            .frame(minWidth: SelectionTranslationLayout.buttonSize.width, minHeight: SelectionTranslationLayout.buttonSize.height)
+            .fixedSize().contentShape(Capsule())
         Group {
             if #available(macOS 26, *) {
                 Button(action: action) { label }.buttonStyle(.plain).glassEffect(.regular.interactive(), in: .capsule)
             } else {
-                Button(action: action) { label }.buttonStyle(HoverButtonStyle())
-                    .background(.regularMaterial, in: Capsule()).overlay(Capsule().stroke(.gray.opacity(0.2), lineWidth: 0.5))
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+                Button(action: action) { label }.buttonStyle(.plain).background(.regularMaterial, in: Capsule())
             }
         }
+        .shadow(color: .black.opacity(0.08), radius: 4, y: 3)
         .help("Translate selection").accessibilityLabel("Translate selection")
         .scaleEffect(shown || reduceMotion ? 1 : 0.85).opacity(shown ? 1 : 0)
         .onAppear { withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) { shown = true } }
@@ -315,11 +352,14 @@ final class TranslationPanel: FloatingPanel {
 
     init(session: TranslationSession, store: TaskStore, origin: CGPoint) {
         self.session = session
-        let size = SelectionTranslationLayout.panelSize
-        super.init(contentRect: NSRect(origin: origin, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        level = .floating; hasShadow = true
+        let size = SelectionTranslationLayout.panelSize, inset = TranslationPanelView.shadowInset
+        super.init(contentRect: NSRect(x: origin.x - inset.leading, y: origin.y - inset.bottom,
+                                       width: size.width + inset.leading + inset.trailing, height: size.height + inset.top + inset.bottom),
+                   styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        level = .floating
         appearance = NSAppearance(named: .darkAqua)
-        let host = FirstMouseHostingView(rootView: TranslationPanelView(session: session, store: store) { [weak self] in self?.close() })
+        let host = FirstMouseHostingView(rootView: TranslationPanelView(session: session, store: store) { [weak self] in self?.close() }
+            .padding(inset))
         host.safeAreaRegions = []
         contentView = host
     }
@@ -345,12 +385,14 @@ final class TranslationPanel: FloatingPanel {
     }
 }
 
+/// Figma "划词翻译": 374×528, radius 38, native glass under a black gradient (99% → 97% at 80% → 40%)
+/// and a 30% black shadow (y 20, blur 50). No border.
 struct TranslationPanelView: View {
+    static let shadowInset = EdgeInsets(top: 32, leading: 56, bottom: 84, trailing: 56)
     @ObservedObject var session: TranslationSession
     @ObservedObject var store: TaskStore
     var close: () -> Void
     @StateObject private var draft = ComposerDraft()
-    @State private var footerHeight: CGFloat = 72
     @State private var sourceExpanded = false
     private let shape = RoundedRectangle(cornerRadius: 38, style: .continuous)
     private var task: Todo? { session.taskID.flatMap { id in store.tasks.first { $0.id == id } } }
@@ -364,42 +406,67 @@ struct TranslationPanelView: View {
                         source
                         result
                         if let task { conversation(task) }
-                        Color.clear.frame(height: footerHeight).id("bottom")
+                        Color.clear.frame(height: 72).id("bottom")
                     }.padding(.horizontal, 16).padding(.top, 16)
                 }.scrollIndicators(.hidden)
-                    .softScrollEdges(top: 56, bottom: footerHeight + 8, alwaysBottom: true)
                     .onChange(of: task?.messages.count) { _, _ in withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+                    .onChange(of: store.streams[session.taskID ?? UUID()]) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             }
-            Composer(draft: draft, placeholder: "Ask Telos", canSend: canSend, identifier: "translationAskField", action: submit)
-                .padding(16)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 56 / 528),
+                                         .init(color: .black, location: 1 - 76 / 528), .init(color: .clear, location: 1 - 52 / 528)],
+                                 startPoint: .top, endPoint: .bottom))
+            footer
         }
         .overlay(alignment: .top) { header }
         .frame(width: SelectionTranslationLayout.panelSize.width, height: SelectionTranslationLayout.panelSize.height)
+        .background(LinearGradient(stops: [.init(color: .black.opacity(0.99), location: 0), .init(color: .black.opacity(0.97), location: 0.8),
+                                           .init(color: .black.opacity(0.4), location: 1)], startPoint: .top, endPoint: .bottom), in: shape)
         .modifier(PanelGlass(shape: shape))
         .clipShape(shape)
+        .compositingGroup()
+        .shadow(color: .black.opacity(0.3), radius: 25, y: 20)
     }
 
+    /// Tool row: 40pt tall, 36pt glass close button on the trailing edge.
     private var header: some View {
-        HStack(spacing: 8) {
-            if let id = session.taskID {
-                GlassCircle(help: "Open in Telos", action: { open(id) }) {
-                    Image(systemName: "arrow.up.forward").font(.system(size: 13, weight: .medium))
+        GlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                if let id = session.taskID {
+                    GlassSymbolButton(symbol: "arrow.up.forward", size: 36, pointSize: 13, help: "Open in Telos") { open(id) }
                 }
+                Spacer(minLength: 0)
+                GlassSymbolButton(symbol: "xmark", size: 36, pointSize: 13, help: "Close", action: close)
             }
-            Spacer()
-            GlassCircle(help: "Close", action: close) { Image(systemName: "xmark").font(.system(size: 13, weight: .medium)) }
         }.padding([.horizontal, .top], 16).frame(height: 56, alignment: .top)
             .modifier(WindowDrag())
     }
 
+    /// 40pt `plus` glass button and a 294×40 glass search field, 8pt apart.
+    private var footer: some View {
+        GlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                GlassSymbolButton(symbol: "plus", size: 40, pointSize: 14, help: "Attach files", action: draft.chooseFiles)
+                HStack(spacing: 4) {
+                    AttachmentInput(draft: draft, placeholder: "Ask Telos", identifier: "translationAskField") { if canSend { submit() } }
+                    if draft.hasContent {
+                        Button(action: submit) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 22)).foregroundStyle(.white) }
+                            .buttonStyle(.plain).disabled(!canSend || draft.isComposing).opacity(canSend ? 1 : 0.4).accessibilityLabel("Send")
+                    }
+                }.padding(.leading, 16).padding(.trailing, 8).padding(.vertical, 10).frame(minHeight: 40)
+                    .background(ComposerHitArea(draft: draft))
+                    .modifier(GlassSurface(shape: Capsule()))
+            }
+        }.padding(.horizontal, 16).padding(.bottom, 16).padding(.top, 16)
+    }
+
+    /// Figma "Message": #262628, radius 16, padding 12, 11/16 SF Pro, tracking −0.11, #E0E0E2.
     private var source: some View {
-        Text(session.source).font(.system(size: 11)).lineSpacing(3)
+        Text(session.source).font(.system(size: 11)).tracking(-0.11).lineSpacing(TranslationType.spacing(size: 11, lineHeight: 16))
             .foregroundStyle(Color(red: 0.878, green: 0.878, blue: 0.886))
             .lineLimit(sourceExpanded ? nil : 2).truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-            .background(Color(red: 0.149, green: 0.149, blue: 0.157), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 20))
+            .background(Color(red: 0.149, green: 0.149, blue: 0.157), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
             .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { sourceExpanded.toggle() } }
             .help(sourceExpanded ? "Collapse" : "Show full selection")
             .accessibilityLabel("Selected text: " + session.source)
@@ -407,15 +474,16 @@ struct TranslationPanelView: View {
 
     @ViewBuilder private var result: some View {
         if let failure = session.failure {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(failure).font(.system(size: 13)).foregroundStyle(.secondary)
-                Button("Try Again") { session.start() }.buttonStyle(HoverButtonStyle(standard: true)).font(.system(size: 12, weight: .medium))
+            VStack(alignment: .leading, spacing: 12) {
+                Text(failure).font(.system(size: 14)).tracking(-0.56).foregroundStyle(.white.opacity(0.5))
+                Button("Try Again") { session.start() }.buttonStyle(.plain).font(.system(size: 13, weight: .medium))
+                    .padding(.horizontal, 12).frame(height: 28).modifier(GlassSurface(shape: Capsule(), interactive: true))
             }.padding(.horizontal, 12).padding(.vertical, 10)
         } else if session.translation.isEmpty {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Translating…").font(.system(size: 13)).foregroundStyle(.secondary)
-            }.padding(.horizontal, 12).padding(.vertical, 12)
+                Text("Translating…").font(.system(size: 14)).tracking(-0.56).foregroundStyle(.white.opacity(0.5))
+            }.padding(.horizontal, 12).padding(.vertical, 10)
         } else {
             TranslationResult(text: session.translation, finished: session.finished)
         }
@@ -425,23 +493,31 @@ struct TranslationPanelView: View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(task.messages) { message in
                 if message.role == "user" {
-                    HStack { Spacer(minLength: 36); MessageBubble(text: message.text).frame(maxWidth: 280, alignment: .trailing) }
+                    HStack {
+                        Spacer(minLength: 48)
+                        Text(message.text).font(.system(size: 14)).tracking(-0.56).lineSpacing(TranslationType.spacing(size: 14, lineHeight: 19))
+                            .foregroundStyle(.white).textSelection(.enabled)
+                            .padding(.horizontal, 12).padding(.vertical, 9)
+                            .background(Color(red: 0.149, green: 0.149, blue: 0.157), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
                 } else if message.role != "confirmation" {
-                    MessageText(text: message.text).font(.system(size: 14)).lineSpacing(1).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    MessageText(text: message.text).font(.system(size: 14)).tracking(-0.56).lineSpacing(TranslationType.spacing(size: 14, lineHeight: 19))
+                        .foregroundStyle(.white).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12)
                 }
             }
-            if let stream = store.streams[task.id], !stream.isEmpty { MessageText(text: stream, markdown: false).font(.system(size: 14)) }
+            if let stream = store.streams[task.id], !stream.isEmpty {
+                MessageText(text: stream, markdown: false).font(.system(size: 14)).tracking(-0.56).foregroundStyle(.white).padding(.horizontal, 12)
+            }
             if task.status == "running" || task.status == "awaiting_approval" {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text(task.status == "awaiting_approval" ? "Waiting for approval in Telos" : task.summary)
-                        .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-                }
+                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.5)).lineLimit(1)
+                }.padding(.horizontal, 12)
             } else if ["error", "paused", "needs_input"].contains(task.status) {
-                Text(task.summary).font(.system(size: 13)).foregroundStyle(.secondary)
+                Text(task.summary).font(.system(size: 13)).foregroundStyle(.white.opacity(0.5)).padding(.horizontal, 12)
             }
-        }.padding(.horizontal, 12).padding(.top, 8)
+        }.padding(.top, 8)
     }
 
     private var canSend: Bool {
@@ -471,7 +547,8 @@ struct TranslationPanelView: View {
     }
 }
 
-/// The translated text; a copy control appears on hover.
+/// Figma "Text": padding 12/10, 12pt gap; 14/19 SF Pro tracking −0.56 white;
+/// `square.on.square` 13pt medium at 50% white, shown on hover.
 private struct TranslationResult: View {
     let text: String
     let finished: Bool
@@ -479,12 +556,13 @@ private struct TranslationResult: View {
     @State private var copied = false
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(text).font(.system(size: 15)).lineSpacing(4).foregroundStyle(.white)
-                .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            Text(text).font(.system(size: 14)).tracking(-0.56).lineSpacing(TranslationType.spacing(size: 14, lineHeight: 19))
+                .foregroundStyle(.white).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
             Button(action: copy) {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5)).frame(width: 18, height: 18).contentShape(Rectangle())
-            }.buttonStyle(HoverButtonStyle(hoverScale: 1.1))
+                Image(systemName: copied ? "checkmark" : "square.on.square").font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5)).frame(height: 18).contentShape(Rectangle())
+                    .contentTransition(.symbolEffect(.replace))
+            }.buttonStyle(.plain)
                 .help(copied ? "Copied" : "Copy translation").accessibilityLabel("Copy translation")
                 .opacity(finished && (hovering || copied) ? 1 : 0).allowsHitTesting(finished)
                 .animation(.easeOut(duration: 0.15), value: hovering)
@@ -495,8 +573,55 @@ private struct TranslationResult: View {
     private func copy() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        copied = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+        withAnimation { copied = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { withAnimation { copied = false } }
+    }
+}
+
+/// Converts a Figma line height into SwiftUI line spacing for SF Pro at that size.
+private enum TranslationType {
+    static func spacing(size: CGFloat, lineHeight: CGFloat) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: size)
+        return max(0, lineHeight - (font.ascender - font.descender + font.leading))
+    }
+}
+
+/// "Button - Liquid Glass - Symbol": a circle of native glass with no fill.
+private struct GlassSymbolButton: View {
+    let symbol: String
+    let size: CGFloat
+    let pointSize: CGFloat
+    let help: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: pointSize, weight: .medium)).foregroundStyle(.white)
+                .frame(width: size, height: size).contentShape(Circle())
+        }.buttonStyle(.plain).modifier(GlassSurface(shape: Circle(), interactive: true))
+            .help(help).accessibilityLabel(help)
+    }
+}
+
+/// Native clear Liquid Glass (Figma GLASS, no fill) on macOS 26; a material stand-in earlier or with Reduce Transparency.
+private struct GlassSurface<S: Shape>: ViewModifier {
+    let shape: S
+    var interactive = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *), !reduceTransparency {
+            content.glassEffect(interactive ? .clear.interactive() : .clear, in: shape)
+        } else {
+            content.background(Color(white: 0.2), in: shape)
+        }
+    }
+}
+
+/// Lets neighboring glass shapes blend and morph together, as the system does.
+private struct GlassGroup<Content: View>: View {
+    let spacing: CGFloat
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        if #available(macOS 26, *) { GlassEffectContainer(spacing: spacing, content: content) } else { content() }
     }
 }
 
@@ -505,7 +630,8 @@ private struct PanelGlass: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     func body(content: Content) -> some View {
         if #available(macOS 26, *), !reduceTransparency {
-            content.background(Color.black.opacity(0.82), in: shape).glassEffect(.regular, in: shape)
+            // Frosted, untinted glass (the gradient's 16pt background blur); light so the cleared bottom reads as in the design.
+            content.background { Color.clear.glassEffect(.regular, in: shape).environment(\.colorScheme, .light) }
         } else {
             content.background(Color(white: 0.06), in: shape)
         }
