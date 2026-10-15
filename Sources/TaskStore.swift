@@ -157,11 +157,16 @@ final class WorkerRun: @unchecked Sendable {
             return message
         } catch { try? FileManager.default.removeItem(at: batch); throw error }
     }
-    @discardableResult func add(_ text: String, files: [ComposerFile] = [], voiceRequestID: String? = nil, voiceLanguage: String? = nil) -> UUID? {
+    /// `context` reaches the agent ahead of the request but is not shown in the conversation.
+    @discardableResult func add(_ text: String, files: [ComposerFile] = [], voiceRequestID: String? = nil, voiceLanguage: String? = nil, context: ((String) -> String)? = nil) -> UUID? {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty || !files.isEmpty else { return nil }
         var todo = Todo(title: "New task"); todo.voiceRequestID = voiceRequestID; todo.voiceLanguage = voiceLanguage; todo.voicePhase = "thinking"
-        do { todo.messages = [try attachmentMessage(value, files: files, task: todo.id)] }
+        do {
+            var message = try attachmentMessage(value, files: files, task: todo.id)
+            if let context { message.attachmentPrompt = context(message.attachmentPrompt ?? value) }
+            todo.messages = [message]
+        }
         catch { self.error = "Could not attach files: \(error.localizedDescription)"; return nil }
         tasks.insert(todo, at: 0); completed = false; save()
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil { run(todo.id, prompt: todo.messages[0].attachmentPrompt ?? value, new: true) }

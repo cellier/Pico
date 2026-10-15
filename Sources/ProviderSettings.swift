@@ -13,6 +13,14 @@ struct ProviderSettings {
         return value
     }
     func apiKey() throws -> String { try read()["api_key"] as? String ?? "" }
+    /// The OpenAI-compatible chat endpoint, model and key the worker uses.
+    func chatEndpoint() throws -> (url: URL, model: String, apiKey: String)? {
+        let value = try read()
+        guard let key = value["api_key"] as? String, !key.isEmpty,
+              let url = URL(string: ((value["base_url"] as? String) ?? "https://api.deepseek.com").trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/chat/completions"),
+              url.scheme == "https" || url.scheme == "http" else { return nil }
+        return (url, value["model"] as? String ?? "deepseek-flash", key)
+    }
     func save(apiKey: String) throws {
         var value = try read()
         let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)

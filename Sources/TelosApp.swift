@@ -838,6 +838,7 @@ final class TelosWindow: NSWindow {
     private var screenshotEditor: ScreenshotEditor?
     let dictation = DictationController()
     private var companion: CompanionBridge?
+    private var selectionTranslation: SelectionTranslationController?
     private var activityIndicator: StatusActivityIndicator?
     private var activitySubscriptions = Set<AnyCancellable>()
     private var outsideClickMonitor: Any?
@@ -856,6 +857,9 @@ final class TelosWindow: NSWindow {
             CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
         }
         store = TaskStore()
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "translation" {
+            selectionTranslation = SelectionTranslationController(store: store); selectionTranslation?.preview(); return
+        }
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil {
             DispatchQueue.main.async { KeyDisplayController.shared.start() }
         }
@@ -945,6 +949,8 @@ final class TelosWindow: NSWindow {
             companion = CompanionBridge(store:store,transcribe:{ [weak self] url, reply in self?.dictation.transcribeCompanion(url,reply:reply) },cancel:{ [weak self] in self?.dictation.cancelCompanion() },show:{ [weak self] id in self?.store.selected=id; self?.showPanel() })
             companion?.showMeeting = { [weak self] in self?.store.meetingManager.pico.show() }
             store.meetingManager.start()
+            selectionTranslation = SelectionTranslationController(store: store)
+            selectionTranslation?.start()
             screenshots.captured = { [weak self] image in
                 guard let self else { return }
                 self.screenshotEditor?.close()
@@ -1154,7 +1160,7 @@ final class TelosWindow: NSWindow {
         Task { await recordings.finishBeforeQuit(); await store.meetingManager.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
-    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
+    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); selectionTranslation?.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 #if !TELOS_TEST
