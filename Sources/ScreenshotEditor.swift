@@ -423,14 +423,14 @@ private struct ScreenshotMarkupToolbar: View {
     @ObservedObject var editor: ScreenshotEditor
     let session: PaperScreenshotSession
     private static let tools: [(PaperScreenshotSession.Tool,String,String)] = [
-        (.pen,"scribble.variable","Pen"),(.marker,"pencil.tip","Marker"),(.eraser,"eraser","Eraser"),
+        (.selection,"pointer.arrow.ipad","Select"),(.pen,"scribble.variable","Pen"),(.marker,"pencil.tip","Marker"),(.eraser,"eraser","Eraser"),
         (.arrow,"arrow.up.left","Arrow"),(.rectangle,"rectangle","Rectangle"),(.ellipse,"circle","Ellipse"),(.text,"character.textbox","Text")]
     var body: some View {
         HStack(spacing:12) {
             ForEach(Self.tools,id:\.1) { tool,symbol,label in
                 let active = session.tool == tool
                 // Selecting the active tool again returns to select & move.
-                Button { session.setTool(active ? .selection : tool) } label: {
+                Button { session.setTool(active && tool != .selection ? .selection : tool) } label: {
                     Image(systemName:symbol).font(.system(size:16,weight:.medium)).frame(width:24,height:24)
                         .foregroundStyle(active ? Color.accentColor : Color(white:0.10))
                         .background(RoundedRectangle(cornerRadius:8).fill(.black.opacity(active ? 0.08 : 0)).frame(width:32,height:30))

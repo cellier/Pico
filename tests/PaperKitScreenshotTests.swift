@@ -67,10 +67,10 @@ import PencilKit
         let textID=session.selectedID;session.endEditing();session.selectedID=textID
         session.replaceText("Styled text")
         let beforeStyle=session.snapshot()
-        session.setTextStyle(family:"Helvetica",size:48,bold:true,italic:true)
+        session.setTextStyle(family:"Helvetica",size:60,bold:true,italic:true)
         session.setColor(.blue)
         let styled=session.selected!
-        precondition(styled.fontSize == 48 && styled.bold && styled.italic && styled.fontFamily == "Helvetica")
+        precondition(styled.fontSize == 60 && styled.bold && styled.italic && styled.fontFamily == "Helvetica")
         let traits=NSFontManager.shared.traits(of:styled.font())
         precondition(traits.contains(.boldFontMask) && traits.contains(.italicFontMask))
         let styledPNG=try await session.png(background:base,size:size)
@@ -121,7 +121,7 @@ import PencilKit
         precondition(inkCount>100 && (16...40).contains(inkLeft) && (16...48).contains(inkTop),"PaperKit object preview must contain upright text at its original local origin")
         print("PASS: 120 drag updates without rasterization; resize anchor/aspect/width; transparent PaperKit object preview")
         session.restore(beforeStyle)
-        precondition(session.elements[0].fontSize == 28 && !session.elements[0].bold,"Style changes must restore with undo snapshot")
+        precondition(session.elements[0].fontSize == session.defaultFontSize && !session.elements[0].bold,"Style changes must restore with undo snapshot")
         print("PASS: text family, font size, bold/italic traits, color export and style snapshot restore")
         var aligned=ScreenshotPaperElement(frame:CGRect(x:100,y:200,width:400,height:120),content:.text("Align\nsecond"),color:.black)
         func leftInk(_ data:Data)->Int {

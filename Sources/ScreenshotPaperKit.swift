@@ -36,7 +36,7 @@ struct ScreenshotPaperElement {
     var tagPadding:CGSize { CGSize(width:ceil(fontSize*0.3),height:ceil(fontSize*0.12)) }
     var renderOutset:CGFloat {
         if isText, fill != nil { return max(tagPadding.width,tagPadding.height)+8 }
-        if case .shape(.line) = content { return 16 }
+        if case .shape = content { return PaperScreenshotSession.shapeLineWidth*3 }
         return 8
     }
     var lineStart:CGPoint { CGPoint(x:lineFromMaxX ? frame.maxX : frame.minX,y:lineFromMaxY ? frame.maxY : frame.minY) }
@@ -92,7 +92,7 @@ struct ScreenshotPaperElement {
                 value.insertNewTextbox(attributedText:line,frame:lineFrame)
             }
         case .shape(let shape):
-            let config = ShapeConfiguration(type:shape,fillColor:nil,strokeColor:color.cgColor,lineWidth:3)
+            let config = ShapeConfiguration(type:shape,fillColor:nil,strokeColor:color.cgColor,lineWidth:PaperScreenshotSession.shapeLineWidth)
             if shape == .line { value.insertNewLine(configuration:config,from:lineStart,to:lineEnd,endMarker:true) }
             else { value.insertNewShape(configuration:config,frame:frame) }
         case .drawing(let drawing,let original):
@@ -266,10 +266,14 @@ struct ScreenshotPaperElement {
         input.needsDisplay=true
     }
     static let tagColor=NSColor.systemRed
+    // Widths and sizes are in screenshot pixels (2× on Retina).
+    nonisolated static let shapeLineWidth:CGFloat=8
+    static func strokeWidth(_ ink:PKInkingTool.InkType)->CGFloat { ink == .marker ? 24 : 7 }
+    var defaultFontSize:CGFloat { min(48,max(16,canvas.height*0.1)) }
     /// Text defaults to a white-on-red tag. With no origin it is centered on the canvas.
     func insertText(at origin:CGPoint? = nil) {
         focusCanvas(); checkpoint()
-        let fontSize=min(28,canvas.height*0.1)
+        let fontSize=defaultFontSize
         let width=min(ceil(("Text" as NSString).size(withAttributes:[.font:NSFont.systemFont(ofSize:fontSize)]).width)+8,canvas.width*0.7),height=ceil(fontSize*1.3)+4
         var frame=CGRect(x:(canvas.width-width)/2,y:(canvas.height-height)/2,width:width,height:height)
         if let origin {
@@ -380,7 +384,7 @@ struct ScreenshotPaperElement {
     }
     func addStroke(_ points:[CGPoint]) {
         guard points.count > 1 else {return};checkpoint()
-        let width:CGFloat=ink == .marker ? 14 : 3
+        let width=Self.strokeWidth(ink)
         let strokePoints=points.enumerated().map { i,p in PKStrokePoint(location:p,timeOffset:Double(i)*0.01,size:CGSize(width:width,height:width),opacity:ink == .marker ? 0.45 : 1,force:1,azimuth:0,altitude:.pi/2) }
         let drawing=PKDrawing(strokes:[PKStroke(ink:PKInk(ink,color:color),path:PKStrokePath(controlPoints:strokePoints,creationDate:Date()))])
         elements.append(ScreenshotPaperElement(frame:drawing.bounds,content:.drawing(drawing,drawing.bounds),color:color))
@@ -484,7 +488,7 @@ private final class ScreenshotPaperBackground:NSImageView {
         }
         if stroke.count>1 {
             session.color.setStroke();let path=NSBezierPath();path.move(to:session.displayPoint(stroke[0]))
-            for p in stroke.dropFirst(){path.line(to:session.displayPoint(p))};path.lineWidth=(session.ink == .marker ? 14 : 3)*scale;path.lineCapStyle = .round;path.stroke()
+            for p in stroke.dropFirst(){path.line(to:session.displayPoint(p))};path.lineWidth=PaperScreenshotSession.strokeWidth(session.ink)*scale;path.lineCapStyle = .round;path.stroke()
         }
         if let origin,let creating {drawCreation(from:session.displayPoint(origin),to:session.displayPoint(creating),tool:session.tool,color:session.color)}
     }
@@ -496,12 +500,12 @@ private final class ScreenshotPaperBackground:NSImageView {
         case .ellipse: path=NSBezierPath(ovalIn:rect)
         case .arrow:
             path=NSBezierPath();path.move(to:a);path.line(to:b)
-            let angle=atan2(b.y-a.y,b.x-a.x),head=min(16*scale,hypot(b.x-a.x,b.y-a.y)*0.4)
+            let angle=atan2(b.y-a.y,b.x-a.x),head=min(PaperScreenshotSession.shapeLineWidth*4*scale,hypot(b.x-a.x,b.y-a.y)*0.4)
             for side in [CGFloat.pi*0.82,-CGFloat.pi*0.82] {path.move(to:b);path.line(to:CGPoint(x:b.x+cos(angle+side)*head,y:b.y+sin(angle+side)*head))}
         default:
             NSColor.controlAccentColor.setStroke();let box=NSBezierPath(rect:rect);box.lineWidth=1;box.setLineDash([4,3],count:2,phase:0);box.stroke();return
         }
-        color.setStroke();path.lineWidth=3*scale;path.lineCapStyle = .round;path.lineJoinStyle = .round;path.stroke()
+        color.setStroke();path.lineWidth=PaperScreenshotSession.shapeLineWidth*scale;path.lineCapStyle = .round;path.lineJoinStyle = .round;path.stroke()
     }
     private func handles(for item:ScreenshotPaperElement)->[ScreenshotResizeHandle] {
         item.isText ? [.left,.right,.bottomRight] : ScreenshotResizeHandle.allCases
@@ -580,13 +584,14 @@ private final class ScreenshotPaperBackground:NSImageView {
         let dragged=hypot(end.x-start.x,end.y-start.y)*scale >= 4
         switch session.tool {
         case .text:
-            let height=ceil(min(28,session.canvasBounds.height*0.1)*1.3)+4
+            let height=ceil(session.defaultFontSize*1.3)+4
             session.insertText(at:dragged ? CGPoint(x:min(start.x,end.x),y:min(start.y,end.y)) : CGPoint(x:start.x,y:start.y-height/2))
         case .arrow where dragged: session.insertShape(.line,from:start,to:end)
         case .rectangle where dragged: session.insertShape(.rectangle,from:start,to:end)
         case .ellipse where dragged: session.insertShape(.ellipse,from:start,to:end)
-        default: break
+        default: return
         }
+        session.tool = .selection
     }
     private func erase(at p:CGPoint) {
         guard let session,let hit=session.element(at:p) else {return}
