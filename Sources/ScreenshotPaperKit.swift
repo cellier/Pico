@@ -33,11 +33,32 @@ struct ScreenshotPaperElement {
     var fill:NSColor? = nil
     var lineFromMaxX = false
     var lineFromMaxY = true
-    var tagPadding:CGSize { CGSize(width:ceil(fontSize*0.3),height:ceil(fontSize*0.12)) }
+    static let tagPadding:CGFloat = 20
+    static let tagCornerRadius:CGFloat = 20
+    var isArrow:Bool { if case .shape(.line) = content {return true};return false }
+    /// What the user sees and grabs: the tag background for tags, the frame otherwise.
+    var visualFrame:CGRect { tagRect ?? frame }
+    /// Tag background: glyph bounds of every line plus equal padding on all sides.
+    var tagRect:CGRect? {
+        guard fill != nil else {return nil}
+        let ink=textLines().reduce(CGRect.null) { $0.union($1.ink) }
+        return (ink.isNull ? frame : ink).insetBy(dx:-Self.tagPadding,dy:-Self.tagPadding)
+    }
     var renderOutset:CGFloat {
-        if isText, fill != nil { return max(tagPadding.width,tagPadding.height)+8 }
+        if let tagRect {
+            return ceil(max(frame.minX-tagRect.minX,tagRect.maxX-frame.maxX,frame.minY-tagRect.minY,tagRect.maxY-frame.maxY,0))+8
+        }
+        if isArrow { return ceil(ScreenshotArrow.headLength(width:PaperScreenshotSession.shapeLineWidth))+8 }
         if case .shape = content { return PaperScreenshotSession.shapeLineWidth*3 }
         return 8
+    }
+    /// Whether `point` grabs this element; arrows only respond near their stroke.
+    func contains(_ point:CGPoint,tolerance:CGFloat)->Bool {
+        guard isArrow else { return visualFrame.insetBy(dx:-tolerance,dy:-tolerance).contains(point) }
+        let a=lineStart,b=lineEnd,dx=b.x-a.x,dy=b.y-a.y,length=dx*dx+dy*dy
+        let t=length == 0 ? 0 : min(1,max(0,((point.x-a.x)*dx+(point.y-a.y)*dy)/length))
+        let distance=hypot(point.x-(a.x+t*dx),point.y-(a.y+t*dy))
+        return distance <= max(PaperScreenshotSession.shapeLineWidth*1.5,tolerance)+(t > 0.7 ? ScreenshotArrow.headLength(width:PaperScreenshotSession.shapeLineWidth)*0.4 : 0)
     }
     var lineStart:CGPoint { CGPoint(x:lineFromMaxX ? frame.maxX : frame.minX,y:lineFromMaxY ? frame.maxY : frame.minY) }
     var lineEnd:CGPoint { CGPoint(x:lineFromMaxX ? frame.minX : frame.maxX,y:lineFromMaxY ? frame.minY : frame.maxY) }
@@ -64,43 +85,100 @@ struct ScreenshotPaperElement {
     func markup(canvas: CGRect) -> PaperMarkup {
         var value = PaperMarkup(bounds:canvas)
         switch content {
-        case .text(let text):
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = alignment
-            paragraph.lineSpacing = lineSpacing
-            if let fill {
-                let pad=tagPadding
-                value.insertNewShape(configuration:ShapeConfiguration(type:.roundedRectangle,fillColor:fill.cgColor,strokeColor:nil,lineWidth:0),frame:frame.insetBy(dx:-pad.width,dy:-pad.height))
-            }
-            let attributed = NSAttributedString(string:text,attributes:[.font:font(),.foregroundColor:color,.paragraphStyle:paragraph,.underlineStyle:underline ? NSUnderlineStyle.single.rawValue : 0])
-            // Lay out lines with AppKit, then preserve their exact origins in PaperKit.
-            // PaperKit centers a multiline textbox inside its frame; separate tight
-            // line frames keep editing, alignment controls and export consistent.
-            let storage=NSTextStorage(attributedString:attributed)
-            let layout=NSLayoutManager()
-            let container=NSTextContainer(size:CGSize(width:max(1,frame.width-8),height:CGFloat.greatestFiniteMagnitude))
-            container.lineFragmentPadding=0;layout.addTextContainer(container);storage.addLayoutManager(layout)
-            layout.ensureLayout(for:container)
-            layout.enumerateLineFragments(forGlyphRange:layout.glyphRange(for:container)) { _,used,_,glyphs,_ in
-                let characters=layout.characterRange(forGlyphRange:glyphs,actualGlyphRange:nil)
-                let text=(attributed.string as NSString).substring(with:characters).trimmingCharacters(in:.newlines)
-                guard !text.isEmpty else {return}
-                let lineParagraph=NSMutableParagraphStyle();lineParagraph.alignment = .left
-                let line=NSAttributedString(string:text,attributes:[.font:font(),.foregroundColor:color,.paragraphStyle:lineParagraph,.underlineStyle:underline ? NSUnderlineStyle.single.rawValue : 0])
-                let width=ceil(line.size().width)+8
-                let lineFrame=CGRect(x:frame.minX+used.minX,y:frame.minY+used.minY,width:max(8,width),height:max(fontSize+4,ceil(used.height)+4))
-                value.insertNewTextbox(attributedText:line,frame:lineFrame)
-            }
+        case .text:
+            if let fill,let tagRect,let image=ScreenshotVectorImage.make(rect:tagRect,draw:{ context in
+                context.setFillColor(fill.cgColor)
+                let radius=min(Self.tagCornerRadius,tagRect.height/2,tagRect.width/2)
+                context.addPath(CGPath(roundedRect:tagRect,cornerWidth:radius,cornerHeight:radius,transform:nil));context.fillPath()
+            }) { value.insertNewImage(image,frame:tagRect) }
+            for line in textLines() { value.insertNewTextbox(attributedText:line.text,frame:line.frame) }
         case .shape(let shape):
-            let config = ShapeConfiguration(type:shape,fillColor:nil,strokeColor:color.cgColor,lineWidth:PaperScreenshotSession.shapeLineWidth)
-            if shape == .line { value.insertNewLine(configuration:config,from:lineStart,to:lineEnd,endMarker:true) }
-            else { value.insertNewShape(configuration:config,frame:frame) }
+            if shape == .line {
+                // A filled, tapered arrow: PaperKit lines have a uniform width and a small head.
+                let path=ScreenshotArrow.path(from:lineStart,to:lineEnd,width:PaperScreenshotSession.shapeLineWidth)
+                if !path.isEmpty,let image=ScreenshotVectorImage.make(rect:path.boundingBoxOfPath.insetBy(dx:-2,dy:-2),draw:{ context in
+                    context.setFillColor(color.cgColor);context.addPath(path);context.fillPath()
+                }) { value.insertNewImage(image,frame:path.boundingBoxOfPath.insetBy(dx:-2,dy:-2)) }
+            } else {
+                let config = ShapeConfiguration(type:shape,fillColor:nil,strokeColor:color.cgColor,lineWidth:PaperScreenshotSession.shapeLineWidth)
+                value.insertNewShape(configuration:config,frame:frame)
+            }
         case .drawing(let drawing,let original):
             value.append(contentsOf:drawing)
             let sx = frame.width/max(1,original.width), sy = frame.height/max(1,original.height)
             value.transformContent(CGAffineTransform(a:sx,b:0,c:0,d:sy,tx:frame.minX-original.minX*sx,ty:frame.minY-original.minY*sy))
         }
         return value
+    }
+    /// Lays out lines with AppKit, then preserves their exact origins in PaperKit.
+    /// PaperKit centers a multiline textbox inside its frame; separate tight
+    /// line frames keep editing, alignment controls and export consistent.
+    /// `ink` is each line's glyph bounds where PaperKit draws it (4px inset, baseline at top + 2 + ascender).
+    func textLines() -> [(text:NSAttributedString,frame:CGRect,ink:CGRect)] {
+        guard case .text(let text)=content else {return []}
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineSpacing = lineSpacing
+        let font=font()
+        let attributed = NSAttributedString(string:text,attributes:[.font:font,.foregroundColor:color,.paragraphStyle:paragraph,.underlineStyle:underline ? NSUnderlineStyle.single.rawValue : 0])
+        let storage=NSTextStorage(attributedString:attributed)
+        let layout=NSLayoutManager()
+        let container=NSTextContainer(size:CGSize(width:max(1,frame.width-8),height:CGFloat.greatestFiniteMagnitude))
+        container.lineFragmentPadding=0;layout.addTextContainer(container);storage.addLayoutManager(layout)
+        layout.ensureLayout(for:container)
+        var lines:[(text:NSAttributedString,frame:CGRect,ink:CGRect)]=[]
+        layout.enumerateLineFragments(forGlyphRange:layout.glyphRange(for:container)) { _,used,_,glyphs,_ in
+            let characters=layout.characterRange(forGlyphRange:glyphs,actualGlyphRange:nil)
+            let text=(attributed.string as NSString).substring(with:characters).trimmingCharacters(in:.newlines)
+            guard !text.isEmpty else {return}
+            let lineParagraph=NSMutableParagraphStyle();lineParagraph.alignment = .left
+            let line=NSAttributedString(string:text,attributes:[.font:font,.foregroundColor:color,.paragraphStyle:lineParagraph,.underlineStyle:underline ? NSUnderlineStyle.single.rawValue : 0])
+            let width=ceil(line.size().width)+8
+            let lineFrame=CGRect(x:frame.minX+used.minX,y:frame.minY+used.minY,width:max(8,width),height:max(fontSize+4,ceil(used.height)+4))
+            var ink=CGRect.null
+            let glyphs=CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(line),.useGlyphPathBounds)
+            if !glyphs.isEmpty {
+                let baseline=CGPoint(x:lineFrame.minX+4,y:lineFrame.minY+2+font.ascender)
+                ink=CGRect(x:baseline.x+glyphs.minX,y:baseline.y-glyphs.maxY,width:glyphs.width,height:glyphs.height)
+            }
+            lines.append((line,lineFrame,ink))
+        }
+        return lines
+    }
+}
+
+/// Tapered arrow: a thin rounded tail widening toward a large swept head.
+enum ScreenshotArrow {
+    static func headLength(width:CGFloat)->CGFloat { width*7 }
+    static func path(from a:CGPoint,to b:CGPoint,width:CGFloat)->CGPath {
+        let path=CGMutablePath()
+        let length=hypot(b.x-a.x,b.y-a.y)
+        guard length >= 1 else {return path}
+        let u=CGPoint(x:(b.x-a.x)/length,y:(b.y-a.y)/length),n=CGPoint(x:-u.y,y:u.x)
+        func at(_ along:CGFloat,_ across:CGFloat)->CGPoint { CGPoint(x:a.x+u.x*along+n.x*across,y:a.y+u.y*along+n.y*across) }
+        let head=min(headLength(width:width),length*0.6),halfHead=head*0.5
+        let neck=length-head*0.8,tail=width*0.15,shaft=width*0.7
+        path.move(to:at(0,tail))
+        path.addLine(to:at(neck,shaft));path.addLine(to:at(length-head,halfHead))
+        path.addLine(to:b)
+        path.addLine(to:at(length-head,-halfHead));path.addLine(to:at(neck,-shaft))
+        path.addLine(to:at(0,-tail))
+        path.addArc(center:a,radius:tail,startAngle:atan2(-n.y,-n.x),endAngle:atan2(n.y,n.x),clockwise:false)
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Rasterizes vector art at 2× for insertion into PaperMarkup in canvas (y-down) coordinates.
+enum ScreenshotVectorImage {
+    static func make(rect:CGRect,scale:CGFloat=2,draw:(CGContext)->Void)->CGImage? {
+        let width=max(1,Int(ceil(rect.width*scale))),height=max(1,Int(ceil(rect.height*scale)))
+        guard width*height <= 40_000_000,let space=CGColorSpace(name:CGColorSpace.sRGB),
+              let context=CGContext(data:nil,width:width,height:height,bitsPerComponent:8,bytesPerRow:0,space:space,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else {return nil}
+        context.translateBy(x:0,y:CGFloat(height));context.scaleBy(x:CGFloat(width)/rect.width,y:-CGFloat(height)/rect.height)
+        context.translateBy(x:-rect.minX,y:-rect.minY)
+        draw(context)
+        return context.makeImage()
     }
 }
 
@@ -186,17 +264,16 @@ struct ScreenshotPaperElement {
         background.frame=imageRect
         for item in elements {
             guard let preview=previews[item.id] else {continue}
-            // During a resize, transform the cached PaperKit image immediately.
-            // Render the final geometry once when the gesture ends.
-            let original=preview.rendered?.frame.size ?? item.frame.size
-            let sx=item.frame.width/max(1,original.width), sy=item.frame.height/max(1,original.height)
-            let outset=preview.rendered?.renderOutset ?? item.renderOutset
-            let rect=item.frame.insetBy(dx:-outset*sx,dy:-outset*sy)
+            // Never stretch a cached image: line widths and text would distort.
+            // Moves reuse it at its rendered size; resizes re-render it.
+            let rendered=preview.rendered ?? item,outset=rendered.renderOutset
+            let rect=CGRect(x:item.frame.minX-outset,y:item.frame.minY-outset,width:ceil(rendered.frame.width)+outset*2,height:ceil(rendered.frame.height)+outset*2)
             preview.view.frame=CGRect(origin:displayPoint(rect.origin),size:CGSize(width:rect.width*displayScale,height:rect.height*displayScale))
             preview.view.isHidden=item.id == editingID
         }
         if let selected {
-            let rect=CGRect(origin:displayPoint(selected.frame.origin),size:CGSize(width:selected.frame.width*displayScale,height:selected.frame.height*displayScale))
+            let visual=selected.visualFrame
+            let rect=CGRect(origin:displayPoint(visual.origin),size:CGSize(width:visual.width*displayScale,height:visual.height*displayScale))
             if selectionDisplayFrame != rect {selectionDisplayFrame=rect}
         }
         input.layoutText();input.needsDisplay=true;view.window?.invalidateCursorRects(for:input)
@@ -246,7 +323,8 @@ struct ScreenshotPaperElement {
         guard let image=context.makeImage() else {throw CocoaError(.fileWriteUnknown)}
         return NSImage(cgImage:image,size:size)
     }
-    func beginTransform() { transformingID=selectedID;isTransforming=true }
+    /// Moves reuse the cached image; resizes (`live`) keep re-rendering at the true size.
+    func beginTransform(live:Bool = false) { transformingID=live ? nil : selectedID;isTransforming=true }
     func finishTransform() {
         transformingID=nil;isTransforming=false
         if let i=selectedIndex,case .text(let text)=elements[i].content {
@@ -269,17 +347,14 @@ struct ScreenshotPaperElement {
     // Widths and sizes are in screenshot pixels (2× on Retina).
     nonisolated static let shapeLineWidth:CGFloat=8
     static func strokeWidth(_ ink:PKInkingTool.InkType)->CGFloat { ink == .marker ? 24 : 7 }
-    var defaultFontSize:CGFloat { min(48,max(16,canvas.height*0.1)) }
-    /// Text defaults to a white-on-red tag. With no origin it is centered on the canvas.
-    func insertText(at origin:CGPoint? = nil) {
+    var defaultFontSize:CGFloat { min(80,max(16,canvas.height*0.15)) }
+    /// Text defaults to a bold, centered, white-on-red tag centered on `center` (or the canvas).
+    func insertText(centeredAt center:CGPoint? = nil) {
         focusCanvas(); checkpoint()
-        let fontSize=defaultFontSize
-        let width=min(ceil(("Text" as NSString).size(withAttributes:[.font:NSFont.systemFont(ofSize:fontSize)]).width)+8,canvas.width*0.7),height=ceil(fontSize*1.3)+4
-        var frame=CGRect(x:(canvas.width-width)/2,y:(canvas.height-height)/2,width:width,height:height)
-        if let origin {
-            frame.origin=CGPoint(x:min(max(0,origin.x),max(0,canvas.width-width)),y:min(max(0,origin.y),max(0,canvas.height-height)))
-        }
-        let element=ScreenshotPaperElement(frame:frame,content:.text("Text"),color:.white,fontSize:fontSize,fill:Self.tagColor)
+        var element=ScreenshotPaperElement(frame:.zero,content:.text("Text"),color:.white,fontSize:defaultFontSize,bold:true,alignment:.center,fill:Self.tagColor)
+        let width=min(ceil(("Text" as NSString).size(withAttributes:[.font:element.font()]).width)+8,canvas.width*0.7),height=ceil(element.fontSize*1.3)+4
+        let point=center ?? CGPoint(x:canvas.midX,y:canvas.midY)
+        element.frame=CGRect(x:min(max(0,point.x-width/2),max(0,canvas.width-width)),y:min(max(0,point.y-height/2),max(0,canvas.height-height)),width:width,height:height)
         elements.append(element);selectedID=element.id;rebuild();input.beginText()
     }
     /// Creates a shape covering the dragged rectangle; arrows point from `start` to `end`.
@@ -371,7 +446,10 @@ struct ScreenshotPaperElement {
         guard let i=selectedIndex else {return};elements[i].content = .text(text)
         if elements[i].autoTextWidth {
             let width=text.components(separatedBy:"\n").map {($0 as NSString).size(withAttributes:[.font:elements[i].font()]).width}.max() ?? 30
+            let midX=elements[i].frame.midX
             elements[i].frame.size.width=min(max(30,ceil(width)+8),canvas.width*0.7)
+            // Centered text grows from its center.
+            if elements[i].alignment == .center { elements[i].frame.origin.x=midX-elements[i].frame.width/2 }
         }
         let paragraph=NSMutableParagraphStyle();paragraph.lineSpacing=elements[i].lineSpacing
         let measured=(text as NSString).boundingRect(with:CGSize(width:max(1,elements[i].frame.width-8),height:.greatestFiniteMagnitude),options:[.usesLineFragmentOrigin,.usesFontLeading],attributes:[.font:elements[i].font(),.paragraphStyle:paragraph]).height
@@ -380,7 +458,14 @@ struct ScreenshotPaperElement {
     }
     func deleteSelection() { guard let i=selectedIndex else {return};checkpoint();elements.remove(at:i);selectedID=nil;rebuild() }
     func element(at point:CGPoint)->ScreenshotPaperElement? {
-        elements.reversed().first { $0.frame.insetBy(dx:-6/displayScale,dy:-6/displayScale).contains(point) }
+        elements.reversed().first { $0.contains(point,tolerance:6/displayScale) }
+    }
+    /// Moves one end of the selected arrow.
+    func replaceLine(from start:CGPoint,to end:CGPoint) {
+        guard let i=selectedIndex else {return}
+        elements[i].frame=CGRect(x:min(start.x,end.x),y:min(start.y,end.y),width:abs(end.x-start.x),height:abs(end.y-start.y))
+        elements[i].lineFromMaxX=start.x>end.x;elements[i].lineFromMaxY=start.y>end.y
+        rebuild()
     }
     func addStroke(_ points:[CGPoint]) {
         guard points.count > 1 else {return};checkpoint()
@@ -424,8 +509,8 @@ enum ScreenshotResizeHandle:CaseIterable {
     var isCorner:Bool { x != 0.5 && y != 0.5 }
     func point(in rect:CGRect)->CGPoint {CGPoint(x:rect.minX+x*rect.width,y:rect.minY+y*rect.height)}
     func resized(_ rect:CGRect,delta:CGPoint,proportional:Bool)->CGRect {
-        var width=x == 0.5 ? rect.width : max(30,rect.width+(x == 0 ? -delta.x : delta.x))
-        var height=y == 0.5 ? rect.height : max(30,rect.height+(y == 0 ? -delta.y : delta.y))
+        var width=x == 0.5 ? rect.width : max(8,rect.width+(x == 0 ? -delta.x : delta.x))
+        var height=y == 0.5 ? rect.height : max(8,rect.height+(y == 0 ? -delta.y : delta.y))
         if proportional && isCorner {
             let factor=max(width/rect.width,height/rect.height)
             width=rect.width*factor;height=rect.height*factor
@@ -450,6 +535,11 @@ private final class ScreenshotPaperBackground:NSImageView {
     private var origin:CGPoint?
     private var startingFrame:CGRect?
     private var resizeHandle:ScreenshotResizeHandle?
+    /// Arrow end being dragged (`true` = head) and the end that stays put.
+    private var arrowEnd:Bool?
+    private var arrowAnchor:CGPoint = .zero
+    private var tagView:NSView?
+    private var editingMidX:CGFloat=0
     private var startingFontSize:CGFloat=28
     private var moving=false
     private var stroke:[CGPoint]=[]
@@ -477,13 +567,16 @@ private final class ScreenshotPaperBackground:NSImageView {
         guard let session else{return}
         NSBezierPath(rect:session.imageRect.intersection(bounds)).addClip()
         if let item=session.selected, session.editingID == nil {
-            let rect=displayRectForMarkup(item.frame)
-            NSColor.controlAccentColor.setStroke();let path=NSBezierPath(rect:rect);path.lineWidth=1;path.stroke()
-            for handle in handles(for:item) {
-                let p=handle.point(in:rect)
+            func dot(_ p:CGPoint,_ color:NSColor) {
                 let dot=NSBezierPath(ovalIn:CGRect(x:p.x-3.5,y:p.y-3.5,width:7,height:7))
-                (item.isText && handle.isCorner ? NSColor.systemGreen : NSColor.controlAccentColor).setFill();dot.fill()
-                NSColor.white.setStroke();dot.lineWidth=0.75;dot.stroke()
+                color.setFill();dot.fill();NSColor.white.setStroke();dot.lineWidth=0.75;dot.stroke()
+            }
+            if item.isArrow {
+                dot(session.displayPoint(item.lineStart),.controlAccentColor);dot(session.displayPoint(item.lineEnd),.controlAccentColor)
+            } else {
+                let rect=displayRectForMarkup(item.visualFrame)
+                NSColor.controlAccentColor.setStroke();let path=NSBezierPath(rect:rect);path.lineWidth=1;path.stroke()
+                for handle in handles(for:item) { dot(handle.point(in:rect),item.isText && handle.isCorner ? .systemGreen : .controlAccentColor) }
             }
         }
         if stroke.count>1 {
@@ -499,30 +592,44 @@ private final class ScreenshotPaperBackground:NSImageView {
         case .rectangle: path=NSBezierPath(rect:rect)
         case .ellipse: path=NSBezierPath(ovalIn:rect)
         case .arrow:
-            path=NSBezierPath();path.move(to:a);path.line(to:b)
-            let angle=atan2(b.y-a.y,b.x-a.x),head=min(PaperScreenshotSession.shapeLineWidth*4*scale,hypot(b.x-a.x,b.y-a.y)*0.4)
-            for side in [CGFloat.pi*0.82,-CGFloat.pi*0.82] {path.move(to:b);path.line(to:CGPoint(x:b.x+cos(angle+side)*head,y:b.y+sin(angle+side)*head))}
+            guard let context=NSGraphicsContext.current?.cgContext else {return}
+            context.setFillColor(color.cgColor);context.addPath(ScreenshotArrow.path(from:a,to:b,width:PaperScreenshotSession.shapeLineWidth*scale));context.fillPath();return
         default:
             NSColor.controlAccentColor.setStroke();let box=NSBezierPath(rect:rect);box.lineWidth=1;box.setLineDash([4,3],count:2,phase:0);box.stroke();return
         }
         color.setStroke();path.lineWidth=PaperScreenshotSession.shapeLineWidth*scale;path.lineCapStyle = .round;path.lineJoinStyle = .round;path.stroke()
     }
+    /// Arrows use endpoint handles instead. Edge handles are dropped on objects too
+    /// small to separate them from corners, so pressing the object moves it.
     private func handles(for item:ScreenshotPaperElement)->[ScreenshotResizeHandle] {
-        item.isText ? [.left,.right,.bottomRight] : ScreenshotResizeHandle.allCases
+        if item.isArrow { return [] }
+        let size=CGSize(width:item.visualFrame.width*scale,height:item.visualFrame.height*scale)
+        return (item.isText ? [.left,.right,.bottomRight] : ScreenshotResizeHandle.allCases).filter {
+            !($0.x == 0.5 && size.width < 40) && !($0.y == 0.5 && size.height < 40)
+        }
     }
     private func handle(at point:CGPoint,item:ScreenshotPaperElement)->ScreenshotResizeHandle? {
-        handles(for:item).first { let p=$0.point(in:item.frame);return hypot(point.x-p.x,point.y-p.y)<7/scale }
+        handles(for:item).first { let p=$0.point(in:item.visualFrame);return hypot(point.x-p.x,point.y-p.y)<6/scale }
+    }
+    private func arrowEnd(at point:CGPoint,item:ScreenshotPaperElement)->Bool? {
+        guard item.isArrow else {return nil}
+        if hypot(point.x-item.lineEnd.x,point.y-item.lineEnd.y)<8/scale {return true}
+        if hypot(point.x-item.lineStart.x,point.y-item.lineStart.y)<8/scale {return false}
+        return nil
     }
     override func resetCursorRects() {
         guard let session else {return}
         if session.tool != .selection {addCursorRect(bounds,cursor:.crosshair);return}
         for item in session.elements {
-            let rect=displayRectForMarkup(item.frame).intersection(bounds)
+            let rect=displayRectForMarkup(item.visualFrame).intersection(bounds)
             if !rect.isNull {addCursorRect(rect,cursor:.openHand)}
         }
         if let item=session.selected {
+            for end in item.isArrow ? [item.lineStart,item.lineEnd] : [] {
+                let p=session.displayPoint(end);addCursorRect(CGRect(x:p.x-8,y:p.y-8,width:16,height:16).intersection(bounds),cursor:.crosshair)
+            }
             for handle in handles(for:item) {
-                let p=handle.point(in:displayRectForMarkup(item.frame))
+                let p=handle.point(in:displayRectForMarkup(item.visualFrame))
                 addCursorRect(CGRect(x:p.x-7,y:p.y-7,width:14,height:14).intersection(bounds),cursor:handle.x == 0.5 ? .resizeUpDown : handle.y == 0.5 ? .resizeLeftRight : .crosshair)
             }
         }
@@ -531,10 +638,15 @@ private final class ScreenshotPaperBackground:NSImageView {
         guard let session, session.editor?.busy != true else{return}
         commitText();window?.makeFirstResponder(self)
         let p=point(event);moving=false;startingFrame=nil;origin=nil;creating=nil;erasing=false
-        resizeHandle=nil
+        resizeHandle=nil;arrowEnd=nil
         let tool=session.tool
-        if tool == .selection || tool.createsObject, let item=session.selected, let handle=handle(at:p,item:item) {
-            resizeHandle=handle;startingFrame=item.frame;startingFontSize=item.fontSize;origin=p;return
+        if tool == .selection || tool.createsObject, let item=session.selected {
+            if let end=arrowEnd(at:p,item:item) {
+                arrowEnd=end;arrowAnchor=end ? item.lineStart : item.lineEnd;startingFrame=item.frame;origin=p;return
+            }
+            if let handle=handle(at:p,item:item) {
+                resizeHandle=handle;startingFrame=item.frame;startingFontSize=item.fontSize;origin=p;return
+            }
         }
         guard session.canvasBounds.contains(p) else {session.selectedID=nil;needsDisplay=true;return}
         origin=p
@@ -558,7 +670,11 @@ private final class ScreenshotPaperBackground:NSImageView {
         guard let original=startingFrame else{return}
         let dx=p.x-origin.x,dy=p.y-origin.y
         guard moving || hypot(dx,dy)*scale >= 3 else {return}
-        if !moving {session.checkpoint();session.beginTransform();moving=true}
+        if !moving {session.checkpoint();session.beginTransform(live:resizeHandle != nil || arrowEnd != nil);moving=true}
+        if let end=arrowEnd {
+            if end {session.replaceLine(from:arrowAnchor,to:p)} else {session.replaceLine(from:p,to:arrowAnchor)}
+            return
+        }
         var frame=original
         var fontSize:CGFloat?
         if let handle=resizeHandle {
@@ -576,7 +692,7 @@ private final class ScreenshotPaperBackground:NSImageView {
         if !stroke.isEmpty {session?.addStroke(stroke);stroke=[];needsDisplay=true}
         if moving {session?.finishTransform()}
         if let start=origin,let end=creating {finishCreation(from:start,to:end)}
-        origin=nil;startingFrame=nil;moving=false;resizeHandle=nil;creating=nil;erasing=false
+        origin=nil;startingFrame=nil;moving=false;resizeHandle=nil;arrowEnd=nil;creating=nil;erasing=false
         needsDisplay=true;window?.invalidateCursorRects(for:self)
     }
     private func finishCreation(from start:CGPoint,to end:CGPoint) {
@@ -584,8 +700,7 @@ private final class ScreenshotPaperBackground:NSImageView {
         let dragged=hypot(end.x-start.x,end.y-start.y)*scale >= 4
         switch session.tool {
         case .text:
-            let height=ceil(session.defaultFontSize*1.3)+4
-            session.insertText(at:dragged ? CGPoint(x:min(start.x,end.x),y:min(start.y,end.y)) : CGPoint(x:start.x,y:start.y-height/2))
+            session.insertText(centeredAt:dragged ? CGPoint(x:(start.x+end.x)/2,y:(start.y+end.y)/2) : start)
         case .arrow where dragged: session.insertShape(.line,from:start,to:end)
         case .rectangle where dragged: session.insertShape(.rectangle,from:start,to:end)
         case .ellipse where dragged: session.insertShape(.ellipse,from:start,to:end)
@@ -617,12 +732,14 @@ private final class ScreenshotPaperBackground:NSImageView {
         guard let session,let selected=session.selected,case .text(let text)=selected.content else{return}
         commitText();session.selectedID=selected.id;session.editingID=selected.id;textBefore=text
         let editor=NSTextView(frame:displayRectForMarkup(selected.frame))
-        editor.isRichText=false;editor.drawsBackground=false;editor.textContainerInset = .zero
+        // Match PaperKit's text inset so typed text sits where it will render.
+        editor.isRichText=false;editor.drawsBackground=false;editor.textContainerInset=NSSize(width:4*scale,height:2*scale)
         editor.textContainer?.lineFragmentPadding=0;editor.isHorizontallyResizable=false;editor.isVerticallyResizable=true
-        editor.font=selected.font(scale:scale);editor.textColor=selected.color
+        editor.font=selected.font(scale:scale);editor.textColor=selected.color;editor.insertionPointColor=selected.color
+        editingMidX=selected.frame.midX
         if let fill=selected.fill {
-            editor.drawsBackground=true;editor.backgroundColor=fill;editor.insertionPointColor=selected.color
-            editor.wantsLayer=true;editor.layer?.cornerRadius=4*scale
+            let tag=NSView();tag.wantsLayer=true;tag.layer?.backgroundColor=fill.cgColor
+            addSubview(tag);tagView=tag
         }
         let paragraph=NSMutableParagraphStyle();paragraph.alignment=selected.alignment;paragraph.lineSpacing=selected.lineSpacing*scale
         editor.defaultParagraphStyle=paragraph;editor.alignment=selected.alignment
@@ -631,32 +748,47 @@ private final class ScreenshotPaperBackground:NSImageView {
         editor.delegate=self;editor.allowsUndo=false
         editor.setAccessibilityLabel("Annotation text")
         textView=editor;addSubview(editor);session.rebuild();window?.makeFirstResponder(editor);editor.selectAll(nil)
+        layoutText()
+    }
+    /// The selected text element as it would look with the text typed so far.
+    private func editingElement()->ScreenshotPaperElement? {
+        guard let session,var item=session.selected,let textView else {return nil}
+        let text=textView.string
+        item.content = .text(text)
+        if item.autoTextWidth {
+            let width=text.components(separatedBy:"\n").map {($0 as NSString).size(withAttributes:[.font:item.font()]).width}.max() ?? 30
+            item.frame.size.width=min(max(30,ceil(width)+8),session.canvasBounds.width*0.7)
+            if item.alignment == .center { item.frame.origin.x=editingMidX-item.frame.width/2 }
+        }
+        let paragraph=NSMutableParagraphStyle();paragraph.lineSpacing=item.lineSpacing
+        let measured=(text as NSString).boundingRect(with:CGSize(width:max(1,item.frame.width-8),height:.greatestFiniteMagnitude),options:[.usesLineFragmentOrigin,.usesFontLeading],attributes:[.font:item.font(),.paragraphStyle:paragraph]).height
+        item.frame.size.height=max(item.frame.height,ceil(measured)+8)
+        return item
     }
     func layoutText() {
-        guard let selected=session?.selected,let textView else{return}
-        let rect=displayRectForMarkup(selected.frame)
-        textView.frame=CGRect(origin:rect.origin,size:CGSize(width:rect.width,height:max(rect.height,textView.frame.height)))
-        textView.font=selected.font(scale:scale)
+        guard let item=editingElement(),let textView else{return}
+        textView.frame=displayRectForMarkup(item.frame)
+        textView.font=item.font(scale:scale)
+        textView.textContainerInset=NSSize(width:4*scale,height:2*scale)
+        if let tagView,let tagRect=item.tagRect {
+            tagView.frame=displayRectForMarkup(tagRect)
+            tagView.layer?.cornerRadius=min(ScreenshotPaperElement.tagCornerRadius,tagRect.height/2,tagRect.width/2)*scale
+        }
     }
     func textDidChange(_ notification:Notification) {
-        guard let textView,let session else{return}
         // Input stays in an AppKit text view until committed; the PaperKit preview omits this one element.
-        textView.needsDisplay=true
-        if let manager=textView.layoutManager,let container=textView.textContainer {
-            manager.ensureLayout(for:container)
-            let needed=max(session.selected?.frame.height ?? 32,(manager.usedRect(for:container).height+8)/scale)
-            textView.setFrameSize(CGSize(width:textView.frame.width,height:needed*scale))
-        }
+        textView?.needsDisplay=true;layoutText()
     }
     func textDidEndEditing(_ notification:Notification) {commitText()}
     func commitText() {
         guard let textView,let session else{return}
         let text=textView.string;let height=textView.frame.height/scale
         self.textView=nil;textView.delegate=nil;textView.removeFromSuperview();session.editingID=nil
+        tagView?.removeFromSuperview();tagView=nil
         if text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {session.deleteSelection();return}
         if text != textBefore {session.checkpoint();session.replaceText(text,height:height)}else{session.rebuild()}
     }
-    func cancelText() {textView?.delegate=nil;textView?.removeFromSuperview();textView=nil;session?.editingID=nil}
+    func cancelText() {textView?.delegate=nil;textView?.removeFromSuperview();textView=nil;tagView?.removeFromSuperview();tagView=nil;session?.editingID=nil}
 }
 
 @available(macOS 26.0, *)

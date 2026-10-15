@@ -121,7 +121,7 @@ import PencilKit
         precondition(inkCount>100 && (16...40).contains(inkLeft) && (16...48).contains(inkTop),"PaperKit object preview must contain upright text at its original local origin")
         print("PASS: 120 drag updates without rasterization; resize anchor/aspect/width; transparent PaperKit object preview")
         session.restore(beforeStyle)
-        precondition(session.elements[0].fontSize == session.defaultFontSize && !session.elements[0].bold,"Style changes must restore with undo snapshot")
+        precondition(session.elements[0].fontSize == session.defaultFontSize && !session.elements[0].italic && session.elements[0].fontFamily == "System","Style changes must restore with undo snapshot")
         print("PASS: text family, font size, bold/italic traits, color export and style snapshot restore")
         var aligned=ScreenshotPaperElement(frame:CGRect(x:100,y:200,width:400,height:120),content:.text("Align\nsecond"),color:.black)
         func leftInk(_ data:Data)->Int {
@@ -147,20 +147,44 @@ import PencilKit
         guard case .text(let plain)=session.selected!.content else {fatalError()}
         precondition(!plain.hasPrefix("• "))
         print("PASS: alignment coordinates, underline/spacing output, reversible list formatting")
-        session.clear();session.insertText(at:CGPoint(x:100,y:300))
+        session.clear();session.insertText(centeredAt:CGPoint(x:300,y:300))
         let tag=session.selected!
-        precondition(tag.fill == PaperScreenshotSession.tagColor && tag.color == .white && tag.frame.origin == CGPoint(x:100,y:300),"Text defaults to a white-on-red tag at the click point")
+        precondition(tag.fill == PaperScreenshotSession.tagColor && tag.color == .white && tag.bold && tag.alignment == .center && tag.fontSize == 80,"Text defaults to a bold, centered, 80px white-on-red tag")
+        precondition(abs(tag.frame.midX-300)<1 && abs(tag.frame.midY-300)<1,"Text is centered on the click point")
         session.endEditing()
         let tagPNG=try await session.png(background:base,size:size)
         try tagPNG.write(to:out.appendingPathComponent("tag-text.png"))
         let tagPixels=NSBitmapImageRep(data:tagPNG)!
-        let tagFill=tagPixels.colorAt(x:Int(tag.frame.minX)+2,y:Int(tag.frame.midY))!.usingColorSpace(.deviceRGB)!
-        precondition(tagFill.redComponent>0.8 && tagFill.greenComponent<0.4,"Tag background must reach PaperKit export")
+        func isRed(_ x:Int,_ y:Int)->Bool { let c=tagPixels.colorAt(x:x,y:y)!.usingColorSpace(.deviceRGB)!;return c.redComponent>0.8 && c.greenComponent<0.4 }
+        var red=(minX:9999,minY:9999,maxX:0,maxY:0),white=red
+        for y in 150..<450 { for x in 50..<550 where isRed(x,y) { red=(min(red.minX,x),min(red.minY,y),max(red.maxX,x),max(red.maxY,y)) } }
+        // Text pixels are enclosed by the tag on all four sides; corner background is not.
+        for y in red.minY...red.maxY { for x in red.minX...red.maxX {
+            let c=tagPixels.colorAt(x:x,y:y)!.usingColorSpace(.deviceRGB)!
+            guard c.greenComponent>0.6 else {continue}
+            if (red.minX..<x).contains(where:{isRed($0,y)}) && (x...red.maxX).contains(where:{isRed($0,y)}) && (red.minY..<y).contains(where:{isRed(x,$0)}) && (y...red.maxY).contains(where:{isRed(x,$0)}) {
+                white=(min(white.minX,x),min(white.minY,y),max(white.maxX,x),max(white.maxY,y))
+            }
+        } }
+        let pads=[white.minX-red.minX,red.maxX-white.maxX,white.minY-red.minY,red.maxY-white.maxY]
+        precondition(pads.allSatisfy { (18...22).contains($0) },"Tag padding must be 20px on every side, got \(pads)")
+        print("PASS: tag padding \(pads)")
         session.clear();session.insertShape(.line,from:CGPoint(x:600,y:100),to:CGPoint(x:200,y:400))
         let arrow=session.selected!
         precondition(arrow.frame == CGRect(x:200,y:100,width:400,height:300) && arrow.lineStart == CGPoint(x:600,y:100) && arrow.lineEnd == CGPoint(x:200,y:400),"Arrow keeps the dragged direction")
         session.insertShape(.ellipse,from:CGPoint(x:300,y:300),to:CGPoint(x:100,y:200))
         precondition(session.selected!.frame == CGRect(x:100,y:200,width:200,height:100),"Shapes fill the dragged rectangle")
+        precondition(arrow.contains(CGPoint(x:400,y:250),tolerance:6) && !arrow.contains(CGPoint(x:250,y:150),tolerance:6),"Arrows are grabbed along their stroke, not their bounding box")
+        // Moving reuses the cached image at its rendered size; nothing is stretched.
+        session.view.frame=CGRect(x:0,y:0,width:800,height:600);session.view.layoutSubtreeIfNeeded()
+        await session.waitForPreview()
+        let ellipse=session.selected!,shapeRenders=session.previewRenderCount
+        session.beginTransform();session.replaceFrame(ellipse.frame.offsetBy(dx:30,dy:20));session.finishTransform()
+        await session.waitForPreview()
+        precondition(session.previewRenderCount == shapeRenders,"Moving must not re-render")
+        session.beginTransform(live:true);session.replaceFrame(CGRect(x:100,y:200,width:300,height:150));await session.waitForPreview()
+        precondition(session.previewRenderCount == shapeRenders+1,"Resizing re-renders at the new size instead of stretching")
+        session.finishTransform()
         try await session.png(background:base,size:size).write(to:out.appendingPathComponent("drag-shapes.png"))
         print("PASS: tag text default, drag-created arrow direction and shape frame")
         try exported.write(to:out.appendingPathComponent("paperkit-render.png"))
