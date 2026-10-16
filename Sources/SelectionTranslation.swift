@@ -112,6 +112,8 @@ import SwiftUI
     private var monitors: [Any] = []
     private var downPoint = CGPoint.zero
     private var downOverText = false
+    /// Set by a mouse-down in another app; a mouse-up without one (e.g. after dragging a Telos panel) is not a selection.
+    private var awaitingUp = false
     private var gesture = UUID()
     private var button: NSPanel?
     private var panel: TranslationPanel?
@@ -122,7 +124,8 @@ import SwiftUI
         guard monitors.isEmpty else { return }
         let handlers: [(NSEvent.EventTypeMask, (NSEvent) -> Void)] = [
             (.leftMouseDown, { [weak self] event in
-                self?.downPoint = Self.screenLocation(event); self?.downOverText = SelectionCapture.pointerIsIBeam; self?.hideButton()
+                self?.downPoint = Self.screenLocation(event); self?.downOverText = SelectionCapture.pointerIsIBeam
+                self?.awaitingUp = true; self?.hideButton()
             }),
             (.leftMouseUp, { [weak self] event in self?.mouseUp(event) }),
             ([.rightMouseDown, .otherMouseDown, .keyDown, .scrollWheel], { [weak self] _ in self?.hideButton() }),
@@ -132,6 +135,11 @@ import SwiftUI
                 MainActor.assumeIsolated { handler(event) }
             }) { monitors.append(monitor) }
         }
+        // Presses on Telos's own windows reach only the local monitor.
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.awaitingUp = false }
+            return event
+        }) { monitors.append(monitor) }
     }
 
     /// Global monitor events carry no window, so their location is already in screen coordinates.
@@ -145,7 +153,10 @@ import SwiftUI
     }
 
     private func mouseUp(_ event: NSEvent) {
+        guard awaitingUp else { return }
+        awaitingUp = false
         let up = Self.screenLocation(event), down = downPoint
+        if NSApp.windows.contains(where: { $0.isVisible && !$0.ignoresMouseEvents && $0.frame.contains(up) }) { return }
         let dragged = hypot(up.x - down.x, up.y - down.y) > 5
         guard dragged || event.clickCount >= 2, AXIsProcessTrusted(),
               let app = NSWorkspace.shared.frontmostApplication,
