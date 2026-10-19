@@ -180,11 +180,11 @@ import SwiftUI
             guard self.gesture == token, !trimmed.isEmpty, trimmed.count <= 8000,
                   NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
                   let rect = SelectionTranslationLayout.selectionRect(accessibility: found?.bounds, primaryHeight: primary, down: down, up: up) else { return }
-            self.showButton(text: trimmed, selection: rect)
+            self.showButton(text: trimmed, app: app.localizedName ?? "", selection: rect)
         }
     }
 
-    private func showButton(text: String, selection: CGRect) {
+    private func showButton(text: String, app: String, selection: CGRect) {
         hideButton()
         guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(selection) }) ?? NSScreen.main else { return }
         let size = SelectionTranslationLayout.buttonSize
@@ -195,7 +195,7 @@ import SwiftUI
                                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.allowsKey = false
         window.contentView = FirstMouseHostingView(rootView: TranslateButton { [weak self] in
-            self?.hideButton(); self?.translate(text, selection: selection, screen: screen)
+            self?.hideButton(); self?.translate(text, app: app, selection: selection, screen: screen)
         }.padding(margin))
         window.orderFrontRegardless()
         button = window
@@ -206,7 +206,7 @@ import SwiftUI
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
         let selection = CGRect(x: visible.midX - 420, y: visible.maxY - 160, width: 300, height: 40)
-        showButton(text: "", selection: selection)
+        showButton(text: "", app: "", selection: selection)
         let session = TranslationSession(source: "出现翻译的小 icon+文字入口，点击后，把划词文案传过去，翻译成英文（如果是中文翻译成英文）、或者中文（如果是英文翻译成中文）", settings: ProviderSettings(directory: store.dataDir))
         session.translation = "A small icon-plus-text entry point appears. When tapped, the selected text is passed over and translated into English if the source is Chinese, or into Chinese if the source is English."
         session.finished = true
@@ -239,9 +239,9 @@ import SwiftUI
         button?.orderOut(nil); button = nil
     }
 
-    private func translate(_ text: String, selection: CGRect, screen: NSScreen) {
+    private func translate(_ text: String, app: String, selection: CGRect, screen: NSScreen) {
         panel?.close()
-        let session = TranslationSession(source: text, settings: ProviderSettings(directory: store.dataDir))
+        let session = TranslationSession(source: text, app: app, settings: ProviderSettings(directory: store.dataDir))
         let origin = SelectionTranslationLayout.panelOrigin(selection: selection, visible: screen.visibleFrame)
         let window = TranslationPanel(session: session, store: store, origin: origin)
         window.closed = { [weak self, weak window] in if self?.panel === window { self?.panel = nil } }
@@ -297,6 +297,8 @@ struct TranslateButton: View {
 @MainActor final class TranslationSession: ObservableObject {
     let source: String
     let target: TranslationTarget
+    /// The app the text was selected in; a hint about genre and register.
+    private let app: String
     private let settings: ProviderSettings
     @Published var translation = ""
     @Published var failure: String?
@@ -304,8 +306,8 @@ struct TranslateButton: View {
     @Published var taskID: UUID?
     private var work: Task<Void, Never>?
 
-    init(source: String, settings: ProviderSettings) {
-        self.source = source; self.settings = settings
+    init(source: String, app: String = "", settings: ProviderSettings) {
+        self.source = source; self.app = app; self.settings = settings
         target = TranslationTarget.detect(source)
     }
 
@@ -333,7 +335,7 @@ struct TranslateButton: View {
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.setValue("Bearer " + endpoint.apiKey, forHTTPHeaderField: "Authorization")
                 var body: [String: Any] = ["model": model, "stream": true, "temperature": 0.3, "messages": [
-                    ["role": "system", "content": target.systemPrompt], ["role": "user", "content": source]]]
+                    ["role": "system", "content": target.systemPrompt], ["role": "user", "content": TranslationTarget.userMessage(source, app: app)]]]
                 if deepSeek { body["thinking"] = ["type": "disabled"] }
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
                 let (bytes, response) = try await URLSession.shared.bytes(for: request)
@@ -346,6 +348,7 @@ struct TranslateButton: View {
                 failure = code == 401 ? "The model API key was rejected. Check it in Telos Settings." : "Translation failed (HTTP \(code)). Try again."
                 return
             }
+            var raw = ""
             for try await line in bytes.lines {
                 guard line.hasPrefix("data:") else { continue }
                 let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
@@ -355,9 +358,10 @@ struct TranslateButton: View {
                       let choice = (json["choices"] as? [[String: Any]])?.first,
                       let delta = choice["delta"] as? [String: Any],
                       let content = delta["content"] as? String else { continue }
-                translation += translation.isEmpty ? String(content.drop { $0.isNewline }) : content
+                raw += content
+                translation = TranslationTarget.cleanOutput(raw)
             }
-            translation = translation.trimmingCharacters(in: .whitespacesAndNewlines)
+            translation = TranslationTarget.cleanOutput(raw, final: true)
             if translation.isEmpty { failure = "No translation was returned. Try again." } else { finished = true }
         } catch is CancellationError {
         } catch let error as URLError where error.code == .cancelled {

@@ -36,6 +36,13 @@ import Foundation
 
         let prompt = SelectionTranslationContext.prompt(source: "你好", translation: "Hello", target: .english, request: "更正式一点")
         precondition(prompt.contains("你好") && prompt.contains("Hello") && prompt.hasSuffix("更正式一点"))
+        precondition(TranslationTarget.userMessage("你好", app: "Zoom") == "<text app=\"Zoom\">你好</text>")
+        precondition(TranslationTarget.userMessage("hi", app: "A \"<b>\"") == "<text app=\"A b\">hi</text>", "App names cannot break the wrapper")
+        precondition(TranslationTarget.cleanOutput("<text app=\"Zoom\">Hello</text>", final: true) == "Hello", "An echoed wrapper is removed")
+        precondition(TranslationTarget.cleanOutput("\nHello there", final: true) == "Hello there")
+        precondition(TranslationTarget.cleanOutput("<tex") == "", "A partial opening tag never shows while streaming")
+        precondition(TranslationTarget.cleanOutput("<text app=\"Zoom\">Hello</te") == "Hello", "A partial closing tag is held back")
+        precondition(TranslationTarget.cleanOutput("Use a < b", final: true) == "Use a < b", "Ordinary text is untouched")
         print("PASS: language direction, selection rect, button and panel placement, follow-up context")
     }
 }
