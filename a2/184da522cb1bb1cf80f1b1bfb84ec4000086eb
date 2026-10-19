@@ -1,0 +1,23 @@
+Sources/SelectionTranslationRules.swift
+  s_21528640f701eb::t_a11f8584bc62db 22-24,27-43,45-79,83-116
+tests/SelectionTranslationTests.swift
+  s_21528640f701eb::t_fcbc5a885b7ef3 39-45
+Sources/SelectionTranslation.swift
+  s_21528640f701eb::t_a11f8584bc62db 183,187,198,209,242,244,300-301,309-310,338,351,361-362,364
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a2184da522cb1bb1cf80f1b1bfb84ec4000086eb",
+  "prompts": {},
+  "sessions": {
+    "s_21528640f701eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea77bad6-92fe-4ff4-ab98-d894e3fcfefd",
+        "model": "unknown"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
