@@ -320,17 +320,29 @@ struct TranslateButton: View {
             guard let endpoint = try settings.chatEndpoint() else {
                 failure = "Add your model API key in Telos Settings to translate."; return
             }
-            var request = URLRequest(url: endpoint.url, timeoutInterval: 60)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("Bearer " + endpoint.apiKey, forHTTPHeaderField: "Authorization")
-            var body: [String: Any] = ["model": endpoint.model, "stream": true, "temperature": 0.3, "messages": [
-                ["role": "system", "content": target.systemPrompt], ["role": "user", "content": source]]]
-            if endpoint.url.host?.hasSuffix("deepseek.com") == true { body["thinking"] = ["type": "disabled"] }
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            let (bytes, response) = try await URLSession.shared.bytes(for: request)
-            guard let status = (response as? HTTPURLResponse)?.statusCode, status == 200 else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            // On DeepSeek, translate with the Pro model: in side-by-side tests it kept nuance that Flash
+            // dropped, at about the same streaming speed. Fall back to the configured model if it is refused.
+            let deepSeek = endpoint.url.host?.hasSuffix("deepseek.com") == true
+            var models = deepSeek ? ["deepseek-v4-pro"] : []
+            if !models.contains(endpoint.model) { models.append(endpoint.model) }
+            var stream: URLSession.AsyncBytes?
+            var code = 0
+            for model in models {
+                var request = URLRequest(url: endpoint.url, timeoutInterval: 60)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("Bearer " + endpoint.apiKey, forHTTPHeaderField: "Authorization")
+                var body: [String: Any] = ["model": model, "stream": true, "temperature": 0.3, "messages": [
+                    ["role": "system", "content": target.systemPrompt], ["role": "user", "content": source]]]
+                if deepSeek { body["thinking"] = ["type": "disabled"] }
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+                let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if code == 200 { stream = bytes; break }
+                // Only an unavailable model is worth retrying; auth and server errors would fail again.
+                guard code == 400 || code == 403 || code == 404 || code == 422 else { break }
+            }
+            guard let bytes = stream else {
                 failure = code == 401 ? "The model API key was rejected. Check it in Telos Settings." : "Translation failed (HTTP \(code)). Try again."
                 return
             }
