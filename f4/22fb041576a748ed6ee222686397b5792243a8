@@ -1,0 +1,21 @@
+Sources/SelectionTranslationRules.swift
+  s_21528640f701eb::t_dc1c59e9d68eac 22-50,52-73
+Sources/SelectionTranslation.swift
+  s_21528640f701eb::t_b00afa9aee2316 323-345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f422fb041576a748ed6ee222686397b5792243a8",
+  "prompts": {},
+  "sessions": {
+    "s_21528640f701eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea77bad6-92fe-4ff4-ab98-d894e3fcfefd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
