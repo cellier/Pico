@@ -1,0 +1,25 @@
+{
+  "hermes-agent": {
+    "repository": "https://github.com/NousResearch/hermes-agent.git",
+    "commit": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "version": "0.22.0",
+    "python": "3.14"
+  },
+  "macos-harness": {
+    "repository": "https://github.com/browser-use/macos-harness.git",
+    "commit": "b88e4d77403bbcac35752eef4f4dd72db3663fd6"
+  },
+  "phone-harness": {
+    "kind": "plugin",
+    "repository": "https://github.com/ShawnPana/phone-harness.git",
+    "commit": "7e3ea6cff1377db4d4f37e852c59493120aa52b6",
+    "directory": "integrations/hermes",
+    "version": "0.1.0",
+    "package": "phone-harness==0.3.2",
+    "files": {
+      "plugin.yaml": "eeb996a944b6adea018a92de6739748247c536de2cbc064ebd9a6419d855a323",
+      "__init__.py": "6dd4616ad458953accf2c01eeace08f944d56cfe14203e4f299ca771136e037b",
+      "README.md": "2ed6620c4d55c982a6242534fc9dff5610ccc10b7636a04632b405d212113b2c"
+    }
+  }
+}

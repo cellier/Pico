@@ -596,12 +596,27 @@ enum ScreenRecordingDiagnostics {
             config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
             config.capturesAudio = true; config.excludesCurrentProcessAudio = true
             config.sampleRate = 48000; config.channelCount = 2
+            if ProcessInfo.processInfo.environment["TELOS_RECORDING_MIC"] != nil {
+                config.captureMicrophone = true
+                config.microphoneCaptureDeviceID = AVCaptureDevice.default(for: .audio)?.uniqueID
+            }
+            report["items_before"] = telosStatusItems()
+            var bubble: RecordingCameraBubble?
+            if ProcessInfo.processInfo.environment["TELOS_RECORDING_CAMERA"] != nil, let camera = AVCaptureDevice.default(for: .video) {
+                let created = RecordingCameraBubble()
+                if created.use(camera.uniqueID) { created.place(in: area); created.show(); bubble = created }
+                try await Task.sleep(nanoseconds: 1_500_000_000)
+                report["items_camera"] = telosStatusItems()
+            }
             let url = output.deletingPathExtension().appendingPathExtension("mp4")
             try? FileManager.default.removeItem(at: url)
             let recorder = ScreenRecorder(url: url)
             try await recorder.start(filter: SCContentFilter(display: display, excludingWindows: excluded), configuration: config)
-            try await Task.sleep(nanoseconds: 2_000_000_000)
+            try await Task.sleep(nanoseconds: 1_500_000_000)
+            report["items_during"] = telosStatusItems()
+            try await Task.sleep(nanoseconds: 500_000_000)
             report["stop_error"] = (await recorder.stop()).map { "\($0)" } ?? "none"
+            bubble?.close()
             let asset = AVURLAsset(url: url)
             report["duration"] = try await asset.load(.duration).seconds
             var tracks: [String] = []
@@ -611,8 +626,18 @@ enum ScreenRecordingDiagnostics {
             let (frame, _) = try await generator.image(at: CMTime(value: 1, timescale: 1))
             try NSBitmapImageRep(cgImage: frame).representation(using: .png, properties: [:])?
                 .write(to: output.deletingPathExtension().appendingPathExtension("png"))
+            // The system capture indicator should be gone once the stream has stopped.
+            try await Task.sleep(nanoseconds: 5_000_000_000)
+            report["items_after"] = telosStatusItems()
         } catch { report["error"] = "\(error)" }
         panel.orderOut(nil)
+    }
+    /// Menu bar items owned by any Telos process, including ScreenCaptureKit's capture indicator.
+    private static func telosStatusItems() -> String {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        return list.filter { ($0[kCGWindowLayer as String] as? Int) == 25 && ($0[kCGWindowName as String] as? String) == Bundle.main.bundleIdentifier }
+            .compactMap { ($0[kCGWindowBounds as String] as? [String: Double]).map { "x\(Int($0["X"] ?? 0))w\(Int($0["Width"] ?? 0))" } }
+            .sorted().joined(separator: ",")
     }
     /// Captures the selection overlay before and after an area is chosen, then the stop bar.
     @MainActor static func snapshots(_ controller: ScreenRecordingController, output: URL) async {

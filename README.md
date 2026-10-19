@@ -6,8 +6,11 @@ Telos 是一个原生 macOS 菜单栏 AI 工作助手。你可以输入目标、
 
 界面使用 SwiftUI / AppKit，任务执行由 Hermes Agent 与 DeepSeek 驱动，Mac 应用操作接入 macOS Harness。
 
-## 最近更新 · 2026-10-12—14
+## 最近更新 · 2026-10-12—19
 
+- **Pico 会议讲稿与演示（试用）：**导入并编辑分段讲稿，配对 Zoom Slides，按声音实际播完的进度共享、翻页；支持插话问答、暂停续讲、语言切换和本人接管。明确道别后可按会前设置离会。[配置与验证范围](docs/PICO-PRESENTATIONS.md)。
+- **iPhone 镜像控制：**升级 Hermes Agent 至 v0.22.0，接入 phone-harness；修复中文联系人识别与微信搜索误选，改为按精确应用和联系人文字定位。
+- **划词翻译与响应：**跨应用选中文字后可翻译并继续追问；修复长对话、连续操作确认引发的详情页卡死，执行结果按轮次保存并支持重启恢复。
 - **Pico 桌面伙伴：**按住说话、拖动摆放、右键设置。支持经典 Pico、粉色花朵和默认白气球三种皮肤；表情更丰富，脸会根据摆放位置轻轻望向屏幕中心。[Pico 源码与运行说明](Pico/README.md)。
 - **更省心的语音输入：**在 Telos Settings 保存一次百炼配置，Telos 与 Pico 共用；支持中英文混说，自动插入文字时不再弹出 ⌘V 提示。
 - **长文与日程：**改善长消息输入和详情页的响应；菜单栏日程改为上下两行，最多 320 点并随空间收窄。
@@ -143,6 +146,20 @@ Agent 的工具包括网页搜索、公开网页读取、天气查询、文档�
 
 可用程度取决于目标应用、登录状态、系统权限以及应用是否暴露可操作的界面。Telos 的批准机制不是操作系统沙箱；脚本以当前 macOS 用户权限执行。
 
+### 通过 iPhone 镜像操作手机
+
+安装并启用官方目录中的 [phone-harness](https://hermes-agent.nousresearch.com/docs/plugins/phone-harness) 后，Telos 可通过 Mac 上的 **iPhone Mirroring／iPhone 镜像** 操作已连接的 iPhone。直接在普通任务中说明要在手机上完成什么；工具会先检查连接，再读取界面并执行。Feed 自动刷新不会得到手机控制工具。
+
+iPhone 需要先在系统镜像应用中完成配对并保持可连接，Telos 需要辅助功能与屏幕录制权限。密码、PIN、双重验证码及系统认证由本人处理。手机操作沿用 Settings 的自动/手动执行设置，多个任务会轮流使用同一台手机，取消任务会终止对应脚本。手机截图用于模型理解界面时会随该任务发往已配置的模型服务；插件遥测关闭。本接入固定为本机 iPhone，不会自动租用云手机。
+
+源码安装会自动准备固定版本；已有 Hermes v0.22.0 和 Python 3.14 的 Telos 开发环境可补装插件：
+
+```sh
+python3 scripts/runtime-phone.py
+```
+
+主环境必须是 Python 3.14。实际插件安装使用 `hermes plugins install phone-harness --yes-deps --enable`，通过 `HERMES_HOME` 定向到 Telos 自己的插件目录；只在其他 Hermes 目录里安装，不会自动接入 Telos。版本及完整提交固定在 `scripts/runtime-pins.json`。
+
 ### Calendar · 未来七天
 
 - 使用 EventKit 读取 macOS 系统日历中的日程。
@@ -236,7 +253,7 @@ Skill 是工作指令与资源，不会自动提供系统权限、账号访问�
 | 硬件 | Apple Silicon Mac；现有构建目标为 `arm64` |
 | macOS | 构建最低目标为 macOS 14；Liquid Glass 与会议功能需要 macOS 26，完整体验建议使用 macOS 26 |
 | 编译工具 | Apple Command Line Tools；当前脚本使用 `/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk` |
-| Python | Python 3.12 环境，由 `uv` 创建 |
+| Python | Hermes 主环境使用 Python 3.14；本地语音环境保持 Python 3.12，由 `uv` 创建 |
 | 依赖工具 | Git、[uv](https://docs.astral.sh/uv/) |
 | 模型服务 | 可用的 DeepSeek API Key；任务执行与模型整理需要网络 |
 
@@ -351,7 +368,7 @@ build/                   本地应用构建结果，不提交
 ```
 
 - **界面：**SwiftUI、AppKit、SF 系统字体、SF Symbols、Instrument Serif。
-- **Agent：**[Hermes Agent](https://github.com/NousResearch/hermes-agent)，固定提交 `3094b5d0aa611531fa7c197f2495ab86602c2b6d`。
+- **Agent：**[Hermes Agent](https://github.com/NousResearch/hermes-agent)，v0.22.0，固定提交 `e06df9c2eae6901f4c88f464e0ae6e753c0428b8`。
 - **Mac 控制：**[macOS Harness](https://github.com/browser-use/macos-harness)，固定提交 `b88e4d77403bbcac35752eef4f4dd72db3663fd6`。
 - **系统集成：**EventKit、ScreenCaptureKit、AVFoundation、Speech、Accessibility。
 - **文档与网页：**python-docx、openpyxl、python-pptx、ReportLab、PyMuPDF、Playwright 等，版本见 `Backend/requirements.txt`。
@@ -466,6 +483,8 @@ Pico 是桌面语音入口。按住说话，松手后识别并交给 Telos 执�
 ### Pico 会议代理（本地 Zoom 客户端，试用）
 
 Pico 菜单的「会议代理…」或 Telos 的 Meeting Setup 可打开独立控制窗口。首次目标是轻松的 1on1：使用现有百炼账户的 `qwen-audio-3.1-realtime-plus` 听取 Zoom 对方音频并生成回复，首次回复说明 AI 代理身份。无 Zoom SDK、开发者账号或自动加入会议；由用户在已经加入的目标会议中启动。
+
+会前也可配对 Zoom Slides 和分段讲稿，导入后编辑开场、每页内容、等待回答和结尾；讲解中支持插话、暂停续讲、中英文切换、回看页面，以及明确道别后的会议收尾。[讲稿示例、操作与验证范围](docs/PICO-PRESENTATIONS.md)。
 
 音频桥使用官方 BlackHole 2ch 驱动。Zoom 的麦克风选择 BlackHole、扬声器选择耳机；控制窗口选择实际麦克风。代理工作时仅代理语音进入 BlackHole；点击 Take over 或按 Control–Option–Space，会在本机先清空代理音频并切到实际麦克风，然后取消网络请求。网络失败也交还控制。结束会话后麦克风桥暂时保持，避免 Zoom 突然无声；把 Zoom 麦克风切回实际设备后，再断开音频桥。退出 Telos 会停止音频桥。
 

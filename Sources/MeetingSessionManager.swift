@@ -232,6 +232,8 @@ import Combine
     }
     func receive(_ observation: MeetingObservation, at now: Date) async {
         guard (enabled || activeID != nil), !preparing, !repairingAccess, !shuttingDown, !finishing, starting == nil else { return }
+        // Let the bound exit operation read Zoom's final state before ending its capture lease.
+        if pico.exitingZoom { return }
         if activeID != nil, pico.active {
             if observation.signal == .ended || (observation.signal == .absent && observation.pid == 0) {
                 // A readable Zoom home screen or a missing Zoom process is a definite exit.

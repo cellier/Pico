@@ -9,6 +9,7 @@ DIST = ROOT / 'dist'
 APP = DIST / 'stage/Telos.app'
 RES = APP / 'Contents/Resources'
 RUNTIME = RES / 'Runtime'
+PINS = json.loads((ROOT / 'scripts/runtime-pins.json').read_text())
 
 def run(*args, **kwargs):
     return subprocess.run([str(x) for x in args], check=True, **kwargs)
@@ -16,24 +17,33 @@ def run(*args, **kwargs):
 def ignore(directory, names):
     return [n for n in names if n in {'.git','__pycache__','.DS_Store'} or n.endswith('.pyc') or n.startswith('__editable__')]
 
+for name, pin in PINS.items():
+    if pin.get('kind') == 'plugin': continue
+    run(sys.executable, ROOT/'scripts/runtime-checkout.py', name, '--check')
 if '--skip-build' not in sys.argv: run('./scripts/build.sh')
 DIST.mkdir(exist_ok=True)
 if (DIST / 'stage').exists(): shutil.rmtree(DIST / 'stage')
 shutil.copytree(ROOT / 'build/Telos.app', APP, symlinks=True, ignore=ignore)
+runtime_sites = {}
 for name, env in [('main','venv'), ('speech','speech-venv')]:
     source = ROOT / '.runtime' / env
+    minor = subprocess.check_output([str(source/'bin/python'), '-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'], text=True).strip()
+    if name == 'main' and minor != PINS['hermes-agent']['python']:
+        raise RuntimeError(f'Hermes {PINS["hermes-agent"]["version"]} requires the reviewed Python {PINS["hermes-agent"]["python"]} runtime; found {minor}.')
+    lib = f'lib/python{minor}'
     base = Path(subprocess.check_output([str(source/'bin/python'), '-c', 'import sys; print(sys.base_prefix)'], text=True).strip())
     target = RUNTIME / name
     shutil.copytree(base, target, symlinks=True, ignore=ignore)
-    (target/'lib/python3.12/EXTERNALLY-MANAGED').unlink(missing_ok=True)
-    site = target / 'lib/python3.12/site-packages'
-    shutil.copytree(source / 'lib/python3.12/site-packages', site, dirs_exist_ok=True, symlinks=True, ignore=ignore)
+    (target/lib/'EXTERNALLY-MANAGED').unlink(missing_ok=True)
+    site = target / lib / 'site-packages'
+    runtime_sites[name] = site
+    shutil.copytree(source / lib / 'site-packages', site, dirs_exist_ok=True, symlinks=True, ignore=ignore)
     # No development-only path injection or installer provenance in distributed environments.
     for p in site.glob('*.pth'):
         if str(ROOT) in p.read_text() or '__editable__' in p.read_text(): p.unlink()
     for p in site.rglob('direct_url.json'): p.unlink()
     for p in (target/'bin').iterdir():
-        if p.name not in {'python','python3','python3.12'} and (p.is_file() or p.is_symlink()): p.unlink()
+        if p.name not in {'python','python3',f'python{minor}'} and (p.is_file() or p.is_symlink()): p.unlink()
     (site/'sitecustomize.py').write_text('''import os, sys
 sys.dont_write_bytecode = True
 from pathlib import Path
@@ -54,7 +64,13 @@ for name in filter(None, tracked):
     src=source/name
     if src.is_file():
         dst=hermes/name; dst.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(src,dst)
-site=RUNTIME/'main/lib/python3.12/site-packages'
+pin = PINS['hermes-agent']
+run(ROOT/'.runtime/venv/bin/python', source/'scripts/write_install_stamp.py',
+    '--output', hermes/'install-stamp.json', '--commit', pin['commit'],
+    '--base-version', pin['version'], '--display-version', pin['version'],
+    '--distance', '0', '--source', 'build', '--update-mechanism', 'external')
+run(sys.executable, ROOT/'scripts/runtime-phone.py', '--stage', RUNTIME/'plugins/phone-harness')
+site=runtime_sites['main']
 with (site/'sitecustomize.py').open('a') as f:
     f.write("import sys\nsys.path.insert(0, str(root / 'hermes'))\n")
 run('uv','pip','install','--python',RUNTIME/'main/bin/python3','--no-deps','--reinstall',ROOT/'.runtime/macos-harness')
@@ -68,7 +84,7 @@ for source in browser_source.iterdir():
 model_root = Path.home()/'.cache/huggingface/hub/models--mlx-community--Qwen3-ASR-0.6B-4bit/snapshots/313d850181767edf09f00a9c289becca70e58cd0'
 shutil.copytree(model_root, RUNTIME/'models/Qwen3-ASR-0.6B-4bit', symlinks=False, ignore=ignore)
 licenses = RES/'ThirdPartyNotices'; licenses.mkdir(exist_ok=True)
-license_file = next((ROOT/'.runtime/speech-venv/lib/python3.12/site-packages').glob('huggingface_hub-*.dist-info/licenses/LICENSE'))
+license_file = next(runtime_sites['speech'].glob('huggingface_hub-*.dist-info/licenses/LICENSE'))
 shutil.copy2(license_file, licenses/'Apache-2.0.txt')
 for name in ['hermes-agent','macos-harness']:
     shutil.copy2(ROOT/'.runtime'/name/'LICENSE',licenses/(name+'-LICENSE'))

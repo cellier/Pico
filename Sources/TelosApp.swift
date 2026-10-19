@@ -109,6 +109,9 @@ struct TaskBoard: View {
             .animation(sheetAnimation, value: detailOpen)
             .onChange(of: tab) { _, value in store.selected = nil; if value == .feed { store.feedCommand() } }
             .onChange(of: store.completed) { _, _ in store.selected = nil }
+            .onChange(of: searching) { _, active in
+                if !active { search = ""; windowResignEditor() }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .init("TelosNewTask"))) { _ in tab = .tasks; store.completed = false }
             .onReceive(NotificationCenter.default.publisher(for: .init("TelosTaskTop"))) { _ in store.selected = nil }
             .onReceive(NotificationCenter.default.publisher(for: .init("TelosShowHome"))) { _ in
@@ -141,9 +144,9 @@ struct TaskBoard: View {
         ZStack(alignment: .top) {
             Group {
                 if tab == .feed {
-                    FeedList(store: store, query: search, newFeed: newFeed, topInset: 60)
+                    FeedList(store: store, query: activeSearch, newFeed: newFeed, topInset: 60)
                 } else if tab == .calendar {
-                    CalendarList(calendar: calendar, query: search, searching: false, search: $search)
+                    CalendarList(calendar: calendar, query: activeSearch, searching: false, search: $search)
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -190,8 +193,8 @@ struct TaskBoard: View {
                                             .opacity(flight?.target == todo.id.uuidString || pendingFlight?.0 == todo.id.uuidString ? 0 : 1)
                                     }
                                     }
-                                    if visibleTasks.isEmpty && (!search.isEmpty || store.completed) {
-                                        Text(search.isEmpty ? "All caught up" : "No results").font(.system(size: 14)).foregroundStyle(.secondary)
+                                    if visibleTasks.isEmpty && (!activeSearch.isEmpty || store.completed) {
+                                        Text(activeSearch.isEmpty ? "All caught up" : "No results").font(.system(size: 14)).foregroundStyle(.secondary)
                                             .frame(maxWidth: .infinity).padding(.top, 32)
                                     }
                                 }.padding(.horizontal, 10).padding(.bottom, 18)
@@ -249,7 +252,8 @@ struct TaskBoard: View {
         }
         .overlay { if let flight { FlightOverlay(flight: flight, finished: { self.flight = nil }).id(flight.id) } }
     }
-    var visibleTasks: [Todo] { search.isEmpty ? store.filtered : store.searchTasks(search) }
+    var activeSearch: String { searching ? search.trimmingCharacters(in: .whitespacesAndNewlines) : "" }
+    var visibleTasks: [Todo] { activeSearch.isEmpty ? store.filtered : store.searchTasks(activeSearch) }
     func greeting(_ date: Date) -> String {
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil { return "Good Evening." }
         let hour = Calendar.current.component(.hour, from: date)
@@ -373,7 +377,10 @@ struct TaskDetail: View {
             ZStack(alignment: .bottom) {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 24) {
+                        // Message heights change while streaming and approvals append.
+                        // Eager placement keeps scrollTo(bottom) from repeatedly
+                        // re-estimating a lazy stack's variable-height predecessors.
+                        VStack(alignment: .leading, spacing: 24) {
                             if let meetingID = todo.sourceMeetingID, let evidence = todo.sourceTranscriptEvidence {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Button("From meeting · " + meetingTimestamp(evidence.startTime)) {
@@ -385,7 +392,7 @@ struct TaskDetail: View {
                             }
                             ForEach(todo.messages) { message in
                                 messageView(message).id(message.id)
-                                    .trackRect(message.id.uuidString, in: "messageFlight")
+                                    .trackRect(message.id.uuidString, in: "messageFlight", when: pendingFlight?.0 == message.id.uuidString)
                                     .opacity(flight?.target == message.id.uuidString || pendingFlight?.0 == message.id.uuidString ? 0 : 1)
                             }
                             if let stream = store.streams[todo.id], !stream.isEmpty { MessageText(text: stream, markdown: false).font(.system(size: 14)) }

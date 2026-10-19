@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "deckURL": "https://slides.zoom.us/p/synthetic-demo/10000",
+  "title": "合成示例演示",
+  "language": "zh-CN",
+  "slides": [
+    {
+      "number": 1,
+      "title": "示例主题",
+      "chunks": [
+        {
+          "text": "这是一个合成演示示例，用于说明 Pico 的讲稿格式。"
+        }
+      ]
+    }
+  ]
+}

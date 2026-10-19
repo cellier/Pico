@@ -95,7 +95,6 @@ class AppDelegate:NSObject,NSApplicationDelegate,NSWindowDelegate,WKScriptMessag
  var recorder:AVAudioRecorder?,audioURL:URL?,recordTimer:Timer?,meterTimer:Timer?,peak:Float = -160
  let cloudSpeech=CloudSpeech();var cloudRecognition=CloudRecognition();let voiceSettings=VoiceSettings()
  var recognitionAudio:URL?
- var feedbackPanel:NSPanel?,feedbackLabel:NSTextField?,feedbackToken=UUID()
  var replyLanguage:String?
  var requestID:String?,lastResponse="",requestStart=Date(),taskID:String?,speech=NSSpeechSynthesizer(),spokenSignature=""
  var pauseMenu:NSMenuItem!,pinMenu:NSMenuItem!,stopMenu:NSMenuItem!,detailMenu:NSMenuItem!
@@ -177,25 +176,10 @@ skinMenu=choices;skinItem.submenu=choices;menu.insertItem(skinItem,at:6);updateS
   }
  }
  func updateLabels(){status.button?.title="";status.button?.setAccessibilityLabel("Pico · "+label(current));menu?.item(at:0)?.title=label(current);status.button?.toolTip=label(current)+(lastResponse.isEmpty ? "":" · "+String(lastResponse.prefix(180)));status.button?.layer?.backgroundColor=NSColor.labelColor.withAlphaComponent(0.08).cgColor;pinMenu?.state=pinned ? .on:.off;pauseMenu?.title=paused ? L("Resume animation","恢复动画"):L("Pause animation","暂停动画")}
- func showFeedback(_ text:String,dismiss:Bool=false){
-  feedbackToken=UUID();let token=feedbackToken
-  if feedbackPanel == nil {
-   let bubble=NSPanel(contentRect:NSRect(x:0,y:0,width:310,height:78),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
-   bubble.title="Pico voice status";bubble.isOpaque=false;bubble.backgroundColor = .clear;bubble.hasShadow=true;bubble.level = .floating;bubble.hidesOnDeactivate=false;bubble.ignoresMouseEvents=true;bubble.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary]
-   let glass=NSVisualEffectView(frame:NSRect(x:0,y:0,width:310,height:78));glass.material = .hudWindow;glass.state = .active;glass.wantsLayer=true;glass.layer?.cornerRadius=12;glass.layer?.masksToBounds=true
-   let label=NSTextField(wrappingLabelWithString:"");label.font = .systemFont(ofSize:13);label.alignment = .center;label.frame=NSRect(x:12,y:10,width:286,height:58);glass.addSubview(label);bubble.contentView=glass
-   feedbackPanel=bubble;feedbackLabel=label
-  }
-  feedbackLabel?.stringValue=text
-  let frame=(panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
-  feedbackPanel?.setFrameOrigin(NSPoint(x:max(frame.minX,min(panel.frame.midX-155,frame.maxX-310)),y:max(frame.minY,min(panel.frame.maxY-12,frame.maxY-78))))
-  feedbackPanel?.orderFrontRegardless()
-  if dismiss {DispatchQueue.main.asyncAfter(deadline:.now()+8){[weak self] in if self?.feedbackToken==token{self?.feedbackPanel?.orderOut(nil)}}}
- }
  func setState(_ s:String){
-  if current==s && s != "error" {return}
-  if s=="error"{showFeedback(lastResponse.isEmpty ? L("Voice input failed. Please try again.","语音输入失败，请重试。"):lastResponse,dismiss:true)}
-  else {feedbackToken=UUID();feedbackPanel?.orderOut(nil)}
+  // Voice feedback stays on Pico and in its menu; never cover the desktop.
+  if s=="error" && lastResponse.isEmpty {lastResponse=L("Voice input failed. Please try again.","语音输入失败，请重试。")}
+  if current==s {updateLabels();return}
   guard current != s else{return};current=s;updateLabels();syncVisualState();log("voice state=\(s)")}
  func syncVisualState(){guard ready else{return};web?.evaluateJavaScript(PetVisualState.script(for:current),completionHandler:nil)}
  func notifyGesture(_ down:Bool){DistributedNotificationCenter.default().postNotificationName(Notification.Name("local.original.sprout.gesture"),object:"local.original.sprout",userInfo:["down":down],deliverImmediately:true)}
@@ -224,7 +208,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
 #endif
  func connected()->Bool{guard let d=try? Data(contentsOf:root.appendingPathComponent("heartbeat.json")),let o=(try? JSONSerialization.jsonObject(with:d)) as? [String:Any],let t=o["updated"] as? Double else{return false};return Date().timeIntervalSince1970-t<3}
  func beginVoice(){
-  guard !["thinking","working","transcribing","awaiting_approval"].contains(current) else{lastResponse=L("Cancel the current task before starting another.","请先取消当前任务，再开始新的语音。");updateLabels();showFeedback(lastResponse,dismiss:true);return}
+  guard !["thinking","working","transcribing","awaiting_approval"].contains(current) else{lastResponse=L("Cancel the current task before starting another.","请先取消当前任务，再开始新的语音。");updateLabels();return}
   guard connected() else{lastResponse=L("Open the updated Telos app, then hold again.","请打开更新后的 Telos，再按住说话。");setState("error");return}
   guard AVCaptureDevice.authorizationStatus(for:.audio) == .authorized else{lastResponse=L("Allow microphone access in the system prompt, then hold again.","请在系统弹窗允许麦克风，然后重新按住说话。");setState("needs_input");AVCaptureDevice.requestAccess(for:.audio){_ in};return}
   let id=UUID().uuidString;let url=root.appendingPathComponent(id+".wav")
@@ -244,7 +228,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
    case .success(let text):
     try? FileManager.default.removeItem(at:url)
     log("cloud asr completed characters=\(text.count)")
-    guard !text.isEmpty else{self.requestID=nil;self.setState("cancelled");self.showFeedback(L("No speech recognized. Please try again.","没有识别到语音，请重试。"),dismiss:true);return}
+    guard !text.isEmpty else{self.requestID=nil;self.lastResponse=L("No speech recognized. Please try again.","没有识别到语音，请重试。");self.setState("cancelled");return}
     self.sendRecognition(id:id,payload:["transcript":text])
    case .failure(let error):
     let failure=error as NSError;log("cloud asr failed domain=\(failure.domain) code=\(failure.code); local recovery")
@@ -257,7 +241,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
   requestStart=Date()
   do{var request=payload;request["id"]=id;let d=try JSONSerialization.data(withJSONObject:request);try d.write(to:root.appendingPathComponent(id+".request.json"),options:.atomic);try? FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:root.appendingPathComponent(id+".request.json").path)}catch{try? FileManager.default.removeItem(at:root.appendingPathComponent(id+".wav"));requestID=nil;lastResponse=L("Could not send speech to Telos.","未能将语音交给 Telos。");setState("error")}
  }
- func finishVoice(){guard let r=recorder,let id=requestID,let url=audioURL else{return};let duration=r.currentTime;r.stop();recorder=nil;recordTimer?.invalidate();meterTimer?.invalidate();audioURL=nil;guard duration>0.35,peak > -54 else{try? FileManager.default.removeItem(at:url);requestID=nil;setState("cancelled");showFeedback(L("No speech heard. Hold Pico and try again.","没有听清，请按住 Pico 再说一次。"),dismiss:true);return};submitAudio(url,id:id)}
+ func finishVoice(){guard let r=recorder,let id=requestID,let url=audioURL else{return};let duration=r.currentTime;r.stop();recorder=nil;recordTimer?.invalidate();meterTimer?.invalidate();audioURL=nil;guard duration>0.35,peak > -54 else{try? FileManager.default.removeItem(at:url);requestID=nil;lastResponse=L("No speech heard. Hold Pico and try again.","没有听清，请按住 Pico 再说一次。");setState("cancelled");return};submitAudio(url,id:id)}
 
  func readStatus(){guard let id=requestID,recorder==nil else{return}
   let elapsed=Date().timeIntervalSince(requestStart)

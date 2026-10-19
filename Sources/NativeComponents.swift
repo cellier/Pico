@@ -66,8 +66,12 @@ struct RectPreference: PreferenceKey {
     static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) { value.merge(nextValue()) { _, new in new } }
 }
 extension View {
-    func trackRect(_ key: String, in space: String) -> some View {
-        background(GeometryReader { geo in Color.clear.preference(key: RectPreference.self, value: [key: geo.frame(in: .named(space))]) })
+    func trackRect(_ key: String, in space: String, when tracked: Bool = true) -> some View {
+        background {
+            if tracked {
+                GeometryReader { geo in Color.clear.preference(key: RectPreference.self, value: [key: geo.frame(in: .named(space))]) }
+            }
+        }
     }
 }
 struct SendFlight: Identifiable {
@@ -295,17 +299,21 @@ struct ExpandingSearchControl: View {
                     .contentShape(Circle())
             }.buttonStyle(HoverButtonStyle(hoverScale: 1))
                 .accessibilityLabel(active ? "Close search" : "Search tasks, calendar and feed")
-            TextField("Search", text: $text)
+            TextField("Search", text: Binding(get: { active ? text : "" }, set: { if active { text = $0 } }))
                 .textFieldStyle(.plain).font(.system(size: 14, weight: .medium))
                 .focused($focused).accessibilityIdentifier("headerSearchField")
                 .frame(width: 272).opacity(active ? 1 : 0)
                 .allowsHitTesting(active).accessibilityHidden(!active)
+                .disabled(!active)
                 .onExitCommand { active = false; text = "" }
         }
         .frame(width: active ? 330 : 36, height: 36, alignment: .leading)
         .clipped().background(TelosTheme.raised.opacity(0.75), in: Capsule()).inputGlass()
         .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.8), value: active)
-        .onChange(of: active) { _, value in focused = value }
+        .onChange(of: active) { _, value in
+            focused = value
+            if !value { text = "" }
+        }
         .onAppear { focused = active }
     }
 }

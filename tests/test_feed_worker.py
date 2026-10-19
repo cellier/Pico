@@ -1,6 +1,7 @@
 """Exercise the real worker/tool protocol with a deterministic agent and source transport."""
 import io
 import json
+import os
 import sys
 import tempfile
 import time
@@ -59,7 +60,12 @@ class FeedWorkerTests(unittest.TestCase):
              patch.object(worker,'read_url',return_value={'url':'https://example.com/news/api','text':'Original factual announcement'}), \
              patch('capabilities.Capabilities.search',return_value={'error':'Search unavailable'}), \
              patch('feed_collection.inspect_source',side_effect=TimeoutError('Offline') if source_failure else None,return_value=original):
-            worker.main()
+            try:
+                worker.main()
+            finally:
+                # worker.main enters its task workspace; restore before the
+                # TemporaryDirectory cleanup removes that process-wide cwd.
+                os.chdir(Path(__file__).resolve().parents[1])
         events=[json.loads(line) for line in output.getvalue().splitlines()]
         return repo,events
     def test_worker_publishes_dated_backlog_and_finishes_from_evidence(self):

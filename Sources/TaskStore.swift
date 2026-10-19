@@ -46,6 +46,7 @@ struct Todo: Codable, Identifiable {
     var voiceLanguage: String?
     var voicePhaseEvents: [String]?
     var dueDate: String?
+    var activeRunID: UUID?
 }
 struct MemoryNote: Decodable, Identifiable {
     var id: String
@@ -75,11 +76,19 @@ struct WorkerEvent: Decodable {
     var tasks: [ProposedTask]?
 }
 final class WorkerRun: @unchecked Sendable {
+    let id = UUID()
     let process = Process()
     var buffer = Data()
     var input: FileHandle?
     var receivedFinal = false
     var creationRequest = UUID()
+    var pendingDelta = ""
+    var deltaFlushScheduled = false
+}
+
+private struct WorkerCheckpoint: Decodable {
+    var run_id: UUID
+    var event: WorkerEvent
 }
 
 @MainActor final class TaskStore: ObservableObject {
@@ -104,6 +113,7 @@ final class WorkerRun: @unchecked Sendable {
     @Published var streams: [UUID: String] = [:]
     private var feedClock: AnyCancellable?
     private var runs: [UUID: WorkerRun] = [:]
+    private var pendingSave: DispatchWorkItem?
     let dataDir: URL
     private let file: URL
     var filtered: [Todo] { tasks.filter { ($0.status == "completed") == completed } }
@@ -116,9 +126,23 @@ final class WorkerRun: @unchecked Sendable {
             try FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             if FileManager.default.fileExists(atPath: file.path) {
                 tasks = try JSONDecoder().decode([Todo].self, from: Data(contentsOf: file))
+                var recovered = false
                 for i in tasks.indices where tasks[i].status == "running" || tasks[i].status == "awaiting_approval" {
-                    tasks[i].approval = nil; tasks[i].status = "paused"; tasks[i].summary = "Interrupted. Open this task to continue."
+                    let checkpoint = dataDir.appendingPathComponent("tasks/\(tasks[i].id.uuidString.lowercased())/last-turn.json")
+                    if let active = tasks[i].activeRunID,
+                       let data = try? Data(contentsOf: checkpoint),
+                       let result = try? JSONDecoder().decode(WorkerCheckpoint.self, from: data), result.run_id == active,
+                       (result.event.type == "done" && ["ready", "needs_input"].contains(result.event.status ?? "")) || result.event.type == "error" {
+                        let event = result.event
+                        tasks[i].status = event.type == "error" ? "error" : event.status!
+                        tasks[i].summary = event.summary ?? event.text ?? "Task ended."
+                        if event.type == "done" { tasks[i].messages.append(Message(role: "assistant", text: event.text ?? "")) }
+                    } else {
+                        tasks[i].status = "paused"; tasks[i].summary = "Interrupted. Open this task to continue."
+                    }
+                    tasks[i].approval = nil; tasks[i].activeRunID = nil; recovered = true
                 }
+                if recovered { save() }
             }
         } catch { self.error = "Could not load your tasks: \(error.localizedDescription)" }
         if let preview = env["TELOS_PREVIEW"] { loadPreview(preview) }
@@ -130,11 +154,18 @@ final class WorkerRun: @unchecked Sendable {
         }
     }
     func save() {
+        pendingSave?.cancel(); pendingSave = nil
         guard ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil else { return }
         do {
             try JSONEncoder().encode(tasks).write(to: file, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         } catch { self.error = "Could not save tasks: \(error.localizedDescription)" }
+    }
+    private func scheduleSave() {
+        guard pendingSave == nil else { return }
+        let work = DispatchWorkItem { [weak self] in self?.save() }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
     private func attachmentMessage(_ text: String, files: [ComposerFile], task: UUID) throws -> Message {
         var message = Message(role: "user", text: text)
@@ -191,7 +222,7 @@ final class WorkerRun: @unchecked Sendable {
         guard tasks.contains(where: { $0.id == id && $0.status != "completed" }) else { return }
         if let task = tasks.first(where: { $0.id == id }), let meetingID = task.meetingID, let session = meetings[meetingID], [.preparing, .recording, .finishing].contains(session.status) { meetingManager.endByUser(); return }
         stop(id)
-        mutate(id) { $0.approval = nil; $0.status = "completed"; $0.completedAt = Date(); $0.summary = "Completed" }
+        mutate(id) { $0.approval = nil; $0.activeRunID = nil; $0.status = "completed"; $0.completedAt = Date(); $0.summary = "Completed" }
         if selected == id { selected = nil }
         save()
     }
@@ -210,7 +241,7 @@ final class WorkerRun: @unchecked Sendable {
         try? run.input?.close()
         if run.process.isRunning { run.process.terminate() }
         streams[id] = nil
-        mutate(id) { $0.approval = nil; $0.status = "paused"; $0.summary = "Paused. You can retry or add a new ask." }
+        mutate(id) { $0.approval = nil; $0.activeRunID = nil; $0.status = "paused"; $0.summary = "Paused. You can retry or add a new ask." }
         save()
     }
     func stopAll() { for id in Array(runs.keys) { stop(id) } }
@@ -235,13 +266,13 @@ final class WorkerRun: @unchecked Sendable {
         run.input = input.fileHandleForWriting
         run.process.standardOutput = output; run.process.standardInput = input
         run.process.standardError = FileHandle.nullDevice
-        mutate(id) { $0.status = "running"; $0.summary = "Preparing your task…" }
+        mutate(id) { $0.activeRunID = run.id; $0.status = "running"; $0.summary = "Preparing your task…" }
         streams[id] = ""; runs[id] = run; save()
         // A dedicated reader drains the pipe through EOF before observing exit.
         do {
             try run.process.run()
             let task = tasks.first(where: { $0.id == id })
-            var request: [String: Any] = ["task_id": id.uuidString, "prompt": prompt, "new": new]
+            var request: [String: Any] = ["task_id": id.uuidString, "run_id": run.id.uuidString, "prompt": prompt, "new": new]
             for (key, value) in TaskExecutionPolicy.requestOptions(feedID: task?.feedID, voiceRequestID: task?.voiceRequestID) { request[key] = value }
             if let language = tasks.first(where: { $0.id == id })?.voiceLanguage { request["voice_language"] = language }
             if let feedID = tasks.first(where: { $0.id == id })?.feedID { request["feed_id"] = feedID }
@@ -266,11 +297,11 @@ final class WorkerRun: @unchecked Sendable {
             }
         } catch {
             runs[id] = nil
-            mutate(id) { $0.status = "error"; $0.summary = error.localizedDescription }; save()
+            mutate(id) { $0.activeRunID = nil; $0.status = "error"; $0.summary = error.localizedDescription }; save()
         }
     }
     private func receive(_ e: WorkerEvent, id: UUID, run: WorkerRun) {
-        guard runs[id] === run else { return }
+        guard runs[id] === run, !run.receivedFinal else { return }
         switch e.type {
         case "create_tasks":
             guard let requestID = e.request_id else { return }
@@ -307,14 +338,29 @@ final class WorkerRun: @unchecked Sendable {
             }
         case "phase":
             guard let phase=e.status, ["thinking","working"].contains(phase) else{return}
+            guard let todo = tasks.first(where: { $0.id == id }), todo.voicePhase != phase else { return }
             mutate(id) { todo in
                 todo.voicePhase=phase
                 if todo.voiceRequestID != nil, todo.voicePhaseEvents?.last != phase {todo.voicePhaseEvents=Array(((todo.voicePhaseEvents ?? [])+[phase]).suffix(40))}
             }
-        case "tool": break
-        case "title": mutate(id) { $0.title = e.text ?? $0.title }
-        case "status": mutate(id) { if $0.approval == nil { $0.summary = e.text ?? "Working…" } }
-        case "delta": streams[id, default: ""] += e.text ?? ""
+        case "tool": return
+        case "title":
+            guard let text = e.text, tasks.first(where: { $0.id == id })?.title != text else { return }
+            mutate(id) { $0.title = text }
+        case "status":
+            let text = e.text ?? "Working…"
+            guard let todo = tasks.first(where: { $0.id == id }), todo.approval == nil, todo.summary != text else { return }
+            mutate(id) { $0.summary = text }
+        case "delta":
+            run.pendingDelta += e.text ?? ""
+            guard !run.deltaFlushScheduled else { return }
+            run.deltaFlushScheduled = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
+                guard let self, self.runs[id] === run, !run.receivedFinal else { return }
+                let text = run.pendingDelta; run.pendingDelta = ""; run.deltaFlushScheduled = false
+                if !text.isEmpty { self.streams[id, default: ""] += text }
+            }
+            return
         case "artifact":
             if let path = e.path, let name = e.name {
                 mutate(id) { todo in
@@ -326,17 +372,18 @@ final class WorkerRun: @unchecked Sendable {
             feedCommand()
             run.receivedFinal = true; streams[id] = nil
             mutate(id) {
-                $0.approval = nil
+                $0.approval = nil; $0.activeRunID = nil
                 $0.messages.append(Message(role: "assistant", text: e.text ?? ""))
                 $0.status = e.status == "ready" ? "ready" : "needs_input"
                 $0.summary = e.summary ?? "Ready for review"
             }
         case "error":
             run.receivedFinal = true; streams[id] = nil
-            mutate(id) { $0.approval = nil; $0.status = "error"; $0.summary = e.text ?? "Something went wrong. Please retry." }
-        default: break
+            mutate(id) { $0.approval = nil; $0.activeRunID = nil; $0.status = "error"; $0.summary = e.text ?? "Something went wrong. Please retry." }
+        default: return
         }
-        if e.type != "delta" { save() }
+        if ["done", "error", "approval", "approval_resolved"].contains(e.type) { save() }
+        else { scheduleSave() }
     }
     private func ended(_ id: UUID, run: WorkerRun) {
         guard runs[id] === run else { return }
@@ -344,7 +391,7 @@ final class WorkerRun: @unchecked Sendable {
         runs[id] = nil
         if !run.receivedFinal {
             streams[id] = nil
-            mutate(id) { $0.approval = nil; $0.status = "error"; $0.summary = "The agent stopped unexpectedly. Please retry." }
+            mutate(id) { $0.approval = nil; $0.activeRunID = nil; $0.status = "error"; $0.summary = "The agent stopped unexpectedly. Please retry." }
         }
         save()
     }
