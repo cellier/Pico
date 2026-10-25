@@ -11,5 +11,5 @@ root = Path.cwd()
 snapshot_download('Runpod/FLUX.2-klein-4B-mflux-4bit',
     revision='7ee1b3aa8178a1240050490072196a57da2bf2a9',
     local_dir=root/'.runtime/image-model', max_workers=4)
-print('Local image editing ready. Rebuild Telos with scripts/build.sh.')
+print('Local image editing ready. Rebuild Pico with scripts/build.sh.')
 PY

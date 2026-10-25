@@ -5,7 +5,7 @@ root=Path.home()/'Library/Application Support/Telos'
 root.mkdir(parents=True,exist_ok=True); os.chmod(root,0o700)
 f=root/'config.json'
 if f.exists():
-    print('Using existing private Telos configuration.')
+    print('Using existing private Pico configuration.')
 else:
     key=getpass.getpass('DeepSeek API key: ').strip()
     if not key: raise SystemExit('A key is required.')

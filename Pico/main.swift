@@ -5,27 +5,9 @@ import AVFoundation
 let project=URL(fileURLWithPath:ProcessInfo.processInfo.environment["SPROUT_PROJECT"] ?? Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().path)
 let logDirectory=URL(fileURLWithPath:ProcessInfo.processInfo.environment["PICO_LOG_DIR"] ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Pico").path)
 func log(_ text:String){try? FileManager.default.createDirectory(at:logDirectory,withIntermediateDirectories:true);let u=logDirectory.appendingPathComponent("runtime.log");let d="\(Date()) \(text)\n".data(using:.utf8)!;if let h=try? FileHandle(forWritingTo:u){h.seekToEndOfFile();h.write(d);try? h.close()}else{try? d.write(to:u)}}
-/// Resolve the app built beside Pico first; an explicit override supports custom installs.
-enum TelosApplication {
- static func resolve()->URL {
-  if let override=ProcessInfo.processInfo.environment["TELOS_APP_PATH"],!override.isEmpty {
-   return URL(fileURLWithPath:(override as NSString).expandingTildeInPath).standardizedFileURL
-  }
-  let bundle=Bundle.main.bundleURL
-  let picoRoot=bundle.deletingLastPathComponent().deletingLastPathComponent()
-  let candidates=[
-   picoRoot.deletingLastPathComponent().appendingPathComponent("build/Telos.app"),
-   bundle.deletingLastPathComponent().appendingPathComponent("Telos.app"),
-   FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Telos.app"),
-   URL(fileURLWithPath:"/Applications/Telos.app")
-  ]
-  if let local=candidates.first(where:{FileManager.default.fileExists(atPath:$0.path)}){return local}
-  return NSWorkspace.shared.runningApplications.first(where:{$0.bundleIdentifier=="com.telos.mac"})?.bundleURL
-   ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier:"com.telos.mac") ?? candidates[0]
- }
-}
 var chinese:Bool {Locale.preferredLanguages.first?.hasPrefix("zh") == true}
 func L(_ en:String,_ zh:String)->String{chinese ? zh:en}
+let petWindowSide:CGFloat = 143.36
 enum PetScreenFacing {
  struct Screen {let frame:NSRect;let visibleFrame:NSRect}
  struct Direction:Equatable {
@@ -96,20 +78,20 @@ class AppDelegate:NSObject,NSApplicationDelegate,NSWindowDelegate,WKScriptMessag
  let cloudSpeech=CloudSpeech();var cloudRecognition=CloudRecognition();let voiceSettings=VoiceSettings()
  var recognitionAudio:URL?
  var replyLanguage:String?
- var requestID:String?,lastResponse="",requestStart=Date(),taskID:String?,speech=NSSpeechSynthesizer(),spokenSignature=""
+ var requestID:String?,lastRouteRequestID:String?,lastResponse="",requestStart=Date(),taskID:String?,speech=NSSpeechSynthesizer(),spokenSignature=""
  var pauseMenu:NSMenuItem!,pinMenu:NSMenuItem!,stopMenu:NSMenuItem!,detailMenu:NSMenuItem!
  var skin=PetSkin.load(),skinMenu:NSMenu?
  var facingUpdate:DispatchWorkItem?,lastScreenFacing:PetScreenFacing.Direction?
  let root:URL
  init(root:URL=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Telos/companion-v1")){self.root=root;super.init()}
- let telosURL=TelosApplication.resolve()
+ var telosURL:URL?{TelosApplication.resolve()}
  func label(_ state:String)->String{switch state{case "listening":return L("Listening","正在聆听");case "transcribing":return L("Transcribing","正在转写");case "thinking":return L("Thinking","思考中");case "working":return L("Working","工作中");case "speaking":return L("Speaking","正在回复");case "completed":return L("Done","已完成");case "error":return L("Error","出错了");case "needs_input","awaiting_approval":return L("Needs input","等待确认");case "cancelled":return L("Cancelled","已取消");default:return L("Idle","闲暇")}}
  func icon()->NSImage{let image=NSImage(size:NSSize(width:18,height:18),flipped:false){rect in NSGraphicsContext.saveGraphicsState();let t=NSAffineTransform();t.scale(by:18/35);t.concat();let p=NSBezierPath(roundedRect:NSRect(x:0,y:0,width:35,height:35),xRadius:12,yRadius:12);p.append(NSBezierPath(roundedRect:NSRect(x:8.71094,y:12.25,width:6.12496,height:10.5),xRadius:2.5,yRadius:2.5));p.append(NSBezierPath(roundedRect:NSRect(x:20.96,y:12.25,width:6.125,height:10.5),xRadius:2.5,yRadius:2.5));p.windingRule = .evenOdd;NSColor.black.setFill();p.fill();NSGraphicsContext.restoreGraphicsState();return true};image.isTemplate=true;return image}
  func applicationDidFinishLaunching(_ notification:Notification){
   NSApp.setActivationPolicy(.accessory);speech.delegate=self
   let f=NSScreen.main!.visibleFrame
-  panel=PetPanel(contentRect:NSRect(x:f.maxX-340,y:f.minY+110,width:280,height:280),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false);panel.delegate=self;panel.title="Pico · Telos";panel.isOpaque=false;panel.backgroundColor = .clear;panel.hasShadow=false;panel.level = .floating;panel.hidesOnDeactivate=false;panel.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary];panel.isReleasedWhenClosed=false
-  let config=WKWebViewConfiguration();config.userContentController.add(self,name:"native");web=WKWebView(frame:NSRect(x:0,y:0,width:280,height:280),configuration:config);web.setValue(false,forKey:"drawsBackground")
+  panel=PetPanel(contentRect:NSRect(x:f.maxX-200-petWindowSide/2,y:f.minY+250-petWindowSide/2,width:petWindowSide,height:petWindowSide),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false);panel.delegate=self;panel.title="Pico";panel.isOpaque=false;panel.backgroundColor = .clear;panel.hasShadow=false;panel.level = .floating;panel.hidesOnDeactivate=false;panel.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary];panel.isReleasedWhenClosed=false
+  let config=WKWebViewConfiguration();config.userContentController.add(self,name:"native");web=WKWebView(frame:NSRect(x:0,y:0,width:petWindowSide,height:petWindowSide),configuration:config);web.setValue(false,forKey:"drawsBackground")
   let container=NSView(frame:web.frame);container.addSubview(web);touch=TouchView(frame:web.frame);touch.owner=self;touch.setAccessibilityElement(true);touch.setAccessibilityRole(.button);touch.setAccessibilityLabel(L("Pico: hold to speak, move to drag, right-click for menu","Pico：按住说话，移动拖动，右键打开菜单"));container.addSubview(touch);panel.contentView=container
   let html=Bundle.main.url(forResource:"index",withExtension:"html")!;web.loadFileURL(html,allowingReadAccessTo:html.deletingLastPathComponent())
   status=NSStatusBar.system.statusItem(withLength:26);status.button?.image=icon();status.button?.imagePosition = .imageOnly;status.button?.font=NSFont.systemFont(ofSize:12,weight:.medium);status.button?.wantsLayer=true;status.button?.layer?.cornerRadius=10
@@ -121,7 +103,7 @@ class AppDelegate:NSObject,NSApplicationDelegate,NSWindowDelegate,WKScriptMessag
   NotificationCenter.default.addObserver(self,selector:#selector(displayLayoutChanged),name:NSApplication.didChangeScreenParametersNotification,object:nil)
   log("voice companion launched; opaque=false; key=\(panel.isKeyWindow)")
  }
- func rebuildMenu(){menu=NSMenu();menu.addItem(withTitle:label(current),action:nil,keyEquivalent:"");menu.addItem(withTitle:L("Hold still to speak · Move to drag","按住不动说话 · 移动拖动"),action:nil,keyEquivalent:"");stopMenu=menu.addItem(withTitle:L("Stop / Cancel voice task","停止 / 取消语音任务"),action:#selector(cancelVoice),keyEquivalent:".");stopMenu.target=self;detailMenu=menu.addItem(withTitle:L("Open task / approval in Telos","在 Telos 查看任务 / 审批"),action:#selector(openTask),keyEquivalent:"");detailMenu.target=self;menu.addItem(.separator());pinMenu=menu.addItem(withTitle:L("Always on top","保持置顶"),action:#selector(togglePin),keyEquivalent:"");pinMenu.target=self;pauseMenu=menu.addItem(withTitle:L("Pause animation","暂停动画"),action:#selector(togglePause),keyEquivalent:"");pauseMenu.target=self;let reset=menu.addItem(withTitle:L("Reset position","重置位置"),action:#selector(resetPosition),keyEquivalent:"");reset.target=self;menu.addItem(.separator());let quit=menu.addItem(withTitle:L("Quit Pico","退出 Pico"),action:#selector(quitApp),keyEquivalent:"q");quit.target=self;
+ func rebuildMenu(){menu=NSMenu();menu.addItem(withTitle:label(current),action:nil,keyEquivalent:"");menu.addItem(withTitle:L("Hold still to speak · Move to drag","按住不动说话 · 移动拖动"),action:nil,keyEquivalent:"");stopMenu=menu.addItem(withTitle:L("Stop / Cancel voice conversation","停止或取消语音对话"),action:#selector(cancelVoice),keyEquivalent:".");stopMenu.target=self;detailMenu=menu.addItem(withTitle:L("Open conversation / task in Pico","在 Pico 查看对话 / 任务"),action:#selector(openTask),keyEquivalent:"");detailMenu.target=self;menu.addItem(.separator());pinMenu=menu.addItem(withTitle:L("Always on top","保持置顶"),action:#selector(togglePin),keyEquivalent:"");pinMenu.target=self;pauseMenu=menu.addItem(withTitle:L("Pause animation","暂停动画"),action:#selector(togglePause),keyEquivalent:"");pauseMenu.target=self;let reset=menu.addItem(withTitle:L("Reset position","重置位置"),action:#selector(resetPosition),keyEquivalent:"");reset.target=self;menu.addItem(.separator());let quit=menu.addItem(withTitle:L("Quit Pico","退出 Pico"),action:#selector(quitApp),keyEquivalent:"q");quit.target=self;
 #if VOICE_QA
 menu.addItem(.separator());for (title,selector) in [("QA: submit audio fixture",#selector(qaSend)),("QA: stop playback",#selector(qaStop)),("QA: cancel pending audio",#selector(qaCancel))]{let item=menu.addItem(withTitle:title,action:selector,keyEquivalent:"");item.target=self}
 #endif
@@ -162,12 +144,13 @@ skinMenu=choices;skinItem.submenu=choices;menu.insertItem(skinItem,at:6);updateS
  @objc func displayLayoutChanged(){syncScreenFacing(force:true)}
  @objc func openMeeting(){
   cancelVoice()
-  let configuration=NSWorkspace.OpenConfiguration();configuration.activates=false
+  guard let telosURL else{lastResponse=L("Could not find the Pico app. Open Pico and try again.","找不到 Pico 主应用，请打开 Pico 后重试。");setState("error");return}
+  let configuration=NSWorkspace.OpenConfiguration();configuration.activates=false;configuration.promptsUserIfNeeded=false
   // Open first, then publish: application reopen must not raise the main panel over this window.
   NSWorkspace.shared.openApplication(at:telosURL,configuration:configuration){[weak self] _,error in
    DispatchQueue.main.async {
     guard let self else{return}
-    guard error == nil else{self.lastResponse=L("Could not open Telos.","未能打开 Telos。");self.setState("error");return}
+    guard error == nil else{self.lastResponse=L("Could not open Pico.","未能打开 Pico。");self.setState("error");return}
     do {
      try FileManager.default.createDirectory(at:self.root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
      try Data("open".utf8).write(to:self.root.appendingPathComponent("pico-meeting.open"),options:.atomic)
@@ -195,7 +178,7 @@ for delay in [0.0,0.07,0.20,0.5]{DispatchQueue.main.asyncAfter(deadline:.now()+d
 DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
 #endif
 } }
- func poll(){guard ready else{return};if !touch.dragging && !polling{polling=true;let p=NSEvent.mouseLocation,x=p.x-panel.frame.minX,y=280-(p.y-panel.frame.minY);web.evaluateJavaScript("window.pointerAt(\(x),\(y))"){[weak self] v,_ in self?.polling=false;self?.panel.ignoresMouseEvents = !(v as? Bool ?? false)}};ticks+=1;if touch.dragging && ticks%6==0{notifyGesture(true)};if ticks%2==0{readStatus()}}
+ func poll(){guard ready else{return};if !touch.dragging && !polling{polling=true;let p=NSEvent.mouseLocation,x=p.x-panel.frame.minX,y=web.bounds.height-(p.y-panel.frame.minY);web.evaluateJavaScript("window.pointerAt(\(x),\(y))"){[weak self] v,_ in self?.polling=false;self?.panel.ignoresMouseEvents = !(v as? Bool ?? false)}};ticks+=1;if touch.dragging && ticks%6==0{notifyGesture(true)};if ticks%2==0{readStatus()}}
 
 #if VOICE_QA
  @objc func qaSend(){submitFixture()}
@@ -209,7 +192,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
  func connected()->Bool{guard let d=try? Data(contentsOf:root.appendingPathComponent("heartbeat.json")),let o=(try? JSONSerialization.jsonObject(with:d)) as? [String:Any],let t=o["updated"] as? Double else{return false};return Date().timeIntervalSince1970-t<3}
  func beginVoice(){
   guard !["thinking","working","transcribing","awaiting_approval"].contains(current) else{lastResponse=L("Cancel the current task before starting another.","请先取消当前任务，再开始新的语音。");updateLabels();return}
-  guard connected() else{lastResponse=L("Open the updated Telos app, then hold again.","请打开更新后的 Telos，再按住说话。");setState("error");return}
+  guard connected() else{lastResponse=L("Open the updated Pico app, then hold again.","请打开更新后的 Pico，再按住说话。");setState("error");return}
   guard AVCaptureDevice.authorizationStatus(for:.audio) == .authorized else{lastResponse=L("Allow microphone access in the system prompt, then hold again.","请在系统弹窗允许麦克风，然后重新按住说话。");setState("needs_input");AVCaptureDevice.requestAccess(for:.audio){_ in};return}
   let id=UUID().uuidString;let url=root.appendingPathComponent(id+".wav")
   do{let r=try AVAudioRecorder(url:url,settings:[AVFormatIDKey:kAudioFormatLinearPCM,AVSampleRateKey:16000,AVNumberOfChannelsKey:1,AVLinearPCMBitDepthKey:16]);r.isMeteringEnabled=true;guard r.prepareToRecord(),r.record() else{throw CocoaError(.fileWriteUnknown)};try? FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url.path);recorder=r;audioURL=url;requestID=id;lastResponse="";taskID=nil;peak = -160;spokenSignature="";replyLanguage=nil;setState("listening")
@@ -231,7 +214,9 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
     guard !text.isEmpty else{self.requestID=nil;self.lastResponse=L("No speech recognized. Please try again.","没有识别到语音，请重试。");self.setState("cancelled");return}
     self.sendRecognition(id:id,payload:["transcript":text])
    case .failure(let error):
-    let failure=error as NSError;log("cloud asr failed domain=\(failure.domain) code=\(failure.code); local recovery")
+    let failure=error as NSError
+    let detail=RecognitionProtocol.diagnostic(error).map{" detail=\($0)"} ?? ""
+    log("cloud asr failed domain=\(failure.domain) code=\(failure.code)\(detail); local recovery")
     self.lastResponse=L("Bailian unavailable. Recognizing locally…","百炼暂不可用，正在使用本机识别…");self.updateLabels()
     self.sendRecognition(id:id,payload:[:])
    }
@@ -239,7 +224,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
  }
  func sendRecognition(id:String,payload:[String:Any]){
   requestStart=Date()
-  do{var request=payload;request["id"]=id;let d=try JSONSerialization.data(withJSONObject:request);try d.write(to:root.appendingPathComponent(id+".request.json"),options:.atomic);try? FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:root.appendingPathComponent(id+".request.json").path)}catch{try? FileManager.default.removeItem(at:root.appendingPathComponent(id+".wav"));requestID=nil;lastResponse=L("Could not send speech to Telos.","未能将语音交给 Telos。");setState("error")}
+  do{var request=payload;request["id"]=id;let d=try JSONSerialization.data(withJSONObject:request);try d.write(to:root.appendingPathComponent(id+".request.json"),options:.atomic);try? FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:root.appendingPathComponent(id+".request.json").path)}catch{try? FileManager.default.removeItem(at:root.appendingPathComponent(id+".wav"));requestID=nil;lastResponse=L("Could not send speech to Pico.","未能将语音交给 Pico。");setState("error")}
  }
  func finishVoice(){guard let r=recorder,let id=requestID,let url=audioURL else{return};let duration=r.currentTime;r.stop();recorder=nil;recordTimer?.invalidate();meterTimer?.invalidate();audioURL=nil;guard duration>0.35,peak > -54 else{try? FileManager.default.removeItem(at:url);requestID=nil;lastResponse=L("No speech heard. Hold Pico and try again.","没有听清，请按住 Pico 再说一次。");setState("cancelled");return};submitAudio(url,id:id)}
 
@@ -247,12 +232,13 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
   let elapsed=Date().timeIntervalSince(requestStart)
   if (elapsed>15 && ["transcribing","thinking","working","awaiting_approval"].contains(current) && !connected()) || (current=="transcribing" && elapsed>90) {
    let disconnected = !connected();cancelVoice()
-   lastResponse=disconnected ? L("Telos is not responding. Open Telos and try again.","Telos 暂未响应，请打开 Telos 后重试。") : L("Speech recognition timed out. Please hold Pico and try again.","语音识别超时，请按住 Pico 重试。")
+   lastResponse=disconnected ? L("Pico is not responding. Open Pico and try again.","Pico 暂未响应，请打开 Pico 后重试。") : L("Speech recognition timed out. Please hold Pico and try again.","语音识别超时，请按住 Pico 重试。")
    setState("error");return
   }
   let file=root.appendingPathComponent(id+".status.json")
   guard let d=try? Data(contentsOf:file),let o=(try? JSONSerialization.jsonObject(with:d)) as? [String:Any],o["id"] as? String==id,let s=o["state"] as? String else{return};taskID=o["task_id"] as? String;replyLanguage=o["language"] as? String
-  if s=="completed" || s=="needs_input" || s=="awaiting_approval" || s=="error"{let signature=id+":"+s;if spokenSignature==signature{return};spokenSignature=signature;terminal=s;lastResponse=o["text"] as? String ?? "";setState(s);let text:String;if s=="awaiting_approval"{text=L("Please review and confirm the action in Telos.","这一步需要你确认，请在 Telos 中查看审批。")}else if s=="error"{text=L("The task could not finish. Please check Telos.","任务没能完成，请到 Telos 查看。")}else{text=shortReply(lastResponse)};if !text.isEmpty{speak(text)}
+  if o["source"] as? String == "chat" || !(taskID?.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ?? true){lastRouteRequestID=id}
+  if s=="completed" || s=="needs_input" || s=="awaiting_approval" || s=="error"{let signature=id+":"+s;if spokenSignature==signature{return};spokenSignature=signature;terminal=s;lastResponse=o["text"] as? String ?? "";setState(s);let text:String;if s=="awaiting_approval"{text=L("Please review and confirm the action in Pico.","这一步需要你确认，请在 Pico 中查看审批。")}else if s=="error"{text=L("This reply could not finish. Please check Pico.","这次回复未能完成，请到 Pico 查看。")}else{text=shortReply(lastResponse)};if !text.isEmpty{speak(text)}
   }else{setState(s)}
  }
  func shortReply(_ input:String)->String{let text=SpeechText.prepare(input);log("tts prepared source_chars=\(input.count) spoken_chars=\(text.count)");return text}
@@ -267,7 +253,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
   let language=replyLanguage ?? (isChinese ? "zh":"en")
   let available=NSSpeechSynthesizer.availableVoices.filter{(NSSpeechSynthesizer.attributes(forVoice:$0)[.localeIdentifier] as? String)?.hasPrefix(language)==true}
   if let voice=available.first(where:{$0.rawValue.lowercased().contains(language == "zh" ? "tingting":"samantha")}) ?? available.first{speech.setVoice(voice);log("tts selected voice=\(voice.rawValue) language=\(language)")}
-  setState("speaking");let accepted=speech.startSpeaking(text);log("tts accepted=\(accepted) characters=\(text.count)");if !accepted{lastResponse=L("System voice playback is unavailable; open the result in Telos.","系统语音暂不可用，请到 Telos 查看结果。");setState(terminal)}
+  setState("speaking");let accepted=speech.startSpeaking(text);log("tts accepted=\(accepted) characters=\(text.count)");if !accepted{lastResponse=L("System voice playback is unavailable; open the result in Pico.","系统语音暂不可用，请到 Pico 查看结果。");setState(terminal)}
  }
  func stopSpeaking(){if cloudSpeech.active{cloudSpeech.cancel();setState(terminal)};if speech.isSpeaking{speech.stopSpeaking();log("tts stop requested");setState(terminal)}}
  func speechSynthesizer(_ sender:NSSpeechSynthesizer,willSpeakWord characterRange:NSRange,of string:String){log("tts word callback")}
@@ -289,10 +275,18 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
  if self.cloudSpeech.speak(text,language:language,force:true,completion:{[weak self] success in guard let self else{return};self.voiceSettings.message.stringValue=success ? L("Cloud trial completed.","云端试听完成。") : L("Cloud trial failed. Check region, workspace, key and model access.","云端试听失败，请检查地域、业务空间、密钥与模型权限。");self.setState(self.terminal)}){self.setState("speaking");self.voiceSettings.message.stringValue=L("Cloud trial requested…","已请求云端试听…")}else{self.voiceSettings.message.stringValue=L("Save the region, workspace and new key first.","请先保存地域、业务空间和新密钥。")}
  };voiceSettings.show()}
  @objc func cancelVoice(){cloudRecognition.cancel();if let url=recognitionAudio{try? FileManager.default.removeItem(at:url)};recognitionAudio=nil;notifyGesture(false);web.evaluateJavaScript("window.setPressed(false)",completionHandler:nil);stopSpeaking();recorder?.stop();recorder=nil;recordTimer?.invalidate();meterTimer?.invalidate();if let u=audioURL{try? FileManager.default.removeItem(at:u)};audioURL=nil;if let id=requestID{try? Data().write(to:root.appendingPathComponent(id+".cancel"),options:.atomic)};requestID=nil;terminal="cancelled";setState("cancelled")}
- @objc func openTask(){if let id=requestID{try? Data().write(to:root.appendingPathComponent(id+".show"),options:.atomic)};NSWorkspace.shared.openApplication(at:telosURL,configuration:NSWorkspace.OpenConfiguration(),completionHandler:nil)}
+ @objc func openTask(){
+  guard let telosURL else{lastResponse=L("Could not find the Pico app. Open Pico and try again.","找不到 Pico 主应用，请打开 Pico 后重试。");setState("error");return}
+  if let id=requestID ?? lastRouteRequestID{try? Data().write(to:root.appendingPathComponent(id+".show"),options:.atomic)}
+  let configuration=NSWorkspace.OpenConfiguration();configuration.promptsUserIfNeeded=false
+  NSWorkspace.shared.openApplication(at:telosURL,configuration:configuration){[weak self] _,error in
+   guard error != nil else{return}
+   DispatchQueue.main.async{guard let self else{return};self.lastResponse=L("Could not open Pico.","未能打开 Pico。");self.setState("error")}
+  }
+ }
  @objc func togglePin(){pinned.toggle();panel.level=pinned ? .floating:.normal;updateLabels()}
  @objc func togglePause(){paused.toggle();web.evaluateJavaScript("window.setPaused(\(paused))",completionHandler:nil);updateLabels()}
- @objc func resetPosition(){let f=NSScreen.main!.visibleFrame;panel.setFrameOrigin(NSPoint(x:f.maxX-340,y:f.minY+110));syncScreenFacing(force:true)}
+ @objc func resetPosition(){let f=NSScreen.main!.visibleFrame;panel.setFrameOrigin(NSPoint(x:f.maxX-200-petWindowSide/2,y:f.minY+250-petWindowSide/2));syncScreenFacing(force:true)}
  @objc func sleepPet(){web.evaluateJavaScript("window.setPressed(false)",completionHandler:nil);if recorder != nil{cancelVoice()};web.evaluateJavaScript("window.setPaused(true)",completionHandler:nil)}
  @objc func wakePet(){web.evaluateJavaScript("window.setPaused(\(paused))",completionHandler:nil);syncScreenFacing(force:true)}
  @objc func quitApp(){cancelVoice();log("quit");NSApp.terminate(nil)}

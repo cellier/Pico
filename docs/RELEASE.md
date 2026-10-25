@@ -1,11 +1,11 @@
-# Telos 0.5.1 — Apple Silicon Preview
+# Pico 0.6.0 — Apple Silicon Preview
 
 ## 安装 / Install
 
-1. 下载 `Telos-0.5.1-macOS-arm64.dmg`，打开后把 Telos 拖入 Applications。
-2. 从 Applications 打开 Telos，点击菜单栏 logo 展开窗口。
+1. 下载 `Pico-0.6.0-macOS-arm64.dmg`，打开后把 Pico 拖入 Applications。
+2. 从 Applications 打开 Pico，点击菜单栏 logo 打开独立窗口。
 3. 在 Settings 输入你自己的 DeepSeek API Key。安装包不含开发者密钥或个人任务数据。
-4. 按需要授予辅助功能、屏幕录制、麦克风和日历权限。
+4. 按需要授予辅助功能、屏幕录制和麦克风权限；Events 通过 DevHelper 登录并连接 Zoom 后直接同步，无需 macOS 日历权限。
 
 Requires macOS 26 or later and an Apple Silicon Mac. Intel Macs are not supported.
 Python, Hermes, macOS Harness, Chromium and the local bilingual speech model are bundled. No Python, uv, Git, Command Line Tools or source checkout is required on the recipient's Mac.
@@ -20,18 +20,21 @@ Repository Releases are private: recipients must have access to cellier/Telos to
 
 ## Included / 包含
 
-- Native menu-bar app with Task, Calendar and Feed.
+- Native resizable dark window with Chat, Task and Events; the menu-bar icon opens the app.
+- Redesigned Chat: translucent bubbles, Messages-style timestamps, typing indicator, send sound, bold and lists, final files inside the reply bubble.
+- Select-to-translate in any app with a Liquid Glass panel and natural-sounding translations.
+- Longer agent runs (120 steps / 30 minutes); a paused run resumes when you reply 继续.
 - Task conversations, attachments, document and local webpage tools.
 - Reviewed Mac automation through macOS Harness.
 - Local bilingual dictation and the in-development Zoom meeting transcript workflow.
-- System Calendar, screenshot shortcut, light/dark appearance.
+- Direct Zoom Calendar sync for Events and the menu bar, screenshot shortcut, light/dark appearance.
 - Self-contained runtime paths resolved relative to the installed app.
 
 ## Known limits / 已知边界
 
 - macOS permissions, target-app behavior, Zoom versions and audio devices affect functionality.
-- Each new build currently attempts to reset Telos-specific permissions on first launch; grant access again after updating.
-- Feed checks run while Telos is running; this is not an independent always-on scheduler.
+- The rebrand preserves the existing application identity and local data directory; updates do not reset system permissions.
+- The Feed tab has been removed. Existing Feed data is retained for compatibility.
 - Clean-home runtime tests and a relocated-app check do not prove all real meetings and hardware combinations work.
 - No automated public website hosting, cross-device sync or cloud-free Agent reasoning.
 

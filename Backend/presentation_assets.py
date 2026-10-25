@@ -53,7 +53,7 @@ class PresentationAssets:
   validate=self.cap.validate_url
   class Redirect(urllib.request.HTTPRedirectHandler):
    def redirect_request(self,req,fp,code,msg,headers,newurl):return super().redirect_request(req,fp,code,msg,headers,validate(newurl))
-  req=urllib.request.Request(validate(url),headers={'User-Agent':'Mozilla/5.0 (compatible; Telos presentation research)'})
+  req=urllib.request.Request(validate(url),headers={'User-Agent':'Mozilla/5.0 (compatible; Pico presentation research)'})
   with urllib.request.build_opener(Redirect).open(req,timeout=20) as r:
    data=r.read(limit+1)
    if len(data)>limit:raise ValueError('Image/page exceeds size limit')

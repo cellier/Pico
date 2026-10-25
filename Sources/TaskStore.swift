@@ -8,6 +8,16 @@ struct Message: Codable, Identifiable {
     var text: String
     var attachmentPrompt: String?
     var files: [ComposerFile]?
+    /// Generated outputs belong to the assistant response that produced them.
+    /// Optional so existing task and Chat transcripts remain readable.
+    var artifacts: [Artifact]?
+    /// When the message was sent or received. Optional so older transcripts, which
+    /// have no times, still load; they simply show no timestamps.
+    var date: Date?
+    /// Local proactive updates are evidence, not user requests or approvals.
+    var origin: String?
+    /// User messages answered together by this assistant bubble.
+    var replyTo: [UUID]?
 }
 struct Artifact: Codable, Identifiable {
     var id: String { path }
@@ -74,6 +84,14 @@ struct WorkerEvent: Decodable {
     var screenshot_path: String?
     var request_id: String?
     var tasks: [ProposedTask]?
+    var run_id: UUID?
+    var message_id: UUID?
+    var message_ids: [UUID]?
+    var reply_to: [UUID]?
+    var handled_message_ids: [UUID]?
+    var consumed_message_ids: [UUID]?
+    var source_message_id: UUID?
+    var delivered_replies: [PicoDeliveredChatReply]?
 }
 final class WorkerRun: @unchecked Sendable {
     let id = UUID()
@@ -92,9 +110,13 @@ private struct WorkerCheckpoint: Decodable {
 }
 
 @MainActor final class TaskStore: ObservableObject {
-    @Published var tasks: [Todo] = []
+    @Published var tasks: [Todo] = [] { didSet { taskListRevision &+= 1 } }
+    private(set) var taskListRevision = 0
     @Published var meetings: [UUID: MeetingSession] = [:]
     lazy var meetingManager = MeetingSessionManager(store: self)
+    lazy var proactivity = PicoProactiveCoordinator(directory: dataDir, taskStore: self)
+    /// All typed and companion voice turns share this one durable conversation.
+    lazy var chat = PicoChatStore(dataDir: dataDir, taskStore: self)
     @Published var feeds: [FeedRule] = []
     @Published var feedItems: [FeedItem] = []
     @Published var feedError: String?
@@ -104,20 +126,22 @@ private struct WorkerCheckpoint: Decodable {
     @Published var macAccess = "Checking Mac access…"
     @Published var showMacAccess = false
     @Published var screenshotShortcutStatus = "Drag to capture a region. Press Space to select a window, then click. Escape cancels. The screenshot opens for local AI editing; type or hold to speak, then copy or save PNG."
-    @Published var recordingShortcutStatus = "Click to record a screen, press Space to pick a window, or drag an area. Escape cancels. Choose microphone, camera and system audio, then Start Recording. The video is saved to the Desktop and copied. In a text field, Option+R still types ®."
+    @Published var recordingShortcutStatus = "Click to record a screen, press Space to pick a window, or drag an area. Escape cancels. Choose microphone, camera and system audio, then Start Recording. The video is saved in Pico Files and copied. In a text field, Option+R still types ®."
     @Published var permissionResetNotice: String?
     @Published var soul = ""
     @Published var memoryNotes: [MemoryNote] = []
     @Published var installedSkills: [String] = []
     @Published var profileError: String?
     @Published var streams: [UUID: String] = [:]
-    private var feedClock: AnyCancellable?
     private var runs: [UUID: WorkerRun] = [:]
     private var pendingSave: DispatchWorkItem?
     let dataDir: URL
     private let file: URL
     var filtered: [Todo] { tasks.filter { ($0.status == "completed") == completed } }
-    var selectedTask: Todo? { tasks.first { $0.id == selected } }
+    var selectedTask: Todo? {
+        guard let selected else { return nil }
+        return tasks.first { $0.id == selected }
+    }
     init() {
         let env = ProcessInfo.processInfo.environment
         dataDir = env["TELOS_DATA_DIR"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Telos")
@@ -136,7 +160,7 @@ private struct WorkerCheckpoint: Decodable {
                         let event = result.event
                         tasks[i].status = event.type == "error" ? "error" : event.status!
                         tasks[i].summary = event.summary ?? event.text ?? "Task ended."
-                        if event.type == "done" { tasks[i].messages.append(Message(role: "assistant", text: event.text ?? "")) }
+                        if event.type == "done" { tasks[i].messages.append(Message(role: "assistant", text: event.text ?? "", date: Date())) }
                     } else {
                         tasks[i].status = "paused"; tasks[i].summary = "Interrupted. Open this task to continue."
                     }
@@ -147,10 +171,11 @@ private struct WorkerCheckpoint: Decodable {
         } catch { self.error = "Could not load your tasks: \(error.localizedDescription)" }
         if let preview = env["TELOS_PREVIEW"] { loadPreview(preview) }
         else {
-            checkMacAccess(); feedCommand(refreshDue: true)
-            feedClock = Timer.publish(every: 60, on: .main, in: .common).autoconnect().sink { [weak self] _ in
-                self?.feedCommand(refreshDue: true)
-            }
+            do { try PicoFileStorage.prepare(dataDirectory: dataDir) }
+            catch { self.error = "Could not prepare Pico Files: \(error.localizedDescription)" }
+            checkMacAccess()
+            // Feed is no longer a product surface. Preserve its stored history,
+            // but do not schedule collection or start background Agent tasks.
         }
     }
     func save() {
@@ -168,9 +193,9 @@ private struct WorkerCheckpoint: Decodable {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
     private func attachmentMessage(_ text: String, files: [ComposerFile], task: UUID) throws -> Message {
-        var message = Message(role: "user", text: text)
+        var message = Message(role: "user", text: text, date: Date())
         guard !files.isEmpty else { return message }
-        let root = dataDir.appendingPathComponent("tasks/\(task.uuidString.lowercased())/files")
+        let root = try PicoFileStorage.workspace(dataDirectory: dataDir, id: task)
         let batch = root.appendingPathComponent("attachments/" + UUID().uuidString)
         try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: true)
         do {
@@ -231,9 +256,17 @@ private struct WorkerCheckpoint: Decodable {
         tasks[i].status = "completed"; tasks[i].completedAt = Date(); tasks[i].summary = "Completed"; selected = nil; save()
     }
     func reopen(_ id: UUID) {
-        guard tasks.first(where: { $0.id == id })?.meetingID == nil else { return }
-        guard let i = tasks.firstIndex(where: { $0.id == id }) else { return }
-        tasks[i].status = "ready"; tasks[i].completedAt = nil; tasks[i].summary = "Ready for your review"; completed = false; save()
+        guard let i = tasks.firstIndex(where: { $0.id == id }), tasks[i].status == "completed" else { return }
+        if let meetingID = tasks[i].meetingID {
+            // A finished meeting's task returns to review with the summary it had
+            // before completion; completing it had replaced that with "Completed".
+            let session = meetings[meetingID]
+            tasks[i].summary = session?.summary?.first?.text
+                ?? (session?.status == .interrupted ? "Meeting interrupted · Transcript saved" : "Meeting ended · Ready for review")
+        } else {
+            tasks[i].summary = "Ready for your review"
+        }
+        tasks[i].status = "ready"; tasks[i].completedAt = nil; completed = false; save()
     }
     func stop(_ id: UUID) {
         if tasks.first(where: { $0.id == id })?.meetingID != nil { meetingManager.endByUser(); return }
@@ -318,7 +351,7 @@ private struct WorkerCheckpoint: Decodable {
             return
         case "auto_approved":
             mutate(id) {
-                $0.messages.append(Message(role: "confirmation", text: "Automatically approved: " + (e.text ?? "Task action")))
+                $0.messages.append(Message(role: "confirmation", text: "Automatically approved: " + (e.text ?? "Task action"), date: Date()))
             }
         case "approval":
             guard let approvalID = e.approval_id, let hash = e.action_hash, let expiry = e.expires_at else { return }
@@ -369,11 +402,10 @@ private struct WorkerCheckpoint: Decodable {
                 }
             }
         case "done":
-            feedCommand()
             run.receivedFinal = true; streams[id] = nil
             mutate(id) {
                 $0.approval = nil; $0.activeRunID = nil
-                $0.messages.append(Message(role: "assistant", text: e.text ?? ""))
+                $0.messages.append(Message(role: "assistant", text: e.text ?? "", date: Date()))
                 $0.status = e.status == "ready" ? "ready" : "needs_input"
                 $0.summary = e.summary ?? "Ready for review"
             }
@@ -405,7 +437,7 @@ private struct WorkerCheckpoint: Decodable {
             mutate(id) {
                 $0.approval = nil; $0.status = "running"
                 $0.summary = allowed ? "Executing the approved action…" : "Action declined. Continuing…"
-                $0.messages.append(Message(role: "confirmation", text: (allowed ? "Approved once: " : "Declined: ") + approval.reason))
+                $0.messages.append(Message(role: "confirmation", text: (allowed ? "Approved once: " : "Declined: ") + approval.reason, date: Date()))
             }
             save()
         } catch {
@@ -526,7 +558,7 @@ private struct WorkerCheckpoint: Decodable {
             tasks[0].status = "ready"
             tasks[0].messages = [Message(role: "user", text: "Message goes here."), Message(role: "assistant", text: "Each of these pies offers a distinct personality: the pepperoni leans classic and comforting, the mushroom & taleggio is earthy and contemplative, and the anchovy & Calabrian chili brings bold, unexpected energy. Together, they cover a spectrum from familiar to adventurous — so it’s really about what mood you’re in tonight.\n\nEach of these pizzas has its own unique character: the pepperoni is traditional and cozy, the mushroom & taleggio is rich and introspective, while the anchovy & Calabrian chili delivers a punch of bold, surprising flavor. Together, they span a range from the comforting to the daring — it all depends on your mood this evening.\n\nWould you like me to suggest a side or drink pairing to go with your choice?")]
             if ProcessInfo.processInfo.environment["TELOS_PREVIEW_LONG"] == "1" {
-                let section = "Research\nSearch the web, read original sources, and prepare a summary with citations.\n\nFeeds\nFollow the competitors you choose and review their latest updates.\n\nRemember\nKeep the preferences you ask Telos to remember.\n\n"
+                let section = "Research\nSearch the web, read original sources, and prepare a summary with citations.\n\nFeeds\nFollow the competitors you choose and review their latest updates.\n\nRemember\nKeep the preferences you ask Pico to remember.\n\n"
                 tasks[0].messages.append(Message(role: "assistant", text: String(repeating: section, count: 4) + "This final line should remain completely readable above the input."))
             }
         }

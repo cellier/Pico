@@ -35,5 +35,5 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" dist/*.dmg dist/SHA256SUMS.txt \
             --verify-tag --prerelease \
-            --title "Telos $RELEASE_TAG · Apple Silicon Preview" \
+            --title "Pico $RELEASE_TAG · Apple Silicon Preview" \
             --notes-file docs/RELEASE.md

@@ -27,7 +27,7 @@ struct FeedList: View {
                     }.padding(.horizontal, 24).padding(.vertical, 10)
                 }
                 if items.isEmpty {
-                    ContentUnavailableView(query.isEmpty ? (store.feeds.isEmpty ? "A feed shaped by you" : "No articles yet") : "No results", systemImage: "text.below.photo", description: Text(query.isEmpty ? (store.feeds.isEmpty ? "Tell Telos what you want to follow in a new task. Your updates will appear here." : "New articles will appear here.") : "Try another topic."))
+                    ContentUnavailableView(query.isEmpty ? (store.feeds.isEmpty ? "A feed shaped by you" : "No articles yet") : "No results", systemImage: "text.below.photo", description: Text(query.isEmpty ? (store.feeds.isEmpty ? "Tell Pico what you want to follow in a new task. Your updates will appear here." : "New articles will appear here.") : "Try another topic."))
                         .padding(.top, 40)
                     if query.isEmpty && store.feeds.isEmpty {
                         Button("Create a feed", action: newFeed)
@@ -109,7 +109,7 @@ struct FeedRulesView: View {
                 Text("Your feeds").font(serif(30)); Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
-            Text("Create or change a feed in a task, or edit its rules here. Scheduled refreshes run while Telos is open.").font(.system(size: 13)).foregroundStyle(.secondary)
+            Text("Create or change a feed in a task, or edit its rules here. Scheduled refreshes run while Pico is open.").font(.system(size: 13)).foregroundStyle(.secondary)
             if let error = store.feedError { Text(error).foregroundStyle(.red).font(.system(size: 12)) }
             List {
                 ForEach(store.feeds) { feed in
@@ -165,7 +165,7 @@ struct FeedRuleEditor: View {
                     Text("Sources · one URL per line")
                     TextEditor(text: $sources).frame(height: 60).font(.system(size: 12)).border(.quaternary)
                 }
-                Picker("Refresh while Telos is open", selection: $interval) {
+                Picker("Refresh while Pico is open", selection: $interval) {
                     Text("Manually").tag(0); Text("Every hour").tag(60); Text("Every 6 hours").tag(360); Text("Daily").tag(1440)
                     if ![0,60,360,1440].contains(feed.interval_minutes) { Text("Every \(feed.interval_minutes) minutes").tag(feed.interval_minutes) }
                 }

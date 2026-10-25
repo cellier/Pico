@@ -36,7 +36,7 @@ import Foundation
               FileManager.default.isExecutableFile(atPath:python),
               FileManager.default.fileExists(atPath:model + "/transformer/0.safetensors"),
               let script = Bundle.main.resourceURL?.appendingPathComponent("Backend/local_image_edit.py") else {
-            throw NSError(domain:"TelosLocalImage",code:1,userInfo:[NSLocalizedDescriptionKey:"Local image editing is not installed. Run scripts/setup-image-edit.sh and rebuild Telos."])
+            throw NSError(domain:"TelosLocalImage",code:1,userInfo:[NSLocalizedDescriptionKey:"Local image editing is not installed. Run scripts/setup-image-edit.sh and rebuild Pico."])
         }
         let task = Process(), stdin = Pipe(), stdout = Pipe()
         task.executableURL = URL(fileURLWithPath:python)

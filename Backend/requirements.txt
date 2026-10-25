@@ -6,3 +6,4 @@ reportlab==5.0.1
 playwright==1.63.0
 pymupdf==1.28.2
 PyYAML==6.0.3
+jsonschema==4.26.0

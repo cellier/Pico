@@ -2,7 +2,8 @@
 const scene=new Scene();
 const camera=new OrthographicCamera(-1.9,1.9,1.88,-1.92,.1,30);camera.position.set(0,0,8);camera.zoom=.78;camera.updateProjectionMatrix();
 const renderer=new WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
-renderer.setSize(280,280);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0,0);renderer.outputColorSpace=SRGBColorSpace;renderer.toneMapping=ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;renderer.shadowMap.enabled=true;renderer.shadowMap.type=PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
+const petViewport={width:window.innerWidth||280,height:window.innerHeight||280};
+renderer.setSize(petViewport.width,petViewport.height);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0,0);renderer.outputColorSpace=SRGBColorSpace;renderer.toneMapping=ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;renderer.shadowMap.enabled=true;renderer.shadowMap.type=PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
 // A local, texture-free studio reflection environment, baked once at startup.
 const studio=new Scene();studio.background=new Color(0x424b59);
 function softbox(x,y,z,sx,sy,sz,color){const m=new Mesh(new BoxGeometry(sx,sy,sz),new MeshBasicMaterial({color}));m.position.set(x,y,z);studio.add(m);}
@@ -136,7 +137,7 @@ window.addEventListener('blur',()=>window.setPressed(false));
 const ray=new Raycaster();
 // Skip absent props even if their descendants are meshes.
 function interactive(o){for(let p=o;p;p=p.parent)if(!p.visible||p.userData.passThrough)return false;return true;}
-window.pointerAt=(x,y)=>{const next={x:x/140-1,y:1-y/140};if(Math.hypot(next.x-pointer.x,next.y-pointer.y)>.006)lastPointerMotion=performance.now()/1000;pointer=next;scene.updateMatrixWorld(true);ray.setFromCamera(pointer,camera);return ray.intersectObjects([activeSkin(),...[work,think,meeting].filter(g=>g.visible)],true).some(h=>interactive(h.object));};
+window.pointerAt=(x,y)=>{const next={x:x/(petViewport.width/2)-1,y:1-y/(petViewport.height/2)};if(Math.hypot(next.x-pointer.x,next.y-pointer.y)>.006)lastPointerMotion=performance.now()/1000;pointer=next;scene.updateMatrixWorld(true);ray.setFromCamera(pointer,camera);return ray.intersectObjects([activeSkin(),...[work,think,meeting].filter(g=>g.visible)],true).some(h=>interactive(h.object));};
 window.setScreenFacing=(x,y)=>{
  const next={x:Number.isFinite(x)?MathUtils.clamp(x,-1,1):0,y:Number.isFinite(y)?MathUtils.clamp(y,-1,1):0};
  if(screenFacing&&next.x===screenFacing.x&&next.y===screenFacing.y)return {...screenFacing};
@@ -149,7 +150,7 @@ window.cheer=()=>{jump=animationTime;eyeRig.cheer();};
 window.setPaused=p=>{paused=Boolean(p);last=performance.now();};
 window.setPetState=next=>{if(!['idle','thinking','working','meeting'].includes(next))throw new Error('Unknown state '+next);state=next;return state;};
 window.sprout=Object.freeze({setState:window.setPetState,setEmotion:value=>eyeRig.setState(value),getState:()=>state,setPaused:window.setPaused,setSkin:window.setSkin,getSkin:window.getSkin});
-function viewBounds(g){if(!g.visible)return null;g.updateWorldMatrix(true,true);const b=new Box3().setFromObject(g),points=[];for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z of [b.min.z,b.max.z]){const v=new Vector3(x,y,z).project(camera);points.push([(v.x+1)*140,(1-v.y)*140]);}const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)].map(v=>Math.round(v*10)/10);}
+function viewBounds(g){if(!g.visible)return null;g.updateWorldMatrix(true,true);const b=new Box3().setFromObject(g),points=[];for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z of [b.min.z,b.max.z]){const v=new Vector3(x,y,z).project(camera);points.push([(v.x+1)*petViewport.width/2,(1-v.y)*petViewport.height/2]);}const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)].map(v=>Math.round(v*10)/10);}
 window.petStats=()=>({state,skin,screenFacing:screenFacing?{...screenFacing}:null,flower:flowerRig.stats(),orb:orbRig.stats(),eyes:eyeRig.stats(),weights:{...weights},headScale:head.scale.x,interaction:{...interaction},reducedMotion,springs:JSON.parse(JSON.stringify(springs)),animationTime,frames,blink,jump,bouncing:animationTime-jump<1.1,rotation:[head.rotation.x,head.rotation.y,head.rotation.z],props:{thinking:think.visible,working:work.visible,meeting:meeting.visible},triangles:renderer.info.render.triangles,pixelRatio:renderer.getPixelRatio(),alpha:renderer.getContext().getContextAttributes().alpha,paused,keyPress,currentKey,keyboardNormal:new Vector3(0,0,1).applyQuaternion(work.quaternion).toArray(),voiceEnvelope,voiceHeights:meters.map(b=>b.scale.y*.20),bulbPulse,glowOpacity:glowMaterial.opacity,bulbEmission:bulbMaterial.emissiveIntensity,viewYaw:head.rotation.y,boundsPt:{head:viewBounds(activeSkin()),eye:viewBounds(activeEye()),thinking:viewBounds(think),working:viewBounds(work),meeting:viewBounds(meeting)}});
 function gazeOffset(p,age){const distance=Math.max(Math.abs(p.x),Math.abs(p.y));const near=1-MathUtils.smoothstep(distance,1.8,2.6);const active=1-MathUtils.smoothstep(age,1.8,3.8);return {yaw:MathUtils.clamp(p.x,-1,1)*.55*near*active,pitch:-MathUtils.clamp(p.y,-1,1)*.30*near*active};}
 function applyHeadFacing(dt,snap=false){

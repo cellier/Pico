@@ -79,6 +79,54 @@ class CapabilityTests(unittest.TestCase):
         self.assertEqual((self.work/'result.txt').read_text(),'done')
         self.assertFalse(any(k=='approval' for k,v in self.events))
         self.assertIn('approval',result['stdout'])
+    def test_large_media_batch_preserves_files_without_artifact_event_flood(self):
+        import csv
+        self.gate.allow=True
+        source='''from pathlib import Path
+for extension,count in [('png',3578),('aiff',90),('wav',90),('json',3),('mp4',1),('srt',1)]:
+    directory=Path(extension); directory.mkdir()
+    for index in range(count): (directory/(str(index)+'.'+extension)).write_bytes(b'fixture')
+'''
+        result=self.cap.python({'source':source,'reason':'Synthetic media output regression'})
+        self.assertEqual(result['exit_code'],0)
+        self.assertEqual(result['generated_file_count'],3763)
+        self.assertTrue(result['automatic_artifacts_grouped'])
+        self.assertEqual(len(self.events),1)
+        self.assertEqual(len(result['artifacts']),1)
+        inventory=Path(result['artifacts'][0]['path'])
+        with inventory.open(newline='') as stream: entries=list(csv.DictReader(stream))
+        self.assertEqual(len(entries),3763)
+        self.assertTrue(all((self.work/entry['relative_path']).is_file() for entry in entries))
+        self.assertEqual(sum(1 for path in self.work.rglob('*') if path.is_file()),3764)
+        delivered=self.cap.publish_artifacts({'names':['mp4/0.mp4','srt/0.srt']})
+        self.assertEqual(len(delivered['artifacts']),2)
+        self.assertEqual([value['name'] for _,value in self.events[1:]],['0.mp4','0.srt'])
+    def test_small_media_batch_keeps_automatic_image_and_audio_deliveries(self):
+        self.gate.allow=True
+        result=self.cap.python({'source':'from pathlib import Path; Path("final.png").write_bytes(b"image"); Path("final.wav").write_bytes(b"audio")','reason':'Two final outputs'})
+        self.assertEqual({Path(item['path']).name for item in result['artifacts']},{'final.png','final.wav'})
+        self.assertFalse(result.get('automatic_artifacts_grouped',False))
+        self.assertEqual(len(self.events),2)
+    def test_explicit_python_deliverables_skip_intermediate_publication(self):
+        self.gate.allow=True
+        source='from pathlib import Path; Path("frames").mkdir(); [(Path("frames")/str(n)).write_bytes(b"frame") for n in range(30)]; Path("final.mp4").write_bytes(b"final")'
+        result=self.cap.python({'source':source,'reason':'Select final output','output_files':['final.mp4']})
+        self.assertEqual(len(result['artifacts']),1)
+        self.assertEqual(self.events[0][1]['name'],'final.mp4')
+        self.assertEqual(sum(1 for path in self.work.rglob('*') if path.is_file()),31)
+        self.events.clear()
+        intermediate=self.cap.python({'source':'from pathlib import Path; Path("next.wav").write_bytes(b"chunk")','reason':'Intermediate work','output_files':[]})
+        self.assertEqual(intermediate['artifacts'],[])
+        self.assertEqual(self.events,[])
+        self.assertTrue((self.work/'next.wav').is_file())
+    def test_artifact_publication_validates_entire_bounded_batch(self):
+        (self.work/'final.txt').write_text('final')
+        for names in [['final.txt','missing.txt'],['../outside'],[str(self.work/'final.txt')],['final.txt']*25,'final.txt']:
+            with self.assertRaises(ValueError): self.cap.publish_artifacts({'names':names})
+            self.assertEqual(self.events,[])
+        self.gate.allow=True
+        with self.assertRaises(ValueError): self.cap.python({'source':'raise AssertionError("must not run")','reason':'Invalid selection','output_files':['../outside']})
+        self.assertEqual(self.gate.calls,[])
     def test_location_denial_prevents_network(self):
         with patch.object(self.cap,'json_url') as fetch:
             with self.assertRaises(ValueError): self.cap.location({})
@@ -105,4 +153,28 @@ class CapabilityTests(unittest.TestCase):
         self.assertTrue((self.work/'website-preview.png').is_file())
         self.cap.package({'name':'index.html'})
         with zipfile.ZipFile(self.work/'website.zip') as z:self.assertIn('index.html',z.namelist())
+
+    def test_generated_formats_use_unified_physical_workspace_and_keep_legacy_links(self):
+        import uuid
+        from generated_files import task_workspace
+        identifier=str(uuid.uuid4())
+        legacy=self.data/'tasks'/identifier/'files'
+        (legacy/'site/assets').mkdir(parents=True)
+        (legacy/'site/index.html').write_text('<link rel="stylesheet" href="assets/style.css"><h1>Preserved site</h1>')
+        (legacy/'site/assets/style.css').write_text('h1 { color: black; }')
+        physical=task_workspace(self.data,identifier)
+        cap=Capabilities(self.data,physical,lambda k,**v:self.events.append((k,v)),self.gate,worker.validate_url,worker.read_url,worker.workspace_path)
+        for extension in ['pdf','docx','xlsx']:
+            cap.office({'name':'report.'+extension,'spec':{'title':'Pico files','sections':[{'text':'Verified output'}]}})
+            self.assertTrue((legacy/('report.'+extension)).is_file())
+        inspected=cap.inspect_document({'name':'report.pdf'})
+        self.assertTrue(Path(inspected['preview']['path']).is_relative_to(physical))
+        zipped=cap.package({'name':'site/index.html'})
+        self.assertTrue(Path(zipped['path']).is_relative_to(physical))
+        with zipfile.ZipFile(zipped['path']) as archive:
+            self.assertIn('assets/style.css',archive.namelist())
+        self.assertEqual((legacy/'site/assets/style.css').read_text(),'h1 { color: black; }')
+        outputs=[Path(value['path']) for kind,value in self.events if kind=='artifact']
+        self.assertTrue(outputs)
+        self.assertTrue(all(path.is_relative_to(physical) and path.is_file() for path in outputs))
 if __name__=='__main__':unittest.main()

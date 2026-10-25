@@ -66,9 +66,9 @@ budget summary or an optimistic model claim after a partially executed tool.
     if reason == 'invalid_result':
         notice = '执行引擎没有返回有效结果，任务尚未完成。'
     elif limit:
-        notice = f'本次达到 {int(limit[2])} 轮执行上限，任务尚未完成。'
+        notice = f'这件事步骤比较多，已经做了 {int(limit[1])} 步，还没完成。进度已保存，回复「继续」我接着做。'
     elif reason == 'budget_exhausted':
-        notice = '本次执行额度已用完，任务尚未完成。'
+        notice = '这件事用时较长，本次执行时间已用完，还没完成。进度已保存，回复「继续」我接着做。'
     elif result.get('interrupted') or reason.startswith('interrupted'):
         notice = '任务已中断，尚未完成。'
     elif reason == 'guardrail_halt':

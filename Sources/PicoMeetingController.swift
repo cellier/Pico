@@ -204,7 +204,7 @@ struct PicoMeetingRecord: Codable {
         }
         realtime.onMemorySearch = { [weak self] query, result in
             guard let self, self.active else { return }
-            self.memoryStatus = result.error == nil ? "Telos 记忆：检索到 \(result.notes.count) 条相关背景" : "Telos 记忆暂时不可用"
+            self.memoryStatus = result.error == nil ? "Pico 记忆：检索到 \(result.notes.count) 条相关背景" : "Pico 记忆暂时不可用"
             self.addTurn(role: "memory", text: "Memory search: " + query + "; note IDs: " + result.notes.map(\.id).joined(separator: ", ") + (result.error.map { "; " + $0 } ?? ""), id: UUID().uuidString)
         }
         realtime.onTranscript = { [weak self] role, text, id in
@@ -214,7 +214,8 @@ struct PicoMeetingRecord: Codable {
                 // A final goodbye is handled by the bounded finish tool, rather than the
                 // presentation's pause/resume cancellation path. It does not exit by itself.
                 if !(self.exitBound && self.preparation.draft.automaticallyLeavesOnGoodbye && Self.isMeetingGoodbye(text)) {
-                    self.handlePresentationInput(text, silentResumeCompleted: self.realtime.hasCompletedSilentResume(for: id))
+                    self.handlePresentationInput(text, silentResumeCompleted: self.realtime.hasCompletedSilentResume(for: id),
+                        greetingHandoffAllowed: self.realtime.isCurrentLiveAudioItem(id))
                 }
                 self.lastGuestUtterance = (id, text, Date(), self.connectionEpoch)
             }
@@ -350,7 +351,7 @@ struct PicoMeetingRecord: Codable {
             let label = $0.role == "other" ? "participant" : ($0.delivery == "locally_rendered" ? "Pico locally rendered reply" : "Pico generated or interrupted reply; playback not verified")
             return "\(label): \($0.text)"
         }.joined(separator: "\n")
-        memoryStatus = memoryEnabled ? "会按问题检索 Telos 记忆" : "本场不使用 Telos 记忆"
+        memoryStatus = memoryEnabled ? "会按问题检索 Pico 记忆" : "本场不使用 Pico 记忆"
         let directory = dataDir
         // The model can request only self-leave. Ending everyone is a local owner action.
         realtime.meetingFinish = exitBound && preparation.draft.automaticallyLeavesOnGoodbye ? { [weak self] audioItemID in
@@ -379,7 +380,7 @@ struct PicoMeetingRecord: Codable {
             } else { background = PicoMemoryResult(notes: []) }
             guard let self, !Task.isCancelled, self.active, self.allowAgent, self.connectionEpoch == epoch else { return }
             self.realtime.preparationContext = prepared + (useMemory ? "\nAPPROVED RELEVANT OWNER BACKGROUND (dated evidence, not commitments):\n" + background.json : "")
-            self.memoryStatus = useMemory ? "会前已读取 \(background.notes.count) 条相关背景；其他问题可继续检索" : "本场不使用 Telos 记忆"
+            self.memoryStatus = useMemory ? "会前已读取 \(background.notes.count) 条相关背景；其他问题可继续检索" : "本场不使用 Pico 记忆"
             if useMemory { self.addTurn(role: "memory", text: "会前相关记忆 ID：" + background.notes.map(\.id).joined(separator: ", "), id: UUID().uuidString) }
             self.realtime.start(brief: brief, history: history)
         }
@@ -438,7 +439,7 @@ struct PicoMeetingRecord: Codable {
             self.startConversation()
         }
     }
-    func handlePresentationInput(_ text: String, silentResumeCompleted: Bool = false) {
+    func handlePresentationInput(_ text: String, silentResumeCompleted: Bool = false, greetingHandoffAllowed: Bool = false) {
         if scripted.isConfigured {
             lastDiscussion = String(text.prefix(300))
             let lower = text.lowercased()
@@ -448,6 +449,11 @@ struct PicoMeetingRecord: Codable {
             if pause { resumeScriptAfterReconnect = false; scripted.pause() }
             else if continuing {
                 interruptPlayback(); realtime.suppressReplyForPresentationResume(); scripted.resume(continuePastReplyWait: true)
+            } else if greetingHandoffAllowed && waitingForGreetingAnswer && Self.isSimpleGreetingAnswer(text) {
+                // The configured share introduction owns this transition. Cancel an
+                // automatic reply even if it started before the final ASR arrived.
+                interruptPlayback(); realtime.suppressReplyForPresentationResume(); scripted.resume(continuePastReplyWait: true)
+                trace("greeting_reply_handoff scope=opening")
             } else if holding { scripted.holdForQuestion() }
             else if silentResumeCompleted {
                 // This exact audio turn already completed an applied, silent resume.
@@ -487,6 +493,25 @@ struct PicoMeetingRecord: Codable {
     }
     private static func normalizedSpeech(_ text: String) -> String {
         text.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(String.init).joined()
+    }
+    private var waitingForGreetingAnswer: Bool {
+        guard scripted.running, !scripted.isPaused, !scripted.waitingForQuestion,
+              scripted.currentPhase == .opening, scripted.waitingForReply,
+              let cursor = scripted.cursor, let opening = scripted.script?.opening,
+              cursor.chunkIndex > 0, cursor.chunkIndex <= opening.count else { return false }
+        let question = opening[cursor.chunkIndex - 1].text.lowercased()
+        return ["你今天怎么样", "今天怎么样", "你最近怎么样", "你怎么样", "忙不忙", "忙吗", "忙不", "还好吗", "how are you", "how's your day", "how is your day", "are you busy"].contains(where: question.contains)
+    }
+    static func isSimpleGreetingAnswer(_ text: String) -> Bool {
+        let lower = text.lowercased().replacingOccurrences(of: "’", with: "'").trimmingCharacters(in: .whitespacesAndNewlines)
+        // Full utterance matching deliberately preserves questions, quotes and mixed
+        // requests. A greeting followed by a real question still needs its answer.
+        let english = lower.trimmingCharacters(in: CharacterSet(charactersIn: ".! "))
+        if ["i'm good", "i am good", "i'm fine", "i am fine", "not bad", "i'm not busy", "i am not busy", "not busy", "good", "fine"].contains(english) { return true }
+        var chinese = lower.unicodeScalars.filter { !CharacterSet.whitespacesAndNewlines.contains($0) && !CharacterSet(charactersIn: ",，.。!！、").contains($0) }.map(String.init).joined()
+        for filler in ["嗯", "哦", "呃"] where chinese.hasPrefix(filler) { chinese.removeFirst(filler.count); break }
+        for ending in ["吧", "啊", "呀"] where chinese.hasSuffix(ending) { chinese.removeLast(ending.count); break }
+        return ["还行", "我还行", "挺好", "挺好的", "很好", "很好的", "还好", "我还好", "还不错", "今天还好", "今天还不错", "今天挺好", "不忙", "我不忙", "好", "好的"].contains(chinese)
     }
     static func isBriefAcknowledgement(_ text: String) -> Bool {
         ["嗯", "嗯嗯", "好", "好的", "可以", "可以啊", "嗯可以啊", "行", "行啊", "ok", "okay", "yes", "sure"].contains(normalizedSpeech(text))
@@ -738,11 +763,31 @@ struct PicoMeetingRecord: Codable {
                 guard !Task.isCancelled, self.exitOperation == operation else { return }
                 _ = self.exitFlow.complete(epoch: epoch, success: false, message: error.localizedDescription)
                 self.exitTask = nil; self.exitingZoom = false
+                let message = "未能确认退出 Zoom：" + error.localizedDescription + " Pico 已停止并保存，请在 Zoom 中检查。"
+                self.addTurn(role: "system", text: message, id: UUID().uuidString)
                 self.finish()
-                self.exitStatus = "未能确认退出 Zoom：" + error.localizedDescription + " Pico 已停止并保存，请在 Zoom 中检查。"
+                self.exitStatus = message
                 self.status = self.exitStatus
-                self.trace("meeting_exit_failed")
+                self.trace("meeting_exit_failed code=" + Self.exitFailureCode(error))
             }
+        }
+    }
+    private static func exitFailureCode(_ error: Error) -> String {
+        guard let failure = error as? ZoomMeetingExitDriver.Failure else { return "transport_or_accessibility" }
+        switch failure {
+        case .busy: return "busy"
+        case .cancelled: return "cancelled"
+        case .notBound: return "not_bound"
+        case .noMeeting: return "no_meeting"
+        case .identityUnavailable: return "identity_unavailable"
+        case .changedMeeting: return "changed_meeting"
+        case .ambiguousControl: return "ambiguous_control"
+        case .unrelatedDialog: return "unrelated_dialog"
+        case .handoffRequired: return "host_handoff_required"
+        case .handoffChoiceRequired: return "host_handoff_choice_required"
+        case .endForAllUnavailable: return "end_for_all_unavailable"
+        case .unconfirmedAction: return "unconfirmed_action"
+        case .timedOut: return "timed_out"
         }
     }
     func finish() {
@@ -945,6 +990,92 @@ struct PicoMeetingRecord: Codable {
         precondition(question.requestMeetingFarewell(audioItemID: "new-question").contains("false") && !question.exitFlow.pending,
                      "a genuine question after interruption must keep the meeting open")
         question.finish(); question.shutdown()
+    }
+    static func verifyGreetingHandoff() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("pico-greeting-handoff-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let script = PicoPresentationScript(deckURL: "https://slides.zoom.us/p/synthetic/10000", title: "Synthetic",
+            opening: [.init(id: "greeting", text: "你好，今天怎么样？", waitForReply: true, replyTimeoutSeconds: nil)],
+            shareIntro: [.init(id: "share-intro", text: "我准备了六页 Slides，我们边看边聊。")],
+            slides: [.init(number: 1, title: "Synthetic", chunks: [.init(text: "Synthetic fact.")])])
+        func prepare(_ controller: PicoMeetingController) throws {
+            controller.activateForMeetingLifecycleTesting(meetingID: UUID(), started: Date())
+            try controller.scripted.configure(script); controller.scripted.start()
+            var opening: PicoScriptSpeech?
+            controller.scripted.tick(canSpeak: true) { opening = $0; return true }
+            precondition(opening?.chunkID == "greeting")
+            controller.scripted.responseStarted(id: "greeting", scriptSpeechID: opening!.id)
+            controller.scripted.responseFinished(id: "greeting", completed: true, hasAudio: true)
+            controller.scripted.rendered(replyIDs: ["greeting"])
+            precondition(controller.waitingForGreetingAnswer)
+            controller.realtime.injectDiagnosticEvent(["type": "session.updated"])
+        }
+        let pcm = [Int16](repeating: 7000, count: 100).withUnsafeBytes { Data($0) }
+        for order in 0..<3 {
+            let flow = PicoMeetingController(dataDir: directory.appendingPathComponent("order-\(order)")) { _ in }
+            defer { flow.finish(); flow.shutdown() }
+            try prepare(flow)
+            var events: [[String: Any]] = []
+            flow.realtime.onSentEvent = { events.append($0) }
+            let item = "greeting-answer-\(order)", reply = "automatic-answer-\(order)"
+            flow.realtime.injectDiagnosticEvent(["type": "input_audio_buffer.speech_started", "item_id": item])
+            flow.realtime.injectDiagnosticEvent(["type": "input_audio_buffer.speech_stopped", "item_id": item])
+            func created() { flow.realtime.injectDiagnosticEvent(["type": "response.created", "response": ["id": reply]]) }
+            func audio() { flow.realtime.injectDiagnosticEvent(["type": "response.audio.delta", "response_id": reply, "delta": pcm.base64EncodedString()]) }
+            if order > 0 { created(); audio() }
+            if order == 2 {
+                flow.realtime.injectDiagnosticEvent(["type": "response.done", "response": ["id": reply, "status": "completed"]])
+                let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!, frameCapacity: 100)!
+                buffer.frameLength = 100
+                flow.audio.gate.render(100, into: UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList))
+                flow.advancePresentation()
+                precondition(flow.waitingForGreetingAnswer, "render completion before ASR must retain the opening reply boundary")
+            }
+            flow.realtime.injectDiagnosticEvent(["type": "conversation.item.input_audio_transcription.completed", "item_id": item, "transcript": "还行吧。"])
+            precondition(!flow.scripted.waitingForReply && !flow.scripted.waitingForAnswerPlayback && flow.audio.gate.bufferedSeconds == 0,
+                         "a greeting response must hand off without a second ordinary-answer or playback barrier")
+            flow.advancePresentation()
+            precondition(!events.contains { $0["type"] as? String == "response.create" }, "settle the automatic turn before requesting the scripted handoff")
+            if order == 0 { created() }
+            audio()
+            if order < 2 { flow.realtime.injectDiagnosticEvent(["type": "response.done", "response": ["id": reply, "status": "cancelled"]]) }
+            precondition(flow.audio.gate.bufferedSeconds == 0 && flow.realtime.canRequestTurn,
+                         "cancelled late automatic audio cannot repeat the sharing transition")
+            try await Task.sleep(nanoseconds: 650_000_000)
+            flow.advancePresentation(); flow.advancePresentation()
+            let requests = events.filter { $0["type"] as? String == "response.create" }
+            precondition(requests.count == 1, "exactly one application-owned sharing introduction must be requested")
+            flow.realtime.injectDiagnosticEvent(["type": "response.created", "response": ["id": "single-share-intro"]])
+            precondition(flow.realtime.scriptScope(for: "single-share-intro") != nil && flow.scripted.currentPhase == .shareIntro)
+        }
+        for text in ["还行，Pico 能帮我做什么？", "今天还好，你呢？", "我很忙，先别讲。"] {
+            let flow = PicoMeetingController(dataDir: directory.appendingPathComponent(UUID().uuidString)) { _ in }
+            defer { flow.finish(); flow.shutdown() }
+            try prepare(flow)
+            flow.realtime.injectDiagnosticEvent(["type": "input_audio_buffer.speech_started", "item_id": "real-question"])
+            flow.realtime.injectDiagnosticEvent(["type": "input_audio_buffer.speech_stopped", "item_id": "real-question"])
+            flow.realtime.injectDiagnosticEvent(["type": "conversation.item.input_audio_transcription.completed", "item_id": "real-question", "transcript": text])
+            precondition(flow.scripted.waitingForAnswerPlayback || flow.scripted.isPaused,
+                         "a real question or pause mixed into a greeting must retain its own flow")
+        }
+        let stale = PicoMeetingController(dataDir: directory.appendingPathComponent("stale")) { _ in }
+        defer { stale.finish(); stale.shutdown() }
+        try prepare(stale)
+        stale.realtime.injectDiagnosticEvent(["type": "input_audio_buffer.speech_started", "item_id": "fresh-question"])
+        stale.realtime.injectDiagnosticEvent(["type": "conversation.item.input_audio_transcription.completed", "item_id": "old-greeting", "transcript": "还行吧。"])
+        precondition(!stale.realtime.isCurrentLiveAudioItem("old-greeting") && stale.scripted.waitingForAnswerPlayback,
+                     "a stale greeting transcript must not silently resume a newer live turn")
+        let unrelated = PicoMeetingController(dataDir: directory.appendingPathComponent("outside-greeting")) { _ in }
+        defer { unrelated.finish(); unrelated.shutdown() }
+        unrelated.activateForMeetingLifecycleTesting(meetingID: UUID(), started: Date())
+        try unrelated.scripted.configure(.init(deckURL: script.deckURL, title: "Synthetic", opening: [.init(text: "你觉得这个项目怎么样？", waitForReply: true)], slides: script.slides))
+        unrelated.scripted.start()
+        var speech: PicoScriptSpeech?
+        unrelated.scripted.tick(canSpeak: true) { speech = $0; return true }
+        unrelated.scripted.responseStarted(id: "opinion", scriptSpeechID: speech!.id)
+        unrelated.scripted.responseFinished(id: "opinion", completed: true, hasAudio: true); unrelated.scripted.rendered(replyIDs: ["opinion"])
+        unrelated.handlePresentationInput("还行吧", greetingHandoffAllowed: true)
+        precondition(unrelated.scripted.waitingForAnswerPlayback, "other opening questions must not acquire greeting-only behavior")
     }
     static func verifyScriptedRecovery() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("pico-script-recovery-" + UUID().uuidString)
@@ -1167,7 +1298,7 @@ struct PicoMeetingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Pico, join the conversation").font(.title2)
-                Text("A relaxed 1-on-1 · Pico identifies itself as your AI representative. Audio and background go to Bailian. Handoff summaries use your configured text model. Records are saved in Telos.").font(.callout).foregroundStyle(.secondary)
+                Text("A relaxed 1-on-1 · Pico identifies itself as your AI representative. Audio and background go to Bailian. Handoff summaries use your configured text model. Records are saved in Pico.").font(.callout).foregroundStyle(.secondary)
                 Button("Bailian API key…") { BailianCredentialWindow.shared.show() }.disabled(controller.active || controller.connecting)
                 HStack {
                     Button(connectionCheck.running ? "停止检查" : "检查模型、知识和 10 分钟稳定性（不向会议播放）") {
@@ -1175,7 +1306,7 @@ struct PicoMeetingView: View {
                     }.disabled(controller.active || controller.connecting)
                 }
                 Text(connectionCheck.status.isEmpty ? "约 10 分钟，仅向百炼发送虚构测试资料；检查回复、记忆调用和空闲恢复，不开麦、不向会议发声。" : connectionCheck.status).font(.caption).foregroundStyle(.secondary)
-                Toggle("使用 Telos 记忆回答问题", isOn: $controller.memoryEnabled).disabled(controller.active || controller.connecting)
+                Toggle("使用 Pico 记忆回答问题", isOn: $controller.memoryEnabled).disabled(controller.active || controller.connecting)
                 Text("相关记忆会发送给百炼，并可能用于回答参会者。可在会前查看或排除不想分享的条目。").font(.caption).foregroundStyle(.secondary)
                 Button("查看用于会议的记忆…") { showMemory = true }.disabled(controller.active || controller.connecting)
                 if !controller.memoryStatus.isEmpty { Text(controller.memoryStatus).font(.caption).foregroundStyle(.secondary) }
@@ -1207,7 +1338,7 @@ struct PicoMeetingView: View {
                     get: { controller.preparation.draft.automaticallyLeavesOnGoodbye },
                     set: { controller.preparation.draft.leaveOnGoodbye = $0 }
                 )).disabled(controller.active || controller.connecting || controller.exitingZoom)
-                Text("介绍结束后仍保留共享和自由交流。只有明确结束整场对话，才会播完告别语后离会；不会自动结束其他人的会议。").font(.caption).foregroundStyle(.secondary)
+                Text("介绍结束后仍保留共享和自由交流；明确道别后播完告别语再离会。一对一会议中，若你是主持人，会先交接给对方；多人会议需你选择接任者。").font(.caption).foregroundStyle(.secondary)
                 Text(controller.status).font(.callout).textSelection(.enabled)
                 if let languageStatus = controller.spokenLanguageStatus { Text(languageStatus).font(.callout).textSelection(.enabled) }
                 if !controller.exitStatus.isEmpty && controller.exitStatus != controller.status { Text(controller.exitStatus).font(.caption).textSelection(.enabled) }

@@ -52,15 +52,38 @@ class ApprovalGate:
         self.reader = reader or self._read
         self.timeout = timeout
         self.lock = threading.Lock()
+        self.control_reader = None
+        self.execution_check = None
+        self._generation = 0
+        self._generation_lock = threading.RLock()
+    @property
+    def generation(self):
+        with self._generation_lock:
+            return self._generation
+    def invalidate_pending(self):
+        with self._generation_lock:
+            self._generation += 1
+    def read_reply(self, timeout, **match):
+        if self.control_reader is not None:
+            return self.control_reader(timeout, **match)
+        return self.reader(timeout)
+    def check_execution(self, generation=None):
+        if self.execution_check is not None:
+            self.execution_check()
+        if generation is not None and generation != self.generation:
+            raise ValueError('The user changed the conversation. The previous approval or plan is no longer valid; inspect current context before acting.')
     def _read(self, timeout):
         ready, _, _ = select.select([sys.stdin], [], [], timeout)
         if not ready: return None
         line = sys.stdin.readline()
         return json.loads(line) if line else None
     def ask(self, action, context):
+        self.check_execution()
+        generation = self.generation
         # Deep copy binds execution to the immutable reviewed payload, not mutable args.
         exact = copy.deepcopy(action)
         if self.auto_approve:
+            self.check_execution(generation)
             self.emit('auto_approved', action_hash=digest({'action':exact, 'context':context}),
                       app=exact.get('app', 'Task'), text=exact.get('reason', 'Task action'))
             return exact
@@ -75,20 +98,25 @@ class ApprovalGate:
                       expires_at=end, screenshot_path=context.get('screenshot_path'))
             try:
                 while time.time() < end:
-                    reply = self.reader(max(0, end-time.time()))
+                    if generation != self.generation: return None
+                    reply = self.read_reply(max(0, end-time.time()), approval_id=approval_id, action_hash=token,
+                                            cancelled=lambda: generation != self.generation)
                     if reply is None: return None
                     if reply.get('approval_id') != approval_id or reply.get('action_hash') != token:
                         continue
-                    if reply.get('decision') == 'approve' and time.time() < end: return exact
+                    if reply.get('decision') == 'approve' and time.time() < end:
+                        self.check_execution(generation)
+                        return exact
                     return None
                 return None
             finally:
                 self.emit('approval_resolved', approval_id=approval_id)
 
 class MacBridge:
-    def __init__(self, data_dir, task_dir, emit, gate=None, mac=None):
+    def __init__(self, data_dir, task_dir, emit, gate=None, mac=None, *, workspace=None):
         self.data_dir = Path(data_dir)
         self.task_dir = Path(task_dir)
+        self.workspace = Path(workspace) if workspace is not None else self.task_dir / 'files'
         self.emit = emit
         self.gate = gate or ApprovalGate(emit)
         self._mac = mac
@@ -97,6 +125,7 @@ class MacBridge:
         self.denied = set()
         self.approved_steps = []
         self.plan_expires = 0
+        self.plan_generation = self.gate.generation
         self.audit_path = self.task_dir / 'mac-actions.jsonl'
     @property
     def mac(self):
@@ -163,6 +192,8 @@ class MacBridge:
         with self.lock:
             return self._approve_plan(args)
     def _approve_plan(self, args):
+        generation = self.gate.generation
+        self.gate.check_execution(generation)
         steps=args.get('steps',[])
         if not isinstance(steps,list) or not 1 <= len(steps) <= 24:
             raise ValueError('A work plan must contain 1–24 exact steps.')
@@ -185,13 +216,15 @@ class MacBridge:
             self.denied.update(self.plan_signature(step) for step in exact_steps)
             self.audit('plan_denied',steps=len(exact_steps))
             return {'status':'denied','message':'User declined the plan. Stop; do not resubmit it as individual actions.'}
+        self.gate.check_execution(generation)
         self.approved_steps=[self.plan_signature(step) for step in approved['steps']]
         self.plan_expires=time.time()+1800
+        self.plan_generation=generation
         self.audit('plan_approved',steps=len(self.approved_steps),expires=self.plan_expires)
         return {'status':'approved','steps':len(self.approved_steps),
                 'next':('Execute the steps with mac_action and verify each result. Further requested actions are automatically approved.' if self.gate.auto_approve else 'Execute these exact steps with mac_action, observing before each one. Do not request approval again for unchanged steps. Changed or additional steps need approval.')}
     def consume_plan_step(self, action):
-        if time.time() >= self.plan_expires:
+        if time.time() >= self.plan_expires or self.plan_generation != self.gate.generation:
             self.approved_steps=[]
             return False
         signature=self.plan_signature(action)
@@ -199,8 +232,10 @@ class MacBridge:
         self.approved_steps.remove(signature)
         self.audit('plan_step_authorized',action_hash=signature,remaining=len(self.approved_steps))
         return True
-    def action(self, raw):
+    def action(self, raw, *, dispatch=None):
         with self.lock:
+            generation = self.gate.generation
+            self.gate.check_execution(generation)
             action=copy.deepcopy(raw)
             required=needs_approval(action)
             signature=digest({k:v for k,v in action.items() if k not in {'reason','observation_id'}})
@@ -236,6 +271,7 @@ class MacBridge:
                     self.audit('denied_or_expired',action_hash=digest(action))
                     return {'status':'denied','message':'User denied, cancelled, or approval expired. Do not retry this action without a new user request.'}
                 action=approved
+            self.gate.check_execution(generation)
             # Global lock serializes writes across tasks; a waiting approval holds no desktop lock.
             lock_path=self.data_dir/'mac-execution.lock'
             with lock_path.open('a') as lock_file:
@@ -248,11 +284,12 @@ class MacBridge:
                     self.observation=None
                     return {'status':'stale','message':'The target app changed. Nothing was executed. Observe and request fresh approval.'}
                 # snapshot resets the last screenshot; restore the exact reviewed coordinate map.
+                self.gate.check_execution(generation)
                 if previous['screenshot']:
                     self.mac._last_screenshot=previous['screenshot']
                 self.audit('executing',action=action,approved=required)
                 try:
-                    result=self.execute(action)
+                    result=(dispatch or self.execute)(action)
                 except Exception as e:
                     self.observation=None
                     self.audit('failed',error=str(e)[:300])
@@ -274,7 +311,7 @@ class MacBridge:
             env={k:v for k,v in os.environ.items() if not any(word in k.upper() for word in ('KEY','TOKEN','SECRET','PASSWORD'))}
             env.update(MACOS_HARNESS_TELEMETRY='0',ANONYMIZED_TELEMETRY='false',DO_NOT_TRACK='1')
             process=subprocess.Popen([sys.executable,'-m','macos_harness.cli'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,
-                                     cwd=self.task_dir/'files',env=env,start_new_session=True)
+                                     cwd=self.workspace,env=env,start_new_session=True)
             try: output,error=process.communicate(code,timeout=60)
             except subprocess.TimeoutExpired:
                 os.killpg(process.pid,signal.SIGTERM)

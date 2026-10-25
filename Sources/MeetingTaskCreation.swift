@@ -27,7 +27,7 @@ import Foundation
         meetings[meetingID] = session
         // A failure here must never be reported as task-creation failure (tasks already committed).
         do { try MeetingRepository(directory: dataDir.appendingPathComponent("meetings")).save(session) }
-        catch { self.error = "Tasks were created, but meeting links could not be saved. They will be recovered when Telos next opens." }
+        catch { self.error = "Tasks were created, but meeting links could not be saved. They will be recovered when Pico next opens." }
         return ids
     }
 }

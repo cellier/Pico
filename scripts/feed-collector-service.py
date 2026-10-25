@@ -14,7 +14,7 @@ def configuration(app,data):
     interpreter=Path(info['TelosPython'])
     if not interpreter.is_absolute():interpreter=resources/interpreter
     script=resources/'Backend/feed_collection.py'
-    if not interpreter.is_file() or not script.is_file():raise ValueError('Build Telos with the collector first')
+    if not interpreter.is_file() or not script.is_file():raise ValueError('Build Pico with the collector first')
     return {'Label':LABEL,'ProgramArguments':[str(interpreter),'-B','-u',str(script),'--data',str(data)],
             'RunAtLoad':True,'StartInterval':900,'ProcessType':'Background',
             'StandardOutPath':str(data/'feed-collector.log'),'StandardErrorPath':str(data/'feed-collector.log'),
@@ -23,7 +23,7 @@ def configuration(app,data):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=['install','uninstall','status'])
-    parser.add_argument('--app',type=Path,default=Path(__file__).resolve().parents[1]/'build/Telos.app')
+    parser.add_argument('--app',type=Path,default=Path(__file__).resolve().parents[1]/'build/Pico.app')
     parser.add_argument('--data',type=Path,default=Path.home()/'Library/Application Support/Telos')
     parser.add_argument('--dry-run',action='store_true');args=parser.parse_args()
     target=Path.home()/'Library/LaunchAgents'/f'{LABEL}.plist'

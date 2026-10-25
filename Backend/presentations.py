@@ -68,7 +68,7 @@ class Presentations:
  def runtime(self):
   candidates=[ROOT/'presentation-runtime.json',ROOT.parent/'.runtime/presentation-runtime.json']
   config=next((p for p in candidates if p.exists()),None)
-  if not config: raise ValueError('Presentation runtime missing. Run scripts/configure-presentations.py and rebuild Telos.')
+  if not config: raise ValueError('Presentation runtime missing. Run scripts/configure-presentations.py and rebuild Pico.')
   values=json.loads(config.read_text())
   if not all(Path(values[k]).exists() for k in ('node','modules','python','skill')): raise ValueError('Presentation runtime moved or is unavailable. Reconfigure it before generating a deck.')
   return config,values

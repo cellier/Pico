@@ -214,7 +214,7 @@ import PaperKit
     private func fail(_ text: String) { cancelWork(); message = text }
     func undo() { guard !busy else { return }; window?.makeFirstResponder(nil); editUndoManager.undo(); objectWillChange.send() }
     func redo() { guard !busy else { return }; window?.makeFirstResponder(nil); editUndoManager.redo(); objectWillChange.send() }
-    /// Copies the marked-up image, saves it to the Desktop as `<time>.png`, then closes.
+    /// Copies the marked-up image, saves it in Pico Files as `<time>.png`, then closes.
     func done() {
         let captured = Date()
         export { [weak self] data in
@@ -223,16 +223,16 @@ import PaperKit
             guard item.setData(data,forType:.png), item.setData(tiff,forType:.tiff) else { throw CocoaError(.fileWriteUnknown) }
             NSPasteboard.general.clearContents()
             guard NSPasteboard.general.writeObjects([item]) else { throw CocoaError(.fileWriteUnknown) }
-            try data.write(to:Self.desktopURL(for:captured),options:.withoutOverwriting)
+            try data.write(to:Self.outputURL(for:captured),options:.withoutOverwriting)
             self?.close()
         }
     }
-    static func desktopURL(for date: Date, in folder: URL? = nil) -> URL {
-        let desktop = folder ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
+    static func outputURL(for date: Date, in folder: URL? = nil) throws -> URL {
+        let directory = try folder ?? PicoFileStorage.exportDirectory("Screenshots")
         let formatter = DateFormatter(); formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
         let stem = formatter.string(from:date)
-        var url = desktop.appendingPathComponent("\(stem).png"), index = 2
-        while FileManager.default.fileExists(atPath:url.path) { url = desktop.appendingPathComponent("\(stem) \(index).png"); index += 1 }
+        var url = directory.appendingPathComponent("\(stem).png"), index = 2
+        while FileManager.default.fileExists(atPath:url.path) { url = directory.appendingPathComponent("\(stem) \(index).png"); index += 1 }
         return url
     }
     func close() { window?.close() }
@@ -269,7 +269,7 @@ private struct ScreenshotEditorView: View {
                     Spacer()
                     Button(action:editor.done) {
                         Text("Done").font(.system(size:14,weight:.medium)).frame(width:72,height:36).contentShape(Capsule())
-                    }.buttonStyle(.plain).help("Copy and save to Desktop (⌘↩)").keyboardShortcut(.return,modifiers:.command)
+                    }.buttonStyle(.plain).help("Copy and save to Pico Files (⌘↩)").keyboardShortcut(.return,modifiers:.command)
                         .inputGlass().disabled(editor.busy)
                 }.padding(.horizontal,12)
                 if #available(macOS 26.0, *), let session = editor.markupSession as? PaperScreenshotSession {

@@ -135,7 +135,7 @@ struct RecordingStopBar: View {
                 Text("Saving…").font(.system(size: 16, weight: .medium)).foregroundStyle(.secondary)
             case .saved:
                 Image(systemName: "checkmark.circle").font(.system(size: 19, weight: .medium)).foregroundStyle(.green)
-                Text("Saved to Desktop · Copied").font(.system(size: 15, weight: .medium))
+                Text("Saved to Pico Files · Copied").font(.system(size: 15, weight: .medium))
             }
         }
         .padding(.leading, 18).padding(.trailing, 14).frame(height: 50)
@@ -208,7 +208,7 @@ final class RecordingStopPanel: NSPanel {
         level = .statusBar; hidesOnDeactivate = false; isReleasedWhenClosed = false; animationBehavior = .none
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         sharingType = .none
-        title = "Telos Recording Controls"
+        title = "Pico Recording Controls"
         if #available(macOS 26, *) {
             let view = RecordingGlassView(rootView: RecordingStopBar(model: model, nativeGlass: true))
             contentView = view
@@ -253,7 +253,7 @@ final class RecordingStopPanel: NSPanel {
         window.level = .popUpMenu
         window.hidesOnDeactivate = false; window.isReleasedWhenClosed = false; window.animationBehavior = .none
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        window.title = "Telos Camera"
+        window.title = "Pico Camera"
         window.contentView = CameraBubbleView(frame: NSRect(x: 0, y: 0, width: side, height: side), session: session)
     }
     /// Switches the live feed to another camera without closing the bubble.

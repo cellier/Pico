@@ -1,7 +1,7 @@
 import AppKit
 import QuartzCore
 
-/// AppKit owns the view's backing-layer geometry. Rotate a separate local layer instead.
+/// Keep the static calendar's local image geometry independent of AppKit's host view.
 final class StatusActivityImageView: NSView {
     let rotationLayer = CALayer()
     var image: NSImage? { didSet { renderedKey = nil; refreshImage() } }
@@ -47,7 +47,7 @@ final class StatusActivityImageView: NSView {
         let key = "\(effectiveAppearance.name.rawValue):\(scale)"
         guard renderedKey != key else { return }
         renderedKey = key
-        let pixels = Int(18 * scale)
+        let pixels = Int(StatusCalendarIcon.side * scale)
         guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
@@ -55,8 +55,8 @@ final class StatusActivityImageView: NSView {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = context
             context.cgContext.scaleBy(x: scale, y: scale)
-            let rect = NSRect(x: 0, y: 0, width: 18, height: 18)
-            image.draw(in: rect)
+            let rect = NSRect(x: 0, y: 0, width: StatusCalendarIcon.side, height: StatusCalendarIcon.side)
+            image.draw(in: StatusCalendarIcon.fittedRect(for: image, in: rect))
             NSColor.labelColor.setFill(); rect.fill(using: .sourceIn)
             NSGraphicsContext.restoreGraphicsState()
         }
@@ -116,19 +116,17 @@ private final class StatusEventLabel: NSTextField {
     let iconView = StatusActivityImageView()
     let contentView = NSView()
     private var renderedImageKey = ""
-    private var animationTimer: Timer?
-    private var animationFrame = 0
     private(set) var renderedImageCount = 0
     private let marker = StatusEventMarker()
     private let timeLabel = StatusEventLabel(labelWithString: "")
     private let eventLabel = StatusEventLabel(labelWithString: "")
     private var count = 0
     private var event: CalendarMenuText?
+    private(set) var currentSymbolName = ""
     var iconFrame: NSRect { iconView.frame }
 
     init(button: NSButton) {
         self.button = button
-        iconView.image = button.image
         button.image = nil
         contentView.addSubview(iconView)
         iconView.setAccessibilityElement(false)
@@ -143,7 +141,15 @@ private final class StatusEventLabel: NSTextField {
         }
         contentView.addSubview(marker)
         marker.setAccessibilityElement(false)
+        updateDate()
         layout()
+    }
+    func updateDate(_ date: Date = Date(), timeZone: TimeZone = .autoupdatingCurrent) {
+        let name = StatusCalendarIcon.symbolName(for: date, timeZone: timeZone)
+        guard name != currentSymbolName else { return }
+        currentSymbolName = name
+        iconView.image = StatusCalendarIcon.image(for: date, timeZone: timeZone)
+        renderButtonImage()
     }
     static func runningCount(_ tasks: [Todo]) -> Int { tasks.filter { $0.status == "running" }.count }
     func setEvent(_ event: CalendarMenuText?, availableWidth: CGFloat = maximumEventWidth) -> CGFloat {
@@ -162,7 +168,9 @@ private final class StatusEventLabel: NSTextField {
         guard let button else { return }
         let width = width ?? button.bounds.width
         let showTitle = event != nil && width >= 80
-        iconView.frame = NSRect(x: showTitle ? 5 : (width - 16) / 2, y: (button.bounds.height - 16) / 2, width: 16, height: 16)
+        let side = StatusCalendarIcon.side
+        iconView.frame = NSRect(x: showTitle ? 13 - side / 2 : (width - side) / 2,
+                               y: (button.bounds.height - side) / 2, width: side, height: side)
         iconView.needsLayout = true
         marker.frame = NSRect(x: 28, y: (button.bounds.height - 9) / 2, width: 2, height: 9)
         marker.isHidden = !showTitle
@@ -182,20 +190,14 @@ private final class StatusEventLabel: NSTextField {
         guard let button, let source = iconView.image else { return }
         let size = contentView.frame.size
         guard size.width > 0, size.height > 0 else { return }
-        let key = "\(size):\(event?.time ?? ""):\(event?.title ?? ""):\(animationFrame)"
+        let key = "\(currentSymbolName):\(size):\(event?.time ?? ""):\(event?.title ?? "")"
         guard renderedImageKey != key else { return }
         renderedImageKey = key
         // Native status-button template images avoid AppKit recursively snapshotting
-        // appearance-changing subviews. Rebuild only when content or animation changes.
+        // appearance-changing subviews. Rebuild only when calendar content or size changes.
         let image = NSImage(size: size)
         image.lockFocus()
-        NSGraphicsContext.saveGraphicsState()
-        let transform = NSAffineTransform()
-        transform.translateX(by: iconView.frame.midX, yBy: iconView.frame.midY)
-        transform.rotate(byRadians: -CGFloat(min(animationFrame, 24)) / 24 * 2 * .pi)
-        transform.concat()
-        source.draw(in: NSRect(x: -8, y: -8, width: 16, height: 16))
-        NSGraphicsContext.restoreGraphicsState()
+        source.draw(in: StatusCalendarIcon.fittedRect(for: source, in: iconView.frame))
         if !marker.isHidden {
             NSColor.black.setFill()
             NSBezierPath(roundedRect: marker.frame, xRadius: 1, yRadius: 1).fill()
@@ -215,38 +217,19 @@ private final class StatusEventLabel: NSTextField {
     }
     private func updateAccessibility() {
         let activity = count > 0 ? " — \(count) tasks running" : ""
-        let text = "Telos" + activity + (event.map { " — " + $0.time + " · " + $0.title } ?? "")
+        let text = "Pico" + activity + (event.map { " — " + $0.time + " · " + $0.title } ?? "")
         button?.toolTip = text; button?.setAccessibilityLabel(text)
     }
-    func update(count: Int, reduceMotion: Bool) {
+    func update(count: Int, reduceMotion _: Bool) {
         self.count = count
         updateAccessibility()
         layout()
+        // Activity stays visible in the tooltip, while the calendar remains upright.
+        // No activity timer or bitmap rotation runs during tasks or meetings.
         let layer = iconView.rotationLayer
-        if count == 0 || reduceMotion {
-            animationTimer?.invalidate(); animationTimer = nil; animationFrame = 0
-            renderButtonImage()
-            layer.removeAnimation(forKey: Self.animationKey)
-        } else if animationTimer == nil {
-            let turn = CAKeyframeAnimation(keyPath: "transform.rotation.z")
-            // This NSView uses AppKit's unflipped coordinates: negative angles turn clockwise.
-            turn.values = [0, -Double.pi * 2, -Double.pi * 2]
-            turn.keyTimes = [0, 0.8, 1]
-            // One uninterrupted revolution: accelerate, coast to rest, then pause for 0.5 s.
-            turn.timingFunctions = [
-                CAMediaTimingFunction(controlPoints: 0.28, 0, 0.12, 1),
-                CAMediaTimingFunction(name: .linear)
-            ]
-            turn.duration = 2.5; turn.repeatCount = .infinity
-            layer.add(turn, forKey: Self.animationKey)
-            animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self, self.count > 0 else { return }
-                    self.animationFrame = (self.animationFrame + 1) % 30
-                    self.renderButtonImage()
-                }
-            }
-        }
+        layer.removeAnimation(forKey: Self.animationKey)
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
     }
-    deinit { animationTimer?.invalidate() }
 }

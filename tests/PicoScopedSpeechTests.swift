@@ -24,6 +24,63 @@ import Foundation
     private static func deleted(_ events: [[String: Any]]) -> [String] {
         events.filter { $0["type"] as? String == "conversation.item.delete" }.compactMap { $0["item_id"] as? String }
     }
+    private static func verifySafeProviderDiagnostics() {
+        let client = PicoRealtime(); var sent: [[String: Any]] = [], diagnostics: [String] = [], failures: [String] = []
+        client.onSentEvent = { sent.append($0) }; client.onDiagnosticEvent = { diagnostics.append($0) }
+        client.onError = { failures.append($0) }
+        ready(client)
+        precondition(client.requestSpokenTurn("SYNTHETIC_PRIVATE_PROMPT"))
+        let controls = sent.filter { $0["type"] as? String != "input_audio_buffer.append" }
+        let identifiers = controls.compactMap { $0["event_id"] as? String }
+        precondition(identifiers.count == controls.count && Set(identifiers).count == identifiers.count)
+        let request = controls.first { $0["type"] as? String == "response.create" }!["event_id"] as! String
+        client.append(Data([1, 2]))
+        precondition(sent.last?["event_id"] == nil, "audio packets must not fill the bounded control metadata map")
+        client.injectDiagnosticEvent(["type": "error", "event_id": "SERVER_EVENT_NOT_A_CLIENT_REFERENCE", "error": [
+            "event_id": request, "type": "invalid_request_error", "code": "invalid_value", "param": "response.create",
+            "message": "Cannot create response while another response is in progress. SYNTHETIC_PRIVATE_MESSAGE"]])
+        let correlated = diagnostics.last { $0.hasPrefix("provider_error ") }!
+        precondition(correlated.contains("param=response.create category=response_already_in_progress client_event=response.create"))
+        precondition(failures.isEmpty, "diagnostics must preserve the existing overlap warning behavior")
+        precondition(!diagnostics.joined().contains("SYNTHETIC_PRIVATE") && !diagnostics.joined().contains(request))
+        client.stop(); ready(client)
+        client.injectDiagnosticEvent(["type": "error", "event_id": request, "error": [
+            "event_id": request, "type": "SYNTHETIC_PRIVATE_TYPE", "code": "invalid value SYNTHETIC_PRIVATE_CODE",
+            "param": "SYNTHETIC_PRIVATE_PARAM", "message": "SYNTHETIC_PRIVATE_MESSAGE"]])
+        let cleared = diagnostics.last { $0.hasPrefix("provider_error ") }!
+        precondition(cleared.contains("code=provider_error type=unknown param=unknown category=other client_event=uncorrelated last_control=none"))
+        precondition(!cleared.contains("SYNTHETIC_PRIVATE") && failures.count == 1,
+                     "unknown failures stay fatal; adding diagnostic metadata must never swallow provider errors")
+        client.stop()
+
+        let toolClient = PicoRealtime(); var toolSent: [[String: Any]] = [], toolLog: [String] = []
+        toolClient.onSentEvent = { toolSent.append($0) }; toolClient.onDiagnosticEvent = { toolLog.append($0) }
+        toolClient.presentationControl = { _ in #"{"applied":true}"# }
+        ready(toolClient); created(toolClient, "diagnostic-tool")
+        done(toolClient, "diagnostic-tool", calls: [["type": "function_call", "name": "control_presentation",
+            "call_id": "diagnostic-call", "arguments": #"{"action":"pause"}"#]])
+        let outputID = toolSent.first { ($0["item"] as? [String: Any])?["type"] as? String == "function_call_output" }!["event_id"] as! String
+        toolClient.injectDiagnosticEvent(["type": "error", "error": ["event_id": outputID,
+            "type": "invalid_request_error", "code": "invalid_value", "param": "call_id", "message": "Synthetic tool error"]])
+        precondition(toolLog.last { $0.hasPrefix("provider_error ") }!.contains("client_event=conversation.item.create:function_call_output"),
+                     "a tool output failure must be distinguishable from its follow-up response.create")
+        toolClient.stop()
+
+        let bounded = PicoRealtime(); var boundedSent: [[String: Any]] = [], boundedLog: [String] = []
+        bounded.onSentEvent = { boundedSent.append($0) }; bounded.onDiagnosticEvent = { boundedLog.append($0) }
+        ready(bounded)
+        for index in 0..<90 {
+            precondition(bounded.requestSpokenTurn("Synthetic bounded-history check."))
+            created(bounded, "diagnostic-\(index)"); done(bounded, "diagnostic-\(index)")
+        }
+        let oldest = boundedSent.first!["event_id"] as! String
+        bounded.injectDiagnosticEvent(["type": "error", "event_id": oldest, "error": [
+            "event_id": oldest, "type": "invalid_request_error", "code": "invalid_value", "param": "item.id",
+            "message": "Synthetic unrelated invalid value"]])
+        precondition(boundedLog.last { $0.hasPrefix("provider_error ") }!.contains("client_event=uncorrelated"),
+                     "control references older than the 256-entry bound must be evicted")
+        bounded.stop()
+    }
     static func run() async {
         let client = PicoRealtime(), scope = UUID()
         var events: [[String: Any]] = [], starts: [(String, UUID?)] = []
@@ -272,6 +329,7 @@ import Foundation
             precondition(failures.count == 1 && !rejected.canRequestTurn, "wrong param or no actual sent cancellation must not swallow invalid_value")
             rejected.stop()
         }
+        verifySafeProviderDiagnostics()
         await PicoRealtime.verifyScopedRepairTimeout()
         print("PASS: temporary app items deleted once, local-only script scopes, late-ASR ordinary QA, VAD in-flight cancellation/one-shot answer repair, tool follow-up scopes, resume suppression, timeout pause, stale audio rejection and stop cleanup. No network, UI, keys or speech.")
     }

@@ -255,7 +255,7 @@ struct DictationActivation {
             return Target(editor: editor, element: nil, pid: ProcessInfo.processInfo.processIdentifier, range: editor.selectedRange(), axRange: nil)
         }
         guard AXIsProcessTrusted() else {
-            targetMessage = "Enable Accessibility for Telos in System Settings, then hold again"
+            targetMessage = "Enable Accessibility for Pico in System Settings, then hold again"
             return nil
         }
         guard let focused = focusedElement() else {
@@ -468,7 +468,7 @@ struct DictationActivation {
         hudGeneration = UUID(); let generation = hudGeneration
         if hud == nil {
             let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 56), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            panel.title = "Telos Voice Typing"
+            panel.title = "Pico Voice Typing"
             panel.isOpaque = false; panel.backgroundColor = .clear; panel.level = .statusBar
             panel.ignoresMouseEvents = true; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             let backdrop = NSVisualEffectView(frame: panel.contentView!.bounds); backdrop.material = .hudWindow; backdrop.state = .active

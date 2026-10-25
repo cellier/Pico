@@ -162,7 +162,7 @@ enum SelectionTranslationLayout {
 enum SelectionTranslationContext {
     static func prompt(source: String, translation: String, target: TranslationTarget, request: String) -> String {
         """
-        The user selected text on screen and Telos translated it into \(target == .english ? "English" : "Chinese").
+        The user selected text on screen and Pico translated it into \(target == .english ? "English" : "Chinese").
 
         Selected text:
         <<<

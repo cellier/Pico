@@ -551,8 +551,9 @@ class PhoneCancelled(Exception):
 
 
 class PhoneBridge:
-    def __init__(self, data, task_dir, gate, emit, *, enabled=True, lock_timeout=120):
+    def __init__(self, data, task_dir, gate, emit, *, enabled=True, lock_timeout=120, workspace=None):
         self.data, self.task_dir = Path(data), Path(task_dir)
+        self.workspace = Path(workspace) if workspace is not None else self.task_dir / 'files'
         self.gate, self.emit = gate, emit
         self.enabled = enabled
         self.lock_timeout = lock_timeout
@@ -588,7 +589,7 @@ class PhoneBridge:
                     acquired = True
                 except BlockingIOError:
                     if time.monotonic() >= end:
-                        raise PhoneBusy('Your iPhone is busy with another Telos task. Try again when it finishes.')
+                        raise PhoneBusy('Your iPhone is busy with another Pico task. Try again when it finishes.')
                     self.cancelled.wait(min(.1, max(0, end - time.monotonic())))
             self._check()
             yield
@@ -645,7 +646,7 @@ class PhoneBridge:
                     started = time.time()
                     result = next_call(exact_args)
                     try:
-                        return normalize_phone_images(result, self.task_dir / 'files', started)
+                        return normalize_phone_images(result, self.workspace, started)
                     except Exception:
                         # The phone action already ran: an image adapter failure
                         # must never report a failed action and encourage a retry.
@@ -688,5 +689,5 @@ class PhoneBridge:
 
 if __name__ == '__main__':
     if sys.argv[1:] != ['--phone-runner']:
-        raise SystemExit('This is Telos\'s internal phone runner.')
+        raise SystemExit('This is Pico\'s internal phone runner.')
     run_phone_runner()

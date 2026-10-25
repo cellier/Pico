@@ -51,7 +51,7 @@ enum BailianCredentialStore {
         var item = query(service: service, account: account)
         item[kSecValueData as String] = Data(key.utf8)
         item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        item[kSecAttrLabel as String] = "Telos · Bailian"
+        item[kSecAttrLabel as String] = "Pico · Bailian"
         let result = SecItemAdd(item as CFDictionary, nil)
         if result == errSecSuccess { sessionKeys.removeValue(forKey: account); return result }
         guard result == errSecDuplicateItem else { return result }
@@ -94,7 +94,7 @@ struct BailianSettingsView: View {
                         key = key.trimmingCharacters(in: .whitespacesAndNewlines)
                         failed = false
                         message = key.isEmpty ? "Key removed. Voice typing will use local recognition."
-                            : "Saved. Used by voice typing and Telos meeting features, including after restart."
+                            : "Saved. Used by voice typing and Pico meeting features, including after restart."
                     } catch {
                         failed = true; message = "Could not save. Check the key, workspace and local configuration."
                     }
@@ -115,7 +115,7 @@ struct BailianSettingsView: View {
                     let existing = await Task.detached { BailianCredentialStore.read(account: account.account, settings: storage) }.value
                     if let existing, !existing.isEmpty {
                         try settings.save(region: region, workspace: workspace, apiKey: existing)
-                        key = existing; message = "Existing key saved to Telos. No need to enter it again."
+                        key = existing; message = "Existing key saved to Pico. No need to enter it again."
                     } else { message = "Enter your key once and save. Future launches will reuse it." }
                 }
                 loaded = true
@@ -130,7 +130,7 @@ struct BailianSettingsView: View {
     func show() {
         if window == nil {
             let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 300), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            panel.title = "Telos · Bailian Settings"; panel.isReleasedWhenClosed = false
+            panel.title = "Pico · Bailian Settings"; panel.isReleasedWhenClosed = false
             panel.center(); window = panel
         }
         window?.contentView = NSHostingView(rootView: BailianSettingsView().padding(24))

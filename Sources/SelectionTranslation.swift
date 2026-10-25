@@ -320,7 +320,7 @@ struct TranslateButton: View {
     private func run() async {
         do {
             guard let endpoint = try settings.chatEndpoint() else {
-                failure = "Add your model API key in Telos Settings to translate."; return
+                failure = "Add your model API key in Pico Settings to translate."; return
             }
             // On DeepSeek, translate with the Pro model: in side-by-side tests it kept nuance that Flash
             // dropped, at about the same streaming speed. Fall back to the configured model if it is refused.
@@ -345,7 +345,7 @@ struct TranslateButton: View {
                 guard code == 400 || code == 403 || code == 404 || code == 422 else { break }
             }
             guard let bytes = stream else {
-                failure = code == 401 ? "The model API key was rejected. Check it in Telos Settings." : "Translation failed (HTTP \(code)). Try again."
+                failure = code == 401 ? "The model API key was rejected. Check it in Pico Settings." : "Translation failed (HTTP \(code)). Try again."
                 return
             }
             var raw = ""
@@ -459,7 +459,7 @@ struct TranslationPanelView: View {
         GlassGroup(spacing: 8) {
             HStack(spacing: 8) {
                 if let id = session.taskID {
-                    GlassSymbolButton(symbol: "arrow.up.forward", size: 36, pointSize: 13, help: "Open in Telos") { open(id) }
+                    GlassSymbolButton(symbol: "arrow.up.forward", size: 36, pointSize: 13, help: "Open in Pico") { open(id) }
                 }
                 Spacer(minLength: 0)
                 GlassSymbolButton(symbol: "xmark", size: 36, pointSize: 13, help: "Close", action: close)
@@ -474,7 +474,7 @@ struct TranslationPanelView: View {
             HStack(spacing: 8) {
                 GlassSymbolButton(symbol: "plus", size: 40, pointSize: 14, help: "Attach files", action: draft.chooseFiles)
                 HStack(spacing: 4) {
-                    AttachmentInput(draft: draft, placeholder: "Ask Telos", identifier: "translationAskField") { if canSend { submit() } }
+                    AttachmentInput(draft: draft, placeholder: "Ask Pico", identifier: "translationAskField") { if canSend { submit() } }
                     if draft.hasContent {
                         Button(action: submit) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 22)).foregroundStyle(.white) }
                             .buttonStyle(.plain).disabled(!canSend || draft.isComposing).opacity(canSend ? 1 : 0.4).accessibilityLabel("Send")
@@ -538,7 +538,7 @@ struct TranslationPanelView: View {
             if task.status == "running" || task.status == "awaiting_approval" {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text(task.status == "awaiting_approval" ? "Waiting for approval in Telos" : task.summary)
+                    Text(task.status == "awaiting_approval" ? "Waiting for approval in Pico" : task.summary)
                         .font(.system(size: 12)).foregroundStyle(.white.opacity(0.5)).lineLimit(1)
                 }.padding(.horizontal, 12)
             } else if ["error", "paused", "needs_input"].contains(task.status) {
@@ -630,7 +630,7 @@ private struct GlassSymbolButton: View {
 }
 
 /// Native clear Liquid Glass (Figma GLASS, no fill) on macOS 26; a material stand-in earlier or with Reduce Transparency.
-private struct GlassSurface<S: Shape>: ViewModifier {
+struct GlassSurface<S: Shape>: ViewModifier {
     let shape: S
     var interactive = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -638,13 +638,13 @@ private struct GlassSurface<S: Shape>: ViewModifier {
         if #available(macOS 26, *), !reduceTransparency {
             content.glassEffect(interactive ? .clear.interactive() : .clear, in: shape)
         } else {
-            content.background(Color(white: 0.2), in: shape)
+            content.background(TelosTheme.shade(0.94, 0.2), in: shape)
         }
     }
 }
 
 /// Lets neighboring glass shapes blend and morph together, as the system does.
-private struct GlassGroup<Content: View>: View {
+struct GlassGroup<Content: View>: View {
     let spacing: CGFloat
     @ViewBuilder let content: () -> Content
     var body: some View {
@@ -652,7 +652,7 @@ private struct GlassGroup<Content: View>: View {
     }
 }
 
-private struct PanelGlass: ViewModifier {
+struct PanelGlass: ViewModifier {
     let shape: RoundedRectangle
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     func body(content: Content) -> some View {
@@ -660,12 +660,12 @@ private struct PanelGlass: ViewModifier {
             // Frosted, untinted glass (the gradient's 16pt background blur); light so the cleared bottom reads as in the design.
             content.background { Color.clear.glassEffect(.regular, in: shape).environment(\.colorScheme, .light) }
         } else {
-            content.background(Color(white: 0.06), in: shape)
+            content.background(TelosTheme.shade(0.97, 0.06), in: shape)
         }
     }
 }
 
-private struct WindowDrag: ViewModifier {
+struct WindowDrag: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 15, *) { content.contentShape(Rectangle()).gesture(WindowDragGesture()) } else { content }
     }

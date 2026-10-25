@@ -7,6 +7,7 @@ import ApplicationServices
         print("PASS: Zoom Slides driver parsing and controlled operation regressions")
     }
     static func run() async throws {
+        try attributeCollectionFixtures()
         // Model CFEqual-equivalent wrappers with deliberate hash collisions. A UI
         // accessibility structure is a graph: children may repeat or point upward.
         final class GraphNode {
@@ -33,6 +34,7 @@ import ApplicationServices
         precondition(seen.count == 4)
 
         let target = ZoomSlidesDriver.Target(url: URL(string: "https://dg01slides.zoom.us/p/synthetic-deck/60000?from=slides")!, title: "Synthetic Meeting Presentation", totalSlides: 6)
+        try await attributeCollectionActionFixtures(target: target)
         precondition(target.documentID == "synthetic-deck")
         for url in ["http://dg01slides.zoom.us/p/deck/60000", "https://zoom.us.attacker.test/p/deck/60000", "https://slides.zoom.us.attacker.test/p/deck/60000", "https://user:pass@dg01slides.zoom.us/p/deck/60000", "https://dg01slides.zoom.us/not-a-deck/60000"] {
             precondition(ZoomSlidesDriver.documentID(URL(string: url)!) == nil, "invalid or credential-bearing targets must be rejected")
@@ -82,23 +84,46 @@ import ApplicationServices
         precondition(!ZoomSlidesDriver.permitsMissingAttribute("AXHelp", error: .cannotComplete), "do not swallow all optional-field communication errors")
         precondition(!ZoomSlidesDriver.permitsMissingAttribute("AXValue", error: .apiDisabled), "permission errors must never be swallowed")
         precondition(AXError.failure.rawValue == -25200 && AXError.attributeUnsupported.rawValue == -25205, "generic failure must not be mislabeled as unsupported")
-        precondition(!ZoomSlidesDriver.permitsMissingAttribute("AXDescription", error: .failure), "descriptor failures remain strict outside the separate evidence/role policy")
-        for advertised in [Optional<[String]>.none, ["AXRole", "AXChildren", "AXTitle", "AXDescription"]] {
-            precondition(ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: "AXTextArea", windowType: "share-picker", supportedAttributes: advertised), "observed picker AXTextArea.Description -25200 may omit only this non-action descriptor after single-read failure")
-            precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXTitle", error: .failure, role: "AXTextArea", windowType: "share-picker", supportedAttributes: advertised), "the observed exception must not silently expand to every descriptor")
+        precondition(!ZoomSlidesDriver.permitsMissingAttribute("AXDescription", error: .failure), "failed descriptors require a separate semantic-evidence policy")
+        for error in [AXError.failure, .notImplemented, .illegalArgument] {
+            for role in ["AXTextArea", "AXStaticText", "AXUnknown", "AXGroup", "AXScrollArea", "AXSplitGroup", "AXImage"] {
+                for advertised in [Optional<[String]>.none, ["AXRole", "AXChildren", "AXTitle", "AXDescription"]] {
+                    precondition(ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: error, role: role, supportedAttributes: advertised, childrenRead: true, identityRead: true), "passive metadata recovery depends on field responsibilities, not the enclosing window")
+                    precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXTitle", error: error, role: role, supportedAttributes: advertised, childrenRead: true, identityRead: true), "a primary semantic title cannot be discarded using the passive-description policy")
+                }
+                for (children, identity, identifier, hasURL, presentation) in [(false, true, "", false, false), (true, false, "", false, false), (true, true, "identity", false, false), (true, true, "", true, false), (true, true, "", false, true)] {
+                    precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: error, role: role, supportedAttributes: ["AXDescription"], childrenRead: children, identityRead: identity, identifier: identifier, hasURL: hasURL, presentationContent: presentation), "unread structure, identity and live document proof remain strict")
+                }
+            }
+            for role in ["AXButton", "AXCell", "AXRow", "AXWindow", "AXWebArea", "AXHeading", "AXCheckBox", "AXRadioButton", "AXTextField", "unknown"] {
+                precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: error, role: role, supportedAttributes: ["AXDescription"], childrenRead: true, identityRead: true), "hiding a control or proof label must not turn ambiguous evidence into a unique candidate")
+            }
         }
-        for role in ["AXButton", "AXCell", "AXRow", "AXWindow", "AXWebArea", "AXHeading", "AXGroup", "unknown"] {
-            precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: role, windowType: "share-picker", supportedAttributes: ["AXDescription"]), "errors on action, identity or container proof must remain failures")
-        }
-        for kind in ["main-meeting", "share-permissions", "permission-probe", "meeting-exit-dialog", "unknown"] {
-            precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: "AXTextArea", windowType: kind, supportedAttributes: nil), "the observed picker exception cannot authorize another window context")
-        }
-        precondition(ZoomSlidesDriver.permitsMissingDescriptor("AXTitle", error: .failure, role: "AXImage", windowType: "main-meeting", supportedAttributes: ["AXRole", "AXDescription"]), "a successful public names query independently proves a missing optional descriptor")
+        precondition(ZoomSlidesDriver.permitsMissingDescriptor("AXTitle", error: .failure, role: "AXImage", supportedAttributes: ["AXRole", "AXDescription"]), "a successful public names query independently proves a missing descriptor")
         for error in [AXError.apiDisabled, .cannotComplete, .invalidUIElement] {
-            precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: error, role: "AXTextArea", windowType: "share-picker", supportedAttributes: []), "permission, stale-object and messaging failures cannot be discarded using optional metadata")
+            precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: error, role: "AXTextArea", supportedAttributes: [], childrenRead: true, identityRead: true), "permission, stale-object and messaging failures cannot be discarded using optional metadata")
         }
         for attribute in ["AXRole", "AXChildren", "AXURL", "AXEnabled", "AXSelected", "AXIdentifier", "AXValue"] {
-            precondition(!ZoomSlidesDriver.permitsMissingDescriptor(attribute, error: .failure, role: "AXTextArea", windowType: "share-picker", supportedAttributes: []), "descriptor recovery must not weaken tree, document, control or state evidence")
+            precondition(!ZoomSlidesDriver.permitsMissingDescriptor(attribute, error: .failure, role: "AXTextArea", supportedAttributes: [], childrenRead: true, identityRead: true), "descriptor recovery must not weaken tree, document, control or state evidence")
+        }
+        for windowType in ["share-picker", "permission-probe", "share-permissions"] {
+            for role in ["AXTextArea", "AXList"] {
+                for identityRead in [false, true] {
+                    precondition(ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: role, supportedAttributes: ["AXDescription"], childrenRead: true, identityRead: identityRead, identifier: "opaque-zoom-metadata-id", windowType: windowType), "supplemental share-flow metadata must not depend on an empty or readable opaque identifier")
+                }
+                for identity in ["MeetingTopBarInfoButton", "zm.meeting.window.main", "zm.meeting.window.leave", "zm.meeting.window.leave.confirm"] {
+                    precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: role, supportedAttributes: ["AXDescription"], childrenRead: true, identityRead: true, identifier: identity, windowType: windowType), "known meeting identity/exit proof cannot become optional metadata")
+                }
+                for (children, hasURL, presentation) in [(false, false, false), (true, true, false), (true, false, true)] {
+                    precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: role, supportedAttributes: ["AXDescription"], childrenRead: children, identityRead: false, identifier: "opaque-zoom-metadata-id", hasURL: hasURL, presentationContent: presentation, windowType: windowType), "share-flow metadata recovery must not weaken structure or document evidence")
+                }
+            }
+            for role in ["AXButton", "AXCell", "AXRow", "AXRadioButton", "AXCheckBox", "AXWindow", "AXWebArea"] {
+                precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: role, supportedAttributes: ["AXDescription"], childrenRead: true, identityRead: false, windowType: windowType), "the sharing metadata exception must not include controls, candidate rows or document/window proof")
+            }
+        }
+        for windowType in ["main-meeting", "meeting-exit-dialog", "unknown"] {
+            precondition(!ZoomSlidesDriver.permitsMissingDescriptor("AXDescription", error: .failure, role: "AXList", supportedAttributes: ["AXDescription"], childrenRead: true, identityRead: true, identifier: "", windowType: windowType), "AXList descriptor recovery must stay confined to sharing metadata contexts")
         }
         precondition(ZoomSlidesDriver.permitsUnimplementedLeafChildren(role: "AXStaticText", singleError: .failure, countError: .failure))
         precondition(ZoomSlidesDriver.permitsUnimplementedLeafChildren(role: "AXButton", singleError: .notImplemented, countError: .failure))
@@ -208,6 +233,21 @@ import ApplicationServices
         fake.reportedMeetingID = "another-meeting"
         try await expectFailure(.meetingChanged) { _ = try await driver.readStatus() }
 
+        for openingReportsFailure in [false, true] {
+            let fourTabs = FakeZoomSlidesAXTransport(); fourTabs.fourTabPicker = true
+            if openingReportsFailure { fourTabs.failAfterEffect = [.press("share")] }
+            let modernDriver = ZoomSlidesDriver(transport: fourTabs, timeout: 1, pollInterval: 1_000_000, operationBudget: 3)
+            let modernShared = try await modernDriver.startSharing(target: target)
+            precondition(modernShared.sharing == .active && modernShared.currentSlide == 1 && modernShared.totalSlides == 6 && modernShared.documentID == target.documentID,
+                         "four-tab sharing must reach independently verified target document and audience page proof")
+            precondition(fourTabs.actions == [.press("share"), .press("files-outer"), .select("doc-row"), .press("file-share"), .press("present"), .press("persistent"), .press("confirm")],
+                         "the observed four-tab layout must press only outer Files, select the unique target and retain permission checks; an after-effect opening failure must not cause a second Share click")
+            let modernReadback = try await modernDriver.readStatus()
+            precondition(modernReadback.sharing == .active && modernReadback.documentID == target.documentID && modernReadback.currentSlide == 1)
+            precondition(fourTabs.presentOnly && !fourTabs.persistentAccess,
+                         "adapting the picker tabs must not change Present-only or persistent access safeguards")
+        }
+
         let stalled = FakeZoomSlidesAXTransport(); stalled.stage = .presenting; stalled.noPageProgress = true
         let bounded = ZoomSlidesDriver(transport: stalled, timeout: 0.04, pollInterval: 1_000_000, operationBudget: 0.04)
         _ = try await bounded.preflight(target: target)
@@ -308,6 +348,340 @@ import ApplicationServices
         catch let error as ZoomSlidesDriver.Failure { if case .timedOut = error {} else { throw error } }
         precondition(noTransition.actions.filter { $0 == .press("share") }.count == 1, "an unconfirmed dispatched press must never be repeated")
     }
+    /// Real public-AX decoding and BFS, backed only by deterministic in-memory
+    /// replies. These do not open a meeting or contact the placeholder AX PIDs.
+    static func attributeCollectionFixtures() throws {
+        precondition(AXError.failure.rawValue == -25200)
+        for singlePath in [false, true] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let state = try fixture.collect()
+            precondition(state.complete && state.windows.count == 1)
+            let nodes = state.windows[0].nodes
+            precondition(nodes.count == 7 && nodes.filter { $0.role == "AXUnknown" }.count == 1,
+                         "the affected structural node must remain in the complete snapshot")
+            let unknown = nodes.first { $0.role == "AXUnknown" }!
+            let child = nodes.first { $0.title == "Next" }!
+            precondition(unknown.description.isEmpty && child.parentID == unknown.id,
+                         "omitting a failed optional description must retain its actual descendants")
+            precondition(ZoomSlidesDriver.isMeeting(state.windows[0]), "existing semantic meeting proof must survive")
+            precondition(fixture.reads.contains("2:single:AXDescription") && fixture.reads.contains("2:names"))
+            precondition(fixture.advertisedDescription, "fixture must reproduce Zoom advertising the failing descriptor")
+            precondition(fixture.reads.firstIndex(of: "2:single:AXDescription")! > fixture.reads.firstIndex(of: "2:batch")!)
+            if singlePath {
+                for prerequisite in ["AXChildren", "AXIdentifier", "AXURL"] {
+                    precondition(fixture.reads.firstIndex(of: "2:single:" + prerequisite)! < fixture.reads.firstIndex(of: "2:single:AXDescription")!,
+                                 "the single fallback must establish structure and identity before descriptor recovery")
+                }
+            }
+            // Standard absent identity evidence is valid; a tolerated generic
+            // identity failure is not proof that the object has no identity.
+            let noIdentity = AttributeCollectionFixture(singlePath: singlePath)
+            noIdentity.fields[2].removeValue(forKey: "AXIdentifier")
+            noIdentity.fields[2].removeValue(forKey: "AXURL")
+            let withoutIdentity = try noIdentity.collect()
+            precondition(withoutIdentity.windows[0].nodes.count == 7)
+            let recoveredChildren = AttributeCollectionFixture(singlePath: singlePath)
+            recoveredChildren.failures[2]?["AXChildren"] = .failure
+            let recovered = try recoveredChildren.collect()
+            precondition(recovered.windows[0].nodes.count == 7,
+                         "a successful public children count/array recovery is structural evidence")
+            precondition(recoveredChildren.reads.contains("2:count") && recoveredChildren.reads.contains("2:values"))
+            for name in ["AXRole", "AXChildren", "AXURL", "AXEnabled", "AXSelected", "AXTitle"] {
+                let broken = AttributeCollectionFixture(singlePath: singlePath)
+                broken.failures[2]?[name] = .failure
+                if name == "AXChildren" { broken.countError = .failure }
+                try broken.expectReadFailure(attribute: name, code: .failure)
+            }
+            for name in ["AXRole", "AXChildren", "AXURL", "AXIdentifier", "AXEnabled", "AXSelected", "AXDescription"] {
+                for error in [AXError.apiDisabled, .cannotComplete, .invalidUIElement] {
+                    let broken = AttributeCollectionFixture(singlePath: singlePath)
+                    broken.failures[2]?[name] = error
+                    try broken.expectReadFailure(attribute: name, code: error)
+                }
+            }
+            let identityFailure = AttributeCollectionFixture(singlePath: singlePath)
+            identityFailure.failures[2]?["AXIdentifier"] = .failure
+            try identityFailure.expectReadFailure(attribute: "AXDescription", code: .failure)
+            for (field, value) in [("AXIdentifier", "MeetingTopBarInfoButton"), ("AXURL", "https://slides.zoom.us/p/test/60000")] {
+                let identified = AttributeCollectionFixture(singlePath: singlePath)
+                identified.fields[2][field] = value
+                try identified.expectReadFailure(attribute: "AXDescription", code: .failure)
+            }
+            for role in ["AXButton", "AXCell", "AXRow", "AXWebArea", "AXWindow", "AXHeading", "AXCheckBox", "AXRadioButton", "AXTextField"] {
+                let otherRole = AttributeCollectionFixture(singlePath: singlePath)
+                otherRole.fields[2]["AXRole"] = role
+                try otherRole.expectReadFailure(attribute: "AXDescription", code: .failure)
+            }
+            let otherParent = AttributeCollectionFixture(singlePath: singlePath)
+            otherParent.fields[1]["AXRole"] = "AXGroup"
+            let otherParentState = try otherParent.collect()
+            precondition(otherParentState.windows[0].nodes.count == 7, "a passive node remains passive under a different layout parent")
+            let otherWindow = AttributeCollectionFixture(singlePath: singlePath)
+            otherWindow.fields[0]["AXTitle"] = "Share screen window"
+            otherWindow.fields[0]["AXIdentifier"] = "picker"
+            let otherWindowState = try otherWindow.collect()
+            precondition(otherWindowState.windows[0].nodes.count == 7, "passive metadata recovery does not depend on the window kind")
+            for role in ["AXTextArea", "AXStaticText", "AXGroup", "AXScrollArea", "AXSplitGroup", "AXImage"] {
+                let passive = AttributeCollectionFixture(singlePath: singlePath)
+                passive.fields[2]["AXRole"] = role
+                let passiveState = try passive.collect()
+                precondition(passiveState.windows[0].nodes.count == 7, "passive description failures must retain all descendants")
+            }
+            let documentContent = AttributeCollectionFixture(singlePath: singlePath)
+            documentContent.fields[1]["AXRole"] = "AXWebArea"
+            try documentContent.expectReadFailure(attribute: "AXDescription", code: .failure)
+            let nestedDocumentContent = AttributeCollectionFixture(singlePath: singlePath)
+            nestedDocumentContent.fields[1]["AXRole"] = "AXWebArea"
+            let layout = nestedDocumentContent.handles.count
+            nestedDocumentContent.handles.append(AXUIElementCreateApplication(pid_t(900_000 + layout)))
+            nestedDocumentContent.fields.append(["AXRole": "AXGroup", "AXChildren": [nestedDocumentContent.handles[2]]])
+            nestedDocumentContent.fields[1]["AXChildren"] = [nestedDocumentContent.handles[layout]]
+            try nestedDocumentContent.expectReadFailure(attribute: "AXDescription", code: .failure)
+            let header = AttributeCollectionFixture(singlePath: singlePath)
+            header.failures[0] = ["AXDescription": .failure]
+            try header.expectReadFailure(attribute: "AXDescription", code: .failure)
+            let malformedIdentity = AttributeCollectionFixture(singlePath: singlePath)
+            malformedIdentity.fields[2]["AXIdentifier"] = NSNumber(value: 42)
+            try malformedIdentity.expectReadFailure(attribute: "AXIdentifier", code: .illegalArgument)
+            try permissionProbeFixtures(singlePath: singlePath)
+            try listDescriptorFixtures(singlePath: singlePath)
+            try sharingTextFixtures(singlePath: singlePath)
+            let cancelled = AttributeCollectionFixture(singlePath: singlePath)
+            var stop = false
+            cancelled.onNames = { stop = true }
+            do {
+                _ = try cancelled.collect(cancelled: { if stop { throw ZoomSlidesDriver.Failure.cancelled } })
+                preconditionFailure("cancellation must discard a partial snapshot")
+            } catch let error as ZoomSlidesDriver.Failure { precondition(error == .cancelled) }
+            precondition(!cancelled.reads.contains("6:batch"), "cancellation must prevent descendant reads")
+            let expired = AttributeCollectionFixture(singlePath: singlePath)
+            do { _ = try expired.collect(deadline: Date().addingTimeInterval(-1)); preconditionFailure("expired read accepted") }
+            catch let error as ZoomSlidesDriver.Failure { if case .timedOut = error {} else { throw error } }
+            precondition(expired.reads.isEmpty)
+        }
+    }
+    static func listDescriptorFixtures(singlePath: Bool) throws {
+        for question in [false, true] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let indices = fixture.addUntitledListWindow(question: question)
+            let state = try fixture.collect()
+            precondition(state.complete && state.windows.count == (question ? 2 : 1))
+            precondition(fixture.reads.contains("\(indices.list):single:AXDescription") && fixture.reads.contains("\(indices.list):names"),
+                         "reproduce the real permission-probe node 2 AXList public descriptor failure, including advertised AXDescription")
+            precondition(fixture.reads.contains("\(indices.child):batch"), "a failed supplemental list description must never hide its child subtree")
+            if question {
+                let nodes = state.windows[1].nodes
+                let list = nodes.first { $0.role == "AXList" }!
+                precondition(list.description.isEmpty && nodes.contains { $0.parentID == list.id && $0.value == "How do you want to share?" },
+                             "the permission question must come from preserved successfully read child text, not inferred missing metadata")
+            }
+        }
+        for role in ["AXButton", "AXCell", "AXRow"] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let indices = fixture.addUntitledListWindow(question: true)
+            fixture.fields[indices.list]["AXRole"] = role
+            try fixture.expectReadFailure(attribute: "AXDescription", code: .failure)
+        }
+        let brokenTree = AttributeCollectionFixture(singlePath: singlePath)
+        let brokenList = brokenTree.addUntitledListWindow(question: true).list
+        brokenTree.failures[brokenList]?["AXChildren"] = .failure; brokenTree.countError = .failure
+        try brokenTree.expectReadFailure(attribute: "AXChildren", code: .failure)
+        let linked = AttributeCollectionFixture(singlePath: singlePath)
+        let linkedList = linked.addUntitledListWindow(question: true).list
+        linked.fields[linkedList]["AXURL"] = "https://slides.zoom.us/p/identity/60000"
+        try linked.expectReadFailure(attribute: "AXDescription", code: .failure)
+        let unreadURL = AttributeCollectionFixture(singlePath: singlePath)
+        let unreadList = unreadURL.addUntitledListWindow(question: true).list
+        unreadURL.failures[unreadList]?["AXURL"] = .failure
+        try unreadURL.expectReadFailure(attribute: "AXURL", code: .failure)
+        let exit = AttributeCollectionFixture(singlePath: singlePath)
+        _ = exit.addUntitledListWindow(question: true)
+        exit.fields[exit.windows.last!]["AXIdentifier"] = "zm.meeting.window.leave"
+        do { _ = try exit.collect(includeExitDialogs: true); preconditionFailure("an exit-dialog list must not inherit sharing metadata recovery") }
+        catch let issue as ZoomSlidesSnapshotReadIssue {
+            precondition(issue.code == .failure && issue.failure.localizedDescription.contains("AXDescription") && issue.failure.localizedDescription.contains("windowType meeting-exit-dialog"))
+        }
+    }
+    static func permissionProbeFixtures(singlePath: Bool) throws {
+        for code in [AXError.failure, .notImplemented, .illegalArgument] {
+            for childrenAbsent in [false, true] {
+                for question in [false, true] {
+                    let fixture = AttributeCollectionFixture(singlePath: singlePath)
+                    let text = fixture.addUntitledWindow(question: question, descriptorError: code)
+                    if childrenAbsent { fixture.fields[text].removeValue(forKey: "AXChildren") }
+                    let state = try fixture.collect()
+                    precondition(state.complete && state.windows.count == (question ? 2 : 1), "missing passive metadata must neither abort an unrelated popover nor invent a permission question")
+                    precondition(ZoomSlidesDriver.isMeeting(state.windows[0]))
+                    precondition(fixture.reads.contains("\(text):single:AXDescription") && fixture.reads.contains("\(text):names"), "reproduce the failed public single read even when Zoom advertises AXDescription")
+                    if question {
+                        precondition(state.windows[1].nodes.contains { $0.role == "AXTextArea" && $0.value == "How do you want to share?" }, "only successfully read exact question text may classify the permission pane")
+                    }
+                }
+            }
+        }
+        // Batch null, standard noValue and standard unsupported leaf children all
+        // establish an empty leaf; generic tree errors do not establish absence.
+        for absence in [AXError.noValue, .attributeUnsupported] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let text = fixture.addUntitledWindow(question: false)
+            fixture.failures[text]?["AXChildren"] = absence
+            fixture.failures[text]?["AXIdentifier"] = absence
+            fixture.failures[text]?["AXURL"] = absence
+            let state = try fixture.collect()
+            precondition(state.complete && state.windows.count == 1)
+        }
+        for name in ["AXRole", "AXChildren", "AXURL", "AXIdentifier", "AXDescription"] {
+            for error in [AXError.apiDisabled, .cannotComplete, .invalidUIElement] {
+                let fixture = AttributeCollectionFixture(singlePath: singlePath)
+                let text = fixture.addUntitledWindow(question: false)
+                fixture.failures[text]?[name] = error
+                do { _ = try fixture.collect(); preconditionFailure("permission or messaging error was swallowed in permission-probe") }
+                catch let issue as ZoomSlidesSnapshotReadIssue {
+                    precondition(issue.code == error && issue.failure.localizedDescription.contains(name))
+                    precondition(issue.failure.localizedDescription.contains("windowType permission-probe，node 2，parentRole AXWindow"), "cover the exact reported failing location")
+                }
+            }
+        }
+        let identity = AttributeCollectionFixture(singlePath: singlePath)
+        let identifiedText = identity.addUntitledWindow(question: false)
+        identity.fields[identifiedText]["AXIdentifier"] = "opaque-text-identifier"
+        let identifiedState = try identity.collect()
+        precondition(identifiedState.windows.count == 1, "an opaque text identifier does not turn an unrelated popover into a permission pane")
+        let linkedIdentity = AttributeCollectionFixture(singlePath: singlePath)
+        let linkedText = linkedIdentity.addUntitledWindow(question: false)
+        linkedIdentity.fields[linkedText]["AXURL"] = "https://slides.zoom.us/p/identity/60000"
+        try linkedIdentity.expectReadFailure(attribute: "AXDescription", code: .failure)
+        let uncertainIdentity = AttributeCollectionFixture(singlePath: singlePath)
+        let text = uncertainIdentity.addUntitledWindow(question: false)
+        uncertainIdentity.failures[text]?["AXIdentifier"] = .failure
+        let uncertainState = try uncertainIdentity.collect()
+        precondition(uncertainState.windows.count == 1, "an optional identifier failure must not make unrelated supplemental text fatal")
+        let uncertainChildren = AttributeCollectionFixture(singlePath: singlePath)
+        let child = uncertainChildren.addUntitledWindow(question: false)
+        uncertainChildren.failures[child]?["AXChildren"] = .failure
+        uncertainChildren.countError = .failure
+        try uncertainChildren.expectReadFailure(attribute: "AXChildren", code: .failure)
+        let uncertainURL = AttributeCollectionFixture(singlePath: singlePath)
+        let linked = uncertainURL.addUntitledWindow(question: false)
+        uncertainURL.failures[linked]?["AXURL"] = .failure
+        try uncertainURL.expectReadFailure(attribute: "AXURL", code: .failure)
+    }
+    static func sharingTextFixtures(singlePath: Bool) throws {
+        for identifierMode in ["opaque", "generic-failure", "absent"] {
+            for childrenAbsent in [false, true] {
+                for emptyURL in [false, true] {
+                    let fixture = AttributeCollectionFixture(singlePath: singlePath)
+                    let picker = fixture.addSharePicker()
+                    switch identifierMode {
+                    case "generic-failure": fixture.failures[picker.text]?["AXIdentifier"] = .failure
+                    case "absent": fixture.fields[picker.text].removeValue(forKey: "AXIdentifier")
+                    default: break
+                    }
+                    if childrenAbsent { fixture.fields[picker.text].removeValue(forKey: "AXChildren") }
+                    if emptyURL {
+                        fixture.fields[picker.text]["AXURL"] = ""
+                        fixture.failures[picker.text]?.removeValue(forKey: "AXURL")
+                    }
+                    let state = try fixture.collect()
+                    let window = state.windows.first { $0.title == "Share screen window" }!
+                    let text = window.nodes.first { $0.role == "AXTextArea" }!
+                    let parent = window.nodes.first { $0.id == text.parentID }!
+                    precondition(state.complete && parent.role == "AXGroup" && text.description.isEmpty)
+                    precondition(text.title == "Share picker help" && text.value == "Choose a file to present", "successful primary text must survive supplemental-description recovery")
+                    precondition(text.identifier == (identifierMode == "opaque" ? "opaque-zoom-share-text" : ""), "keep a successful opaque identity without inventing one after a failed read")
+                    if emptyURL { precondition(text.url == "", "exercise an actual successful empty URL, independently of standard unsupported URL reads") }
+                    if !childrenAbsent {
+                        precondition(window.nodes.contains { $0.parentID == text.id && $0.value == "Selecting a file does not begin sharing" }, "the observed AXTextArea has one actual child; the failed metadata must not hide it")
+                    }
+                    precondition(window.nodes.contains { $0.role == "AXCell" && $0.description.hasPrefix("Slides, Synthetic Meeting Presentation,") }, "a repaired text node must retain the complete target-file subtree")
+                }
+            }
+        }
+        for field in ["AXURL", "AXChildren"] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let picker = fixture.addSharePicker()
+            fixture.failures[picker.text]?[field] = .failure
+            if field == "AXChildren" { fixture.countError = .failure }
+            try fixture.expectReadFailure(attribute: field, code: .failure)
+        }
+        for role in ["AXButton", "AXRow", "AXCell", "AXWebArea"] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let picker = fixture.addSharePicker()
+            fixture.fields[picker.text]["AXRole"] = role
+            try fixture.expectReadFailure(attribute: "AXDescription", code: .failure)
+        }
+        for url in ["https://slides.zoom.us/p/other/60000" as Any, NSNumber(value: 42)] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let picker = fixture.addSharePicker()
+            fixture.fields[picker.text]["AXURL"] = url
+            fixture.failures[picker.text]?.removeValue(forKey: "AXURL")
+            try fixture.expectReadFailure(attribute: "AXDescription", code: .failure)
+        }
+        let presentation = AttributeCollectionFixture(singlePath: singlePath)
+        let picker = presentation.addSharePicker()
+        presentation.fields[picker.group]["AXRole"] = "AXWebArea"
+        try presentation.expectReadFailure(attribute: "AXDescription", code: .failure)
+        for identity in ["MeetingTopBarInfoButton", "zm.meeting.window.main", "zm.meeting.window.leave.confirm"] {
+            let fixture = AttributeCollectionFixture(singlePath: singlePath)
+            let picker = fixture.addSharePicker()
+            fixture.fields[picker.text]["AXIdentifier"] = identity
+            try fixture.expectReadFailure(attribute: "AXDescription", code: .failure)
+        }
+        let exitProfile = AttributeCollectionFixture(singlePath: singlePath)
+        let exitPicker = exitProfile.addSharePicker()
+        exitProfile.failures[exitPicker.text]?["AXIdentifier"] = .failure
+        let exitState = try exitProfile.collect(includeExitDialogs: true)
+        precondition(exitState.complete && exitState.windows.contains { $0.title == "Share screen window" && $0.nodes.contains { $0.value == "Selecting a file does not begin sharing" } }, "the exit profile must retain all sharing help children despite the same optional metadata failure")
+        let unrelatedExitPopover = AttributeCollectionFixture(singlePath: singlePath)
+        let popoverText = unrelatedExitPopover.addUntitledWindow(question: false)
+        unrelatedExitPopover.failures[popoverText]?["AXIdentifier"] = .failure
+        let popoverState = try unrelatedExitPopover.collect(includeExitDialogs: true)
+        precondition(popoverState.complete && popoverState.windows.count == 1, "an unrelated help popover must not prevent leaving the bound meeting")
+        let strictExit = AttributeCollectionFixture(singlePath: singlePath)
+        let hostText = strictExit.addSharePicker()
+        strictExit.fields[hostText.window]["AXTitle"] = ""
+        strictExit.fields[hostText.window]["AXIdentifier"] = "zm.meeting.window.leave"
+        strictExit.failures[hostText.text]?["AXIdentifier"] = .failure
+        do {
+            _ = try strictExit.collect(includeExitDialogs: true)
+            preconditionFailure("actual exit-dialog and host-handoff text must remain strict")
+        } catch let issue as ZoomSlidesSnapshotReadIssue {
+            precondition(issue.code == .failure && issue.failure.localizedDescription.contains("AXDescription"))
+        }
+    }
+    static func attributeCollectionActionFixtures(target: ZoomSlidesDriver.Target) async throws {
+        for duplicateRows in [false, true] {
+            let transport = CollectedPickerTransport(duplicateRows: duplicateRows)
+            let driver = ZoomSlidesDriver(transport: transport, timeout: 0.05, pollInterval: 1_000_000, operationBudget: 0.2)
+            _ = try await driver.preflight(target: target)
+            if duplicateRows {
+                do { _ = try await driver.startSharing(target: target); preconditionFailure("duplicate collected rows must not authorize sharing") }
+                catch let failure as ZoomSlidesDriver.Failure { if case .unavailable = failure {} else { throw failure } }
+                precondition(transport.base.actions == [.press("share"), .key("switch", 124)], "duplicate target rows must dispatch neither row selection nor a footer share")
+            } else {
+                let snapshot = try await driver.startSharing(target: target)
+                precondition(snapshot.sharing == .active && snapshot.currentSlide == 1)
+                precondition(transport.base.actions.contains(.select("doc-row")) && transport.base.actions.contains(.press("file-share")), "the actual repaired collector snapshot must retain the correct target row and selected footer")
+            }
+        }
+        for question in [false, true] {
+            let fixture = AttributeCollectionFixture(singlePath: false)
+            _ = fixture.addUntitledWindow(question: question)
+            let transport = CollectedSnapshotTransport(state: try fixture.collect())
+            let driver = ZoomSlidesDriver(transport: transport, timeout: 0.03, pollInterval: 1_000_000, operationBudget: 0.03)
+            _ = try await driver.preflight(target: target)
+            do { _ = try await driver.startSharing(target: target); preconditionFailure("incomplete or unrelated UI cannot authorize sharing") }
+            catch let failure as ZoomSlidesDriver.Failure { if case .unavailable = failure {} else { throw failure } }
+            precondition(transport.actions.isEmpty, "neither an unrecognized popover nor an incomplete permission question can cause any click")
+        }
+        // Two action controls with identical successful primary labels remain
+        // ambiguous. A failed secondary description cannot hide either candidate.
+        let ambiguous = AttributeCollectionFixture(singlePath: false)
+        ambiguous.fields[2]["AXRole"] = "AXButton"
+        ambiguous.fields[2]["AXTitle"] = "Share"
+        ambiguous.fields[6]["AXTitle"] = "Share"
+        try ambiguous.expectReadFailure(attribute: "AXDescription", code: .failure)
+    }
     static func expectFailure(_ failure: ZoomSlidesDriver.Failure, _ operation: () throws -> Void) throws {
         do { try operation(); preconditionFailure("expected \(failure)") }
         catch let actual as ZoomSlidesDriver.Failure { precondition(actual == failure) }
@@ -334,6 +708,7 @@ private final class FakeZoomSlidesAXTransport: ZoomSlidesAXTransport, @unchecked
     var presentAfterFileReads: Int?
     var failAfterEffect: [ZoomSlidesAXAction] = [], failWithoutEffect: [ZoomSlidesAXAction] = []
     var keepPickerDuringPermissions = false, incompletePermissionPane = false
+    var fourTabPicker = false
     var onAction: ((ZoomSlidesAXAction) -> Void)?
     var readBudgets: [TimeInterval] = []
     var reportedDocumentID = "synthetic-deck", reportedMeetingID = "dedicated-test"
@@ -353,8 +728,20 @@ private final class FakeZoomSlidesAXTransport: ZoomSlidesAXTransport, @unchecked
         case .meeting: break
         case .pickerScreens, .pickerFiles:
             var picker = ZoomSlidesAXWindow(id: "picker", title: "Select a window or an application that you want to share", nodes: [
-                .init(id: "picker-root", role: "AXWindow", description: "Share screen window"),
-                .init(id: "switch", role: "AXTabGroup", description: "Switch", value: stage == .pickerScreens ? "Screens, 1 of 3" : "Files, 2 of 3")])
+                .init(id: "picker-root", role: "AXWindow", description: "Share screen window")])
+            if fourTabPicker {
+                picker.nodes.append(.init(id: "four-tabs", role: "AXTabGroup", parentID: "picker-root"))
+                for (index, label) in ["Screens", "Windows", "Files", "Other"].enumerated() {
+                    let prefix = label.lowercased(), description = "\(label) Tab, \(index + 1) of 4"
+                    let selected = stage == .pickerScreens ? index == 0 : index == 2
+                    picker.nodes.append(.init(id: prefix + "-outer", role: "AXRadioButton", description: description,
+                                              value: selected ? "on" : "off", parentID: "four-tabs"))
+                    picker.nodes.append(.init(id: prefix + "-inner", role: "AXRadioButton", description: description,
+                                              value: selected ? "on" : "off", parentID: prefix + "-outer"))
+                }
+            } else {
+                picker.nodes.append(.init(id: "switch", role: "AXTabGroup", description: "Switch", value: stage == .pickerScreens ? "Screens, 1 of 3" : "Files, 2 of 3"))
+            }
             if stage == .pickerFiles {
                 fileReads += 1
                 if fileReads > emptyFileReads {
@@ -391,6 +778,8 @@ private final class FakeZoomSlidesAXTransport: ZoomSlidesAXTransport, @unchecked
         switch action {
         case .press("share"): if !shareDoesNothing { stage = .pickerScreens }
         case .key("switch", 124): stage = .pickerFiles
+        case .press("files-outer"):
+            precondition(fourTabPicker && stage == .pickerScreens); stage = .pickerFiles
         case .select("doc-row"): selectedFile = true
         case .press("file-share"): stage = .permissions
         case .press("present"): presentOnly = true
@@ -402,5 +791,180 @@ private final class FakeZoomSlidesAXTransport: ZoomSlidesAXTransport, @unchecked
         }
         onAction?(action)
         if failAfterEffect.contains(action) { throw ZoomSlidesDriver.Failure.unavailable("Synthetic AXPress failure") }
+    }
+}
+
+/// Placeholder handles are only identities. All data and errors, including the
+/// SDK's actual .axError AXValue representation, come from this injected client.
+private final class AttributeCollectionFixture {
+    var handles = (0..<7).map { AXUIElementCreateApplication(pid_t(900_000 + $0)) }
+    var windows = [0]
+    var fields: [[String: Any]]
+    var failures: [Int: [String: AXError]] = [2: ["AXDescription": .failure]]
+    var reads: [String] = []
+    var advertisedDescription = false
+    var countError: AXError?
+    var onNames: (() -> Void)?
+    let singlePath: Bool
+    init(singlePath: Bool) {
+        self.singlePath = singlePath
+        fields = [
+            ["AXRole": "AXWindow", "AXTitle": "Zoom Meeting", "AXIdentifier": "zm.meeting.window.main"],
+            ["AXRole": "AXScrollArea"],
+            ["AXRole": "AXUnknown", "AXIdentifier": ""],
+            ["AXRole": "AXButton", "AXTitle": "Leave"],
+            ["AXRole": "AXButton", "AXTitle": "Mute my audio"],
+            ["AXRole": "AXButton", "AXTitle": "Participants"],
+            ["AXRole": "AXButton", "AXTitle": "Next"]]
+        for index in fields.indices { fields[index]["AXChildren"] = [AXUIElement]() }
+        fields[0]["AXChildren"] = [handles[1], handles[3], handles[4], handles[5]]
+        fields[1]["AXChildren"] = [handles[2]]
+        fields[2]["AXChildren"] = [handles[6]]
+    }
+    func index(_ element: AXUIElement) -> Int { handles.firstIndex { CFEqual($0, element) }! }
+    @discardableResult func addUntitledWindow(question: Bool, descriptorError: AXError = .failure) -> Int {
+        let window = handles.count, text = window + 1
+        handles.append(AXUIElementCreateApplication(pid_t(900_000 + window)))
+        handles.append(AXUIElementCreateApplication(pid_t(900_000 + text)))
+        fields.append(["AXRole": "AXWindow", "AXTitle": "", "AXIdentifier": "unrelated-popover", "AXChildren": [handles[text]]])
+        fields.append(["AXRole": "AXTextArea", "AXValue": question ? "How do you want to share?" : "Unrelated notes", "AXChildren": [AXUIElement]()])
+        failures[text] = ["AXDescription": descriptorError]
+        windows.append(window)
+        return text
+    }
+    func addUntitledListWindow(question: Bool) -> (list: Int, child: Int) {
+        let list = addUntitledWindow(question: false)
+        fields[list]["AXRole"] = "AXList"
+        fields[list]["AXIdentifier"] = "opaque-zoom-list"
+        fields[list].removeValue(forKey: "AXValue")
+        let child = handles.count
+        handles.append(AXUIElementCreateApplication(pid_t(900_000 + child)))
+        fields.append(["AXRole": "AXStaticText", "AXValue": question ? "How do you want to share?" : "Unrelated list entry", "AXChildren": [AXUIElement]()])
+        fields[list]["AXChildren"] = [handles[child]]
+        return (list, child)
+    }
+    /// Matches the real share-picker failure: AXGroup > AXTextArea, one child,
+    /// advertised failing AXDescription and an unsupported AXURL. Tests also fail
+    /// the advertised AXIdentifier, exactly as in the captured live read.
+    func addSharePicker(files: Bool = true, selected: Bool = false, duplicateRows: Bool = false) -> (window: Int, group: Int, text: Int) {
+        func append(_ values: [String: Any]) -> Int {
+            let index = handles.count
+            handles.append(AXUIElementCreateApplication(pid_t(900_000 + index)))
+            fields.append(values)
+            return index
+        }
+        let window = append(["AXRole": "AXWindow", "AXTitle": "Share screen window"])
+        let group = append(["AXRole": "AXGroup"])
+        let text = append(["AXRole": "AXTextArea", "AXTitle": "Share picker help", "AXValue": "Choose a file to present", "AXIdentifier": "opaque-zoom-share-text"])
+        let child = append(["AXRole": "AXStaticText", "AXValue": "Selecting a file does not begin sharing", "AXChildren": [AXUIElement]()])
+        let tab = append(["AXRole": "AXTabGroup", "AXDescription": "Switch", "AXValue": files ? "Files, 2 of 3" : "Screens, 1 of 3", "AXChildren": [AXUIElement]()])
+        fields[window]["AXChildren"] = [handles[group], handles[tab]]
+        fields[group]["AXChildren"] = [handles[text]]
+        fields[text]["AXChildren"] = [handles[child]]
+        failures[text] = ["AXDescription": .failure, "AXURL": .attributeUnsupported]
+        if files {
+            for ordinal in 0..<(duplicateRows ? 2 : 1) {
+                let row = append(["AXRole": "AXRow"])
+                let cell = append(["AXRole": "AXCell", "AXDescription": "Slides, Synthetic Meeting Presentation, owner \(ordinal), 7 minutes ago, \(ordinal + 1) of 50", "AXChildren": [AXUIElement]()])
+                fields[row]["AXChildren"] = [handles[cell]]
+                fields[window]["AXChildren"] = (fields[window]["AXChildren"] as! [AXUIElement]) + [handles[row]]
+            }
+            if selected {
+                let footer = append(["AXRole": "AXButton", "AXTitle": "Share - Synthetic Meeting Presentation", "AXChildren": [AXUIElement]()])
+                fields[window]["AXChildren"] = (fields[window]["AXChildren"] as! [AXUIElement]) + [handles[footer]]
+            }
+        }
+        windows.append(window)
+        return (window, group, text)
+    }
+    func encoded(_ error: AXError) -> AXValue {
+        var code = error
+        return AXValueCreate(.axError, &code)!
+    }
+    var client: ZoomSlidesAXReadClient {
+        ZoomSlidesAXReadClient(multiple: { [self] element, names in
+            let index = self.index(element); reads.append("\(index):batch")
+            if singlePath { return (.cannotComplete, nil) }
+            let result: [Any] = names.map { name in
+                if let error = failures[index]?[name] { return encoded(error) }
+                return fields[index][name] ?? kCFNull!
+            }
+            return (.success, result as CFArray)
+        }, single: { [self] element, name in
+            let index = self.index(element); reads.append("\(index):single:\(name)")
+            if let error = failures[index]?[name] { return (error, nil) }
+            guard let value = fields[index][name] else { return (.noValue, nil) }
+            return (.success, value as CFTypeRef)
+        }, names: { [self] element in
+            let index = self.index(element); reads.append("\(index):names")
+            let names = Array(Set(fields[index].keys).union(failures[index]?.keys.map { $0 } ?? []))
+            advertisedDescription = names.contains("AXDescription")
+            onNames?()
+            return (.success, names as CFArray)
+        }, count: { [self] element, name in
+            let index = self.index(element); reads.append("\(index):count")
+            if let countError { return (countError, 0) }
+            return (.success, (fields[index][name] as? [AXUIElement])?.count ?? 0)
+        }, values: { [self] element, name, count in
+            let index = self.index(element); reads.append("\(index):values")
+            let children = fields[index][name] as! [AXUIElement]
+            precondition(children.count == count)
+            return (.success, children as CFArray)
+        }, timeout: { _, _ in })
+    }
+    func collect(deadline: Date = Date().addingTimeInterval(2), includeExitDialogs: Bool = false, cancelled: @escaping () throws -> Void = {}) throws -> ZoomSlidesAXState {
+        try ZoomSlidesSystemAXTransport(includeExitDialogs: includeExitDialogs, readClient: client).collectWindows(windows.map { handles[$0] }, pid: 42, deadline: deadline, cancelled: cancelled)
+    }
+    func expectReadFailure(attribute: String, code: AXError) throws {
+        do { _ = try collect(); preconditionFailure("expected failure for \(attribute)") }
+        catch let issue as ZoomSlidesSnapshotReadIssue {
+            precondition(issue.code == code && issue.failure.localizedDescription.contains(attribute),
+                         "the real collector must preserve the failed field and SDK error")
+        }
+    }
+}
+
+/// Only the picker is replaced, using the real attribute collector with the
+/// captured failure pattern. Dispatch remains an in-memory state machine.
+private final class CollectedPickerTransport: ZoomSlidesAXTransport, @unchecked Sendable {
+    let base = FakeZoomSlidesAXTransport()
+    let duplicateRows: Bool
+    private var pickerNodes: [ZoomSlidesAXNode] = []
+    init(duplicateRows: Bool) { self.duplicateRows = duplicateRows }
+    func read(pid: pid_t?, deadline: Date, cancelled: () throws -> Void) throws -> ZoomSlidesAXState {
+        var state = try base.read(pid: pid, deadline: deadline, cancelled: cancelled)
+        guard base.stage == .pickerScreens || base.stage == .pickerFiles else { return state }
+        let fixture = AttributeCollectionFixture(singlePath: base.stage == .pickerFiles)
+        let picker = fixture.addSharePicker(files: base.stage == .pickerFiles, selected: base.selectedFile, duplicateRows: duplicateRows)
+        fixture.failures[picker.text]?["AXIdentifier"] = .failure
+        var collected = try fixture.collect().windows.first { $0.title == "Share screen window" }!
+        collected.id = "picker"
+        pickerNodes = collected.nodes
+        state.windows.removeAll { $0.id == "picker" }
+        state.windows.append(collected)
+        return state
+    }
+    func perform(_ action: ZoomSlidesAXAction, pid: pid_t, deadline: Date, cancelled: () throws -> Void) throws {
+        let translated: ZoomSlidesAXAction
+        switch action {
+        case .select(let id) where pickerNodes.contains(where: { $0.id == id && $0.role == "AXRow" }): translated = .select("doc-row")
+        case .key(let id, let key) where pickerNodes.contains(where: { $0.id == id && $0.role == "AXTabGroup" }): translated = .key("switch", key)
+        case .press(let id) where pickerNodes.contains(where: { $0.id == id && $0.role == "AXButton" && $0.title == "Share - Synthetic Meeting Presentation" }): translated = .press("file-share")
+        default: translated = action
+        }
+        try base.perform(translated, pid: pid, deadline: deadline, cancelled: cancelled)
+    }
+}
+
+/// Runs actor-level semantic/action guards against the real collector's result.
+/// Dispatch is recorded only; no accessibility action or remote process is used.
+private final class CollectedSnapshotTransport: ZoomSlidesAXTransport, @unchecked Sendable {
+    let state: ZoomSlidesAXState
+    var actions: [ZoomSlidesAXAction] = []
+    init(state: ZoomSlidesAXState) { self.state = state }
+    func read(pid: pid_t?, deadline: Date, cancelled: () throws -> Void) throws -> ZoomSlidesAXState { try cancelled(); return state }
+    func perform(_ action: ZoomSlidesAXAction, pid: pid_t, deadline: Date, cancelled: () throws -> Void) throws {
+        try cancelled(); actions.append(action)
+        throw ZoomSlidesDriver.Failure.unavailable("Synthetic snapshot must not dispatch actions")
     }
 }

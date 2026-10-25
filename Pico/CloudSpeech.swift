@@ -164,7 +164,7 @@ final class VoiceSettings:NSObject,NSWindowDelegate {
         let view=window.contentView!
         func label(_ s:String,_ y:CGFloat,_ size:CGFloat=13){let v=NSTextField(wrappingLabelWithString:s);v.frame=NSRect(x:24,y:y,width:512,height:44);v.font = .systemFont(ofSize:size);view.addSubview(v)}
         label(L("Pico · Listening & speaking","Pico · 聆听与回复"),475,18)
-        label(L("Cloud recognition sends your held recording to Bailian; cloud voice sends reply text. Both reuse the account saved in Telos Settings. Turn recognition off for local ASR.","云端识别将录音发给百炼，云端朗读发送回复文字。两者复用 Telos Settings 保存的账号；关闭云端识别可使用本地模型。"),425)
+        label(L("Cloud recognition sends your held recording to Bailian; cloud voice sends reply text. Both reuse the account saved in Pico Settings. Turn recognition off for local ASR.","云端识别将录音发给百炼，云端朗读发送回复文字。两者复用 Pico Settings 保存的账号；关闭云端识别可使用本地模型。"),425)
         recognition=NSButton(checkboxWithTitle:L("Bailian recognition · Chinese + English + mixed","百炼语音识别 · 中文、英文及混读"),target:nil,action:nil);recognition.frame=NSRect(x:24,y:378,width:512,height:25);recognition.state=UserDefaults.standard.bool(forKey:"asr.enabled") ? .on:.off;view.addSubview(recognition)
         let check=NSButton(title:L("Test mixed recognition (paid)","测试中英混读（付费）"),target:self,action:#selector(testRecognition));check.frame=NSRect(x:24,y:335,width:300,height:30);check.bezelStyle = .rounded;view.addSubview(check)
         region.frame=NSRect(x:24,y:298,width:220,height:28);region.addItems(withTitles:[L("Choose account region…","选择账号地域…"),L("Beijing","北京"),L("Singapore","新加坡")]);let saved=BailianConfig.saved;region.selectItem(at:saved.region=="cn-beijing" ? 1:saved.region=="ap-southeast-1" ? 2:0);view.addSubview(region)
@@ -185,22 +185,22 @@ final class VoiceSettings:NSObject,NSWindowDelegate {
             let saved=BailianConfig.saved
             region.selectItem(at:saved.region=="cn-beijing" ? 1:saved.region=="ap-southeast-1" ? 2:0)
             workspace.stringValue=saved.workspace;secret.stringValue=""
-            secret.placeholderString=L("Using the API key saved in Telos Settings","使用 Telos Settings 已保存的 API Key")
-            accountNotice.stringValue=L("Account managed in Telos Settings. Pico reuses it after restart; no separate key is needed. Save configuration changes only Pico's voice switches. Cloud usage is billed by Bailian.","账号在 Telos Settings 管理，Pico 重启后继续复用，无需再填密钥。保存配置只更改 Pico 的语音开关。云端识别与朗读按百炼用量计费。")
+            secret.placeholderString=L("Using the API key saved in Pico Settings","使用 Pico Settings 已保存的 API Key")
+            accountNotice.stringValue=L("Account managed in Pico Settings. Pico reuses it after restart; no separate key is needed. Save configuration changes only Pico's voice switches. Cloud usage is billed by Bailian.","账号在 Pico Settings 管理，Pico 重启后继续复用，无需再填密钥。保存配置只更改 Pico 的语音开关。云端识别与朗读按百炼用量计费。")
         } else {
             secret.placeholderString=L("New API key · blank keeps existing key","新的 API Key · 留空保留已存密钥")
-            accountNotice.stringValue=L("Save your Bailian account once in Telos Settings to share it with Pico. Until then, this panel uses Pico's existing Keychain account. Cloud usage is billed by Bailian.","推荐在 Telos Settings 保存一次百炼账号，即可与 Pico 共用。未配置时使用 Pico 已有的钥匙串账号。云端识别与朗读按百炼用量计费。")
+            accountNotice.stringValue=L("Save your Bailian account once in Pico Settings to share it with Pico. Until then, this panel uses Pico's existing Keychain account. Cloud usage is billed by Bailian.","推荐在 Pico Settings 保存一次百炼账号，即可与 Pico 共用。未配置时使用 Pico 已有的钥匙串账号。云端识别与朗读按百炼用量计费。")
         }
     }
     @objc func save(){
         refreshAccountSource()
         if BailianCredentials.usesTelosSettings {
             if (enabled.state == .on || recognition.state == .on) && (try? BailianCredentials.load()) == nil {
-                message.stringValue=L("Check the saved Bailian account in Telos Settings.","请在 Telos Settings 检查已保存的百炼账号。");return
+                message.stringValue=L("Check the saved Bailian account in Pico Settings.","请在 Pico Settings 检查已保存的百炼账号。");return
             }
             UserDefaults.standard.set(enabled.state == .on,forKey:"tts.enabled")
             UserDefaults.standard.set(recognition.state == .on,forKey:"asr.enabled")
-            message.stringValue=L("Voice switches saved. Reusing the account in Telos Settings.","语音开关已保存，继续使用 Telos Settings 中的账号。")
+            message.stringValue=L("Voice switches saved. Reusing the account in Pico Settings.","语音开关已保存，继续使用 Pico Settings 中的账号。")
             return
         }
         let r=region.indexOfSelectedItem==1 ? "cn-beijing":region.indexOfSelectedItem==2 ? "ap-southeast-1":""

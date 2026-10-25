@@ -10,9 +10,9 @@ let lineColor = TelosTheme.shade(0.925, 0.27)
 struct Brand: View {
     var size: CGFloat = 20
     var body: some View {
-        if let url = Bundle.main.url(forResource: "status-icon", withExtension: "pdf"), let logo = NSImage(contentsOf: url) {
-            Image(nsImage: logo).renderingMode(.template).resizable().interpolation(.high).foregroundStyle(TelosTheme.primary).frame(width: size, height: size).accessibilityLabel("Telos")
-        }
+        Image(nsImage: PicoStatusMark.image(size: size)).renderingMode(.template)
+            .resizable().interpolation(.high).foregroundStyle(TelosTheme.primary)
+            .frame(width: size, height: size).accessibilityLabel("Pico")
     }
 }
 struct RootView: View {
@@ -21,23 +21,8 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let preview = ProcessInfo.processInfo.environment["TELOS_PREVIEW"]
     var body: some View {
-        Group {
-            if stage == 0 {
-                HStack(spacing: 16) { Brand(size: 32); Text("Telos").font(serif(48)) }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else { TaskBoard(store: store) }
-        }
-        .background(TelosTheme.surface)
-        
-        .ignoresSafeArea()
-        .onAppear {
-            if let preview { stage = preview == "splash" ? 0 : preview == "tagline" ? 1 : 2; return }
-            if UserDefaults.standard.bool(forKey: "hasLaunched") { stage = 2; return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
-                withAnimation(.easeInOut(duration: 0.25)) { stage = 2 }
-                UserDefaults.standard.set(true, forKey: "hasLaunched")
-            }
-        }
+        PicoAppView(store: store)
+            .ignoresSafeArea()
         .allowsHitTesting(!store.showMacAccess)
         .accessibilityHidden(store.showMacAccess)
         .overlay {
@@ -57,12 +42,38 @@ struct RootView: View {
         }
         .buttonStyle(HoverButtonStyle(standard: true))
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.showMacAccess)
-        .alert("Telos", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
+        .alert("Pico", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
             Button("OK") { store.error = nil }
         } message: { Text(store.error ?? "") }
     }
 }
+// The latest flight origin is read only when sending. Recording a resized
+// composer's rectangle must not invalidate and relayout the entire task board.
+private final class ComposerRectCache {
+    var frame: CGRect?
+}
+
+private struct TaskListRowGeometry: ViewModifier {
+    let id: String
+    let scroll: PicoChatScrollController
+    @State private var cache = ComposerRectCache()
+    func body(content: Content) -> some View {
+        content.onGeometryChange(for: CGRect.self) { proxy in
+            let frame = proxy.frame(in: .named("taskListContent"))
+            PicoDiag.track("taskRow " + id.prefix(8), "\(Int(frame.minY)),\(Int(frame.width))x\(Int(frame.height))")
+            return frame
+        } action: { frame in
+            cache.frame = frame; scroll.record(id: id, frame: frame)
+        }
+        .onAppear { if let frame = cache.frame { scroll.record(id: id, frame: frame) } }
+        .onDisappear { scroll.remove(id: id) }
+    }
+}
+
 struct TaskBoard: View {
+    var embedded = false
+    var externalSearch = ""
+    var headerInset: CGFloat = 0
     @ObservedObject private var calendar = CalendarStore.shared
     @ObservedObject var store: TaskStore
     @State private var tab: BoardTab = .tasks
@@ -70,43 +81,29 @@ struct TaskBoard: View {
     @State private var search = ""
     @State private var searching = false
     @State private var taskScrollInitialized = false
+    @StateObject private var taskIndex = PicoTaskListIndex()
+    @StateObject private var taskScroll = PicoChatScrollController()
+    @State private var taskNearTop = true
+    @State private var taskNavigationScope: String?
+    @State private var taskNavigationQuery = ""
     @State private var manageFeeds = false
-    @State private var composerRect: CGRect?
+    @State private var composerRect = ComposerRectCache()
     @State private var flight: SendFlight?
     @State private var pendingFlight: (String, String, CGRect)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var sheetDrag: CGFloat = 0
     var sheetAnimation: Animation? { reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.88) }
     private func windowResignEditor() { (NSApp.delegate as? AppDelegate)?.window.makeFirstResponder(nil) }
-    func closeDetail() { withAnimation(sheetAnimation) { store.selected = nil; sheetDrag = 0 } }
-    var detailOpen: Bool { store.selectedTask != nil && tab == .tasks }
+    var detailOpen: Bool { !embedded && store.selectedTask != nil && tab == .tasks }
     var body: some View {
         ZStack(alignment: .bottom) {
-            panel.blur(radius: detailOpen ? 5.5 : 0).allowsHitTesting(!detailOpen).accessibilityHidden(detailOpen)
-            if detailOpen {
-                Color.black.opacity(0.6).ignoresSafeArea()
-                    .onTapGesture { closeDetail() }
-                    .accessibilityLabel("Close task details").accessibilityAddTraits(.isButton)
-                    .transition(.opacity)
-                ZStack(alignment: .top) {
-                    detail
-                    Capsule().fill(TelosTheme.shade(0.93, 0.23)).frame(width: 30, height: 5)
-                        .frame(maxWidth: .infinity).frame(height: 28).contentShape(Rectangle())
-                        .gesture(DragGesture(minimumDistance: 3)
-                            .onChanged { sheetDrag = max(0, $0.translation.height) }
-                            .onEnded { value in
-                                if value.translation.height > 90 || value.predictedEndTranslation.height > 180 { closeDetail() }
-                                withAnimation(sheetAnimation) { sheetDrag = 0 }
-                            })
-                        .accessibilityLabel("Dismiss task details").accessibilityAddTraits(.isButton)
-                        .accessibilityAction { closeDetail() }
-                }.frame(height: 664).background(TelosTheme.surface, in: UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40))
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40))
-                    .offset(y: sheetDrag).transition(.move(edge: .bottom)).zIndex(2)
+            panel.blur(radius: detailOpen ? PicoTaskDetailMetrics.backdropBlur : 0)
+                .animation(sheetAnimation, value: detailOpen)
+                .allowsHitTesting(!detailOpen).accessibilityHidden(detailOpen)
+            if !embedded {
+                PicoTaskDetailPresentation(store: store, isPresented: detailOpen).zIndex(2)
             }
         }
             .clipped()
-            .animation(sheetAnimation, value: detailOpen)
             .onChange(of: tab) { _, value in store.selected = nil; if value == .feed { store.feedCommand() } }
             .onChange(of: store.completed) { _, _ in store.selected = nil }
             .onChange(of: searching) { _, active in
@@ -148,81 +145,18 @@ struct TaskBoard: View {
                 } else if tab == .calendar {
                     CalendarList(calendar: calendar, query: activeSearch, searching: false, search: $search)
                 } else {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
-                                Color.clear.frame(height: 0).id("taskTop")
-                                TimelineView(.periodic(from: .now, by: 1)) { context in
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(HomeClock.text(context.date))
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(TelosTheme.primary)
-                                            .frame(height: 24)
-                                            .padding(.leading, 2)
-                                            .accessibilityIdentifier("homeDateTime")
-                                        Text(greeting(context.date)).font(serif(32))
-                                            .frame(height: 36, alignment: .leading)
-                                    }.progressiveScrollBlur()
-                                }.padding(.horizontal, 26).padding(.top, 70).padding(.bottom, 20)
-                                TaskComposer(draft: draft, action: submit)
-                                    .trackRect("composer", in: "taskFlight").padding(.horizontal, 20).padding(.bottom, 16)
-                                HStack(spacing: 0) {
-                                    ForEach([false, true], id: \.self) { done in
-                                        Button(done ? "Completed" : "Todo") { withAnimation(sheetAnimation) { store.completed = done } }
-                                            .buttonStyle(HoverButtonStyle()).font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(store.completed == done ? TelosTheme.primary : TelosTheme.shade(0.5, 0.6))
-                                            .padding(.horizontal, 6).frame(height: 24)
-                                            .accessibilityAddTraits(store.completed == done ? .isSelected : [])
-                                    }
-                                }.padding(.horizontal, 20).padding(.bottom, 4).progressiveScrollBlur()
-                                LazyVStack(spacing: 0) {
-                                    if store.completed {
-                                        TimelineView(.periodic(from: .now, by: 60)) { context in
-                                            ForEach(CompletionSection.group(visibleTasks, now: context.date)) { section in
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    Text(section.title).font(.system(size: 18, weight: .semibold)).progressiveScrollBlur()
-                                                        .padding(.horizontal, 14).padding(.top, 16).padding(.bottom, 4)
-                                                        .accessibilityAddTraits(.isHeader)
-                                                    ForEach(section.tasks) { todo in taskRow(todo).id(todo.id) }
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                    ForEach(visibleTasks) { todo in
-                                        taskRow(todo).id(todo.id).trackRect(todo.id.uuidString, in: "taskFlight")
-                                            .opacity(flight?.target == todo.id.uuidString || pendingFlight?.0 == todo.id.uuidString ? 0 : 1)
-                                    }
-                                    }
-                                    if visibleTasks.isEmpty && (!activeSearch.isEmpty || store.completed) {
-                                        Text(activeSearch.isEmpty ? "All caught up" : "No results").font(.system(size: 14)).foregroundStyle(.secondary)
-                                            .frame(maxWidth: .infinity).padding(.top, 32)
-                                    }
-                                }.padding(.horizontal, 10).padding(.bottom, 18)
-                            }
-                        }.scrollIndicators(.hidden)
-                        .softScrollEdges(top: 72, bottom: 40, alwaysTop: true)
-                        .defaultScrollAnchor(ProcessInfo.processInfo.environment["TELOS_PREVIEW_SCROLL"] == "bottom" ? .bottom : .top)
-                        .onAppear {
-                            if !taskScrollInitialized {
-                                taskScrollInitialized = true
-                                if ProcessInfo.processInfo.environment["TELOS_PREVIEW_SCROLL"] != "bottom" { proxy.scrollTo("taskTop", anchor: .top) }
-                            }
-                        }
-                        .onReceive(NotificationCenter.default.publisher(for: .init("TelosTaskTop"))) { _ in
-                            windowResignEditor()
-                            withAnimation(sheetAnimation) { proxy.scrollTo("taskTop", anchor: .top) }
-                        }
-                        .onChange(of: store.tasks.first?.id) { _, id in if let id, pendingFlight != nil { proxy.scrollTo(id, anchor: .center) } }
+                    TimelineView(.periodic(from: .now, by: 60)) { tick in
+                        pagedTasks(now: tick.date)
                     }
                 }
             }
-            ZStack(alignment: .leading) {
+            if !embedded { ZStack(alignment: .leading) {
                 HStack(spacing: 0) {
                     Color.clear.frame(width: 36, height: 36)
                     Spacer(minLength: 0)
                     BoardSegments(selection: $tab).frame(width: 183, height: 36).inputGlass()
                     Spacer(minLength: 0)
-                    GlassCircle(help: "Telos Settings", action: { store.showMacAccess = true; store.checkMacAccess() }) { Brand(size: 16) }
+                    GlassCircle(help: "Pico Settings", action: { store.showMacAccess = true; store.checkMacAccess() }) { Brand(size: 16) }
                         .contextMenu {
                             Button("New feed…", action: newFeed)
                             Button("Manage feeds…") { manageFeeds = true }
@@ -238,13 +172,13 @@ struct TaskBoard: View {
                     }
                 }.opacity(searching ? 1 : 0).allowsHitTesting(searching).accessibilityHidden(!searching)
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: searching)
-            }.frame(height: 36).padding(.horizontal, 12).padding(.top, 12)
+            }.frame(height: 36).padding(.horizontal, 12).padding(.top, 12) }
 
         }
-        .background(TelosTheme.surface).coordinateSpace(name: "taskFlight")
+        .background(embedded ? Color.clear : TelosTheme.surface).coordinateSpace(name: "taskFlight")
         .onPreferenceChange(RectPreference.self) { values in
             // Store only the composer: lazy rows re-estimate their frames every pass, so storing them all never settles.
-            if values["composer"] != composerRect { composerRect = values["composer"] }
+            composerRect.frame = values["composer"]
             if let pending = pendingFlight, let destination = values[pending.0], destination.height > 0 {
                 flight = SendFlight(text: pending.1, source: pending.2, destination: destination, target: pending.0)
                 pendingFlight = nil
@@ -252,16 +186,158 @@ struct TaskBoard: View {
         }
         .overlay { if let flight { FlightOverlay(flight: flight, finished: { self.flight = nil }).id(flight.id) } }
     }
-    var activeSearch: String { searching ? search.trimmingCharacters(in: .whitespacesAndNewlines) : "" }
-    var visibleTasks: [Todo] { activeSearch.isEmpty ? store.filtered : store.searchTasks(activeSearch) }
+    private var taskScope: String { PicoTaskListIndex.scopeID(completed: store.completed, query: activeSearch) }
+    private func taskRows(now: Date = Date()) -> [PicoTaskListRow] {
+        taskIndex.rows(tasks: store.tasks, revision: store.taskListRevision, completed: store.completed,
+                       query: activeSearch, now: now, followsTop: taskNavigationScope == taskScope &&
+                       !taskScroll.isRestoringReadingPosition && taskNearTop && !taskIndex.hasEarlier)
+    }
+    private func pagedTasks(now: Date) -> some View {
+        // Reconcile cached data before the navigation flags are read below.
+        let rows = taskRows(now: now)
+        let ids = Set(rows.map(\.id)).union(["taskChrome"])
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Color.clear.frame(height: 0).id("taskTop")
+                    taskChrome.id("taskChrome")
+                        .modifier(TaskListRowGeometry(id: "taskChrome", scroll: taskScroll))
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows) { row in
+                            taskListRow(row).id(row.id)
+                                .modifier(TaskListRowGeometry(id: row.id, scroll: taskScroll))
+                        }
+                        if taskIndex.totalMatchCount == 0 && (!activeSearch.isEmpty || store.completed) {
+                            Text(activeSearch.isEmpty ? "All caught up" : "No results")
+                                .font(.system(size: 14)).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity).padding(.top, 32)
+                        }
+                    }.scrollTargetLayout().padding(.horizontal, embedded ? 2 : 10).padding(.bottom, 18)
+                    Color.clear.frame(height: 1).id("picoLatest")
+                        .modifier(TaskListRowGeometry(id: "picoLatest", scroll: taskScroll))
+                }
+                .coordinateSpace(name: "taskListContent")
+                .background(PicoChatScrollProbe(controller: taskScroll))
+            }
+            .scrollIndicators(.hidden)
+            .softScrollEdges(top: embedded ? (headerInset > 0 ? headerInset + 12 : 20) : 72,
+                             bottom: embedded ? 28 : 40, alwaysTop: !embedded || headerInset > 0,
+                             treatment: embedded ? (headerInset > 0 ? .underHeader : .contentFade) : .material)
+            .defaultScrollAnchor(ProcessInfo.processInfo.environment["TELOS_PREVIEW_SCROLL"] == "bottom" ? .bottom : .top)
+            .onAppear {
+                configureTaskScroll(proxy: proxy)
+                if !taskScrollInitialized {
+                    taskScrollInitialized = true
+                    taskScroll.navigate(scope: taskScope, retainingGeometryIDs: ["taskChrome"])
+                    taskNavigationScope = taskScope
+                    taskNavigationQuery = PicoTaskListIndex.normalizedQuery(activeSearch)
+                    if ProcessInfo.processInfo.environment["TELOS_PREVIEW_SCROLL"] == "bottom" {
+                        taskIndex.loadLater()
+                        taskScroll.restore(.init(id: rows.last?.id ?? "taskChrome", offset: 0))
+                    } else { taskScroll.scrollToTop() }
+                }
+            }
+            .onChange(of: taskScope) { _, scope in
+                configureTaskScroll(proxy: proxy)
+                let query = PicoTaskListIndex.normalizedQuery(activeSearch)
+                taskScroll.navigate(scope: scope, preservingSharedHeaderID: query == taskNavigationQuery ? "taskChrome" : nil,
+                                    retainingGeometryIDs: ["taskChrome"])
+                taskNavigationScope = scope; taskNavigationQuery = query
+            }
+            .onChange(of: store.taskListRevision) { _, _ in
+                guard taskNavigationScope == taskScope else { return }
+                if let current = taskScroll.prepareForChange(), !ids.contains(current.id) {
+                    if let neighbor = taskScroll.prepareForChange(survivingIDs: ids) { taskScroll.restore(neighbor) }
+                    else { taskScroll.scrollToTop() }
+                } else { taskScroll.contentChanged() }
+            }
+            .onChange(of: taskIndex.navigationRevision) { _, _ in taskScroll.contentChanged() }
+            .onReceive(NotificationCenter.default.publisher(for: .init("TelosTaskTop"))) { _ in
+                windowResignEditor(); taskIndex.showTop(); taskScroll.scrollToTop()
+            }
+            .onChange(of: store.tasks.first?.id) { _, id in
+                if let id, pendingFlight != nil {
+                    taskIndex.showTop()
+                    taskScroll.restore(.init(id: PicoTaskListIndex.taskRowID(id), offset: -(headerInset + 12)))
+                }
+            }
+        }
+    }
+    private var taskChrome: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(HomeClock.text(context.date)).font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(TelosTheme.primary).frame(height: 24).padding(.leading, 2)
+                        .accessibilityIdentifier("homeDateTime")
+                    Text(greeting(context.date)).font(serif(32)).frame(height: 36, alignment: .leading)
+                }.progressiveScrollBlur()
+            }.padding(.horizontal, embedded ? 18 : 26).padding(.top, embedded ? 12 + headerInset : 70).padding(.bottom, 20)
+            TaskComposer(draft: draft, action: submit)
+                .trackRect("composer", in: "taskFlight").padding(.horizontal, embedded ? 12 : 20).padding(.bottom, 16)
+            HStack(spacing: 0) {
+                ForEach([false, true], id: \.self) { done in
+                    Button(done ? "Completed" : "Todo") { withAnimation(sheetAnimation) { store.completed = done } }
+                        .buttonStyle(HoverButtonStyle()).font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(store.completed == done ? TelosTheme.primary : TelosTheme.shade(0.5, 0.6))
+                        .padding(.horizontal, 6).frame(height: 24)
+                        .accessibilityAddTraits(store.completed == done ? .isSelected : [])
+                }
+            }.padding(.horizontal, embedded ? 12 : 20).padding(.bottom, 4).progressiveScrollBlur()
+        }
+    }
+    @ViewBuilder private func taskListRow(_ row: PicoTaskListRow) -> some View {
+        switch row {
+        case .section(let section):
+            Text(section.title).font(.system(size: 18, weight: .semibold)).progressiveScrollBlur()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14).padding(.top, 16).padding(.bottom, 4)
+                .accessibilityAddTraits(.isHeader)
+        case .task(let todo):
+            taskRow(todo).padding(.top, store.completed ? 4 : 0)
+                .trackRect(todo.id.uuidString, in: "taskFlight", when: pendingFlight?.0 == todo.id.uuidString)
+                .opacity(flight?.target == todo.id.uuidString || pendingFlight?.0 == todo.id.uuidString ? 0 : 1)
+                .accessibilityIdentifier("taskListRow-" + todo.id.uuidString)
+        }
+    }
+    private func configureTaskScroll(proxy: ScrollViewProxy) {
+        taskScroll.retainedScopes = ["todo", "completed"]
+        taskScroll.canFollowLatest = false
+        taskScroll.configure { id, anchor in proxy.scrollTo(id, anchor: anchor) }
+        // Edge callbacks can arrive from a row's geometry action; apply them next turn.
+        taskScroll.onEdges = { _, top in DispatchQueue.main.async { if taskNearTop != top { taskNearTop = top } } }
+        taskScroll.onUserEdge = { top, bottom in DispatchQueue.main.async {
+            guard taskNavigationScope == taskScope else { return }
+            if top && taskIndex.hasEarlier { loadTaskPage(earlier: true) }
+            else if bottom && taskIndex.hasLater { loadTaskPage(earlier: false) }
+        } }
+    }
+    private func loadTaskPage(earlier: Bool) {
+        let anchor = taskScroll.prepareForChange()
+        if earlier { taskIndex.loadEarlier() } else { taskIndex.loadLater() }
+        taskScroll.restore(anchor)
+    }
+    private func changeTask(_ id: UUID, reopen: Bool) {
+        let current = taskScroll.prepareForChange()
+        let scope = taskScope
+        let before = taskRows()
+        let neighbor = taskScroll.prepareForChange(survivingIDs: Set(before.map(\.id)).subtracting([PicoTaskListIndex.taskRowID(id)]).union(["taskChrome"]))
+        if reopen { store.reopen(id) } else { store.complete(id) }
+        guard scope == taskScope else { return }
+        let surviving = Set(taskRows().map(\.id)).union(["taskChrome"])
+        if let current, surviving.contains(current.id) { taskScroll.restore(current) }
+        else if let neighbor, surviving.contains(neighbor.id) { taskScroll.restore(neighbor) }
+        else { taskScroll.scrollToTop() }
+    }
+    var activeSearch: String { embedded ? externalSearch : searching ? search.trimmingCharacters(in: .whitespacesAndNewlines) : "" }
     func greeting(_ date: Date) -> String {
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil { return "Good Evening." }
         let hour = Calendar.current.component(.hour, from: date)
         return hour < 12 ? "Good Morning." : hour < 18 ? "Good Afternoon." : "Good Evening."
     }
-    func taskRow(_ todo: Todo) -> some View {
+    func taskRow(_ todo: PicoTaskListItem) -> some View {
         HStack(spacing: 12) {
-            TaskCompletionToggle(completed: todo.status == "completed", running: todo.status == "running") { todo.status == "completed" ? store.reopen(todo.id) : store.complete(todo.id) }
+            TaskCompletionToggle(completed: todo.status == "completed", running: todo.status == "running") { changeTask(todo.id, reopen: todo.status == "completed") }
             VStack(alignment: .leading, spacing: 2) {
                 Text(todo.title).font(.system(size: 15)).tracking(-0.1).lineLimit(1)
                 if let meetingID = todo.meetingID, let meeting = store.meetings[meetingID] {
@@ -280,12 +356,12 @@ struct TaskBoard: View {
                 Button("Open task") { store.selected = todo.id }
                 if ["running", "awaiting_approval"].contains(todo.status) { Button("Stop") { store.stop(todo.id) } }
                 if ["error", "paused"].contains(todo.status) { Button(todo.status == "pending" ? "Start task" : "Retry") { store.retry(todo.id) } }
-                if todo.status == "completed" && todo.meetingID == nil { Button("Reopen") { store.reopen(todo.id) } }
+                if todo.status == "completed" { Button("Reopen") { changeTask(todo.id, reopen: true) } }
             }
     }
     func submit() {
         guard draft.hasContent else { return }
-        let text = draft.text, source = composerRect
+        let text = draft.text, source = composerRect.frame
         search = ""; tab = .tasks
         guard let id = store.add(text, files: draft.files) else { return }; draft.clear()
         if !reduceMotion, text.utf16.count <= 2000, let source { pendingFlight = (id.uuidString, text, source) }
@@ -298,7 +374,7 @@ struct SearchField: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search tasks, messages, and feed", text: $text).textFieldStyle(.plain).focused($focused).accessibilityIdentifier("searchField")
+            TextField("Search tasks and messages", text: $text).textFieldStyle(.plain).focused($focused).accessibilityIdentifier("searchField")
             if !text.isEmpty { Button { text = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(HoverButtonStyle()).accessibilityLabel("Clear search") }
         }.font(.system(size: 13)).padding(.horizontal, 14).frame(height: 36).inputGlass().onAppear { focused = true }
     }
@@ -367,20 +443,52 @@ struct TaskDetail: View {
     @ObservedObject var store: TaskStore
     let todo: Todo
     @StateObject private var ask = ComposerDraft()
-    @State private var footerHeight: CGFloat = 80
-    @State private var composerRect: CGRect?
-    @State private var flight: SendFlight?
-    @State private var pendingFlight: (String, String, CGRect)?
+    @State private var footerHeight: CGFloat = 68
+    @State private var deferFooter = NextTurnWrite<CGFloat>()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var rowCache = PicoTaskDetailTimelineCache()
+    @StateObject private var rowWindow = PicoChatRowWindow(pageSize: 20, maximumRows: 40)
+    @StateObject private var timeline = PicoChatScrollController()
+    @StateObject private var liveRows = PicoChatLiveTimelineRowsCache()
+    @State private var streamID = UUID()
+    @State private var nearBottom = true
+    @State private var latestJumpRows: [PicoChatTimelineRowDescriptor] = []
+    @State private var latestJumpInProgress = false
+    private var running: Bool { todo.status == "running" }
+    private var workspace: URL { PicoFileStorage.workspaceURL(dataDirectory: store.dataDir, id: todo.id) }
+    private var completedArtifacts: [Artifact] {
+        ["ready", "completed", "needs_input"].contains(todo.status) ? todo.artifacts : []
+    }
+    private var allRows: [PicoChatTimelineRowDescriptor] {
+        var history = rowCache.rows(messages: todo.messages, artifacts: completedArtifacts)
+        if history.isEmpty && !completedArtifacts.isEmpty {
+            history.append(PicoChatTimelineRowDescriptor(id: todo.id.uuidString + ":result", ownerMessageID: todo.id,
+                kind: .assistant, markdown: true, text: "", fullMessageText: "", isFirst: true, isLast: true,
+                files: [], artifacts: PicoChatTimelineRows.finalArtifacts(text: todo.summary, artifacts: completedArtifacts)))
+        }
+        guard let stream = store.streams[todo.id], !stream.isEmpty else { return history }
+        return history + liveRows.build(text: stream, ownerMessageID: streamID)
+    }
+    private var displayRows: [PicoChatTimelineRowDescriptor] {
+        let current = rowWindow.rows(all: allRows, scope: "history", followsLatest: latestJumpInProgress || timeline.followingLatest)
+        let ids = Set(current.map(\.id))
+        return latestJumpRows.filter { !ids.contains($0.id) } + current
+    }
     var body: some View {
-        GeometryReader { geometry in
+        let rows = displayRows
+        return GeometryReader { geometry in
             ZStack(alignment: .bottom) {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        // Message heights change while streaming and approvals append.
-                        // Eager placement keeps scrollTo(bottom) from repeatedly
-                        // re-estimating a lazy stack's variable-height predecessors.
-                        VStack(alignment: .leading, spacing: 24) {
+                        // Ordinary history is bounded to40 chunks; an animated
+                        // jump temporarily joins at most40 old and20 new chunks.
+                        // It gives stable native geometry without constructing a
+                        // selectable view for every message in the full history.
+                        VStack(alignment: .leading, spacing: 0) {
+                            if rowWindow.hasEarlier {
+                                PicoHistoryLoading(label: "Load earlier task messages", action: loadEarlier)
+                                    .accessibilityIdentifier("taskDetail-loadEarlier")
+                            }
                             if let meetingID = todo.sourceMeetingID, let evidence = todo.sourceTranscriptEvidence {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Button("From meeting · " + meetingTimestamp(evidence.startTime)) {
@@ -390,67 +498,144 @@ struct TaskDetail: View {
                                     if let date = todo.dueDate { Text("Due " + date).font(.system(size: 12)).foregroundStyle(.secondary) }
                                 }
                             }
-                            ForEach(todo.messages) { message in
-                                messageView(message).id(message.id)
-                                    .trackRect(message.id.uuidString, in: "messageFlight", when: pendingFlight?.0 == message.id.uuidString)
-                                    .opacity(flight?.target == message.id.uuidString || pendingFlight?.0 == message.id.uuidString ? 0 : 1)
+                            ForEach(rows) { row in
+                                PicoTaskDetailTimelineRow(row: row,
+                                    openAttachment: { openFile($0.path) }, openArtifact: { openFile($0.path) },
+                                    artifactsFolderURL: workspace).id(row.id)
+                                    .modifier(PicoTaskDetailRowGeometry(id: row.id, timeline: timeline))
                             }
-                            if let stream = store.streams[todo.id], !stream.isEmpty { MessageText(text: stream, markdown: false).font(.system(size: 14)) }
-                            if todo.status == "running" && ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil {
-                                HStack(spacing: 8) {
-                                    ProgressView().controlSize(.small)
-                                    Text(todo.summary).font(.system(size: 12)).foregroundStyle(.secondary)
-                                    Spacer()
-                                    Button { store.stop(todo.id) } label: { Image(systemName: "stop.circle") }.buttonStyle(HoverButtonStyle()).help("Stop task")
-                                }
+                            if rowWindow.hasLater {
+                                PicoHistoryLoading(label: "Load newer task messages", action: loadLater)
+                                    .padding(.top, 12).accessibilityIdentifier("taskDetail-loadLater")
+                            }
+                            if running && (store.streams[todo.id] ?? "").isEmpty && !rowWindow.hasLater {
+                                PicoTypingIndicator()
                             }
                             if ["error", "paused", "needs_input", "pending"].contains(todo.status) {
                                 Text(todo.summary).font(.system(size: 14)).foregroundStyle(.secondary)
                                 if todo.status != "needs_input" { Button(todo.status == "pending" ? "Start task" : "Retry") { store.retry(todo.id) } }
                             }
-                            ForEach(todo.artifacts) { artifact in
-                                Button { NSWorkspace.shared.open(URL(fileURLWithPath: artifact.path)) } label: { Label(artifact.name, systemImage: "doc.text").font(.system(size: 14)) }.buttonStyle(.bordered).nativeHoverFeedback()
-                            }
-                            Color.clear.frame(height: footerHeight + 16).id("bottom")
-                        }.padding(.horizontal, 24).padding(.top, 36).frame(maxWidth: .infinity, alignment: .leading)
+                            // The viewport reaches beneath the floating composer.
+                            // Only the document's final reserve moves the last
+                            // message above it when the user reaches the end.
+                            Color.clear.frame(height: todo.approval == nil ? footerHeight + 8 : 6).id("picoLatest")
+                                .modifier(PicoTaskDetailRowGeometry(id: "picoLatest", timeline: timeline))
+                        }.padding(.horizontal, 16).padding(.top, 32)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .coordinateSpace(name: "picoTaskDetailTimeline")
+                            .background(PicoChatScrollProbe(controller: timeline))
                     }.scrollIndicators(.hidden)
-                    .softScrollEdges(top: 56, bottom: footerHeight + 32, alwaysTop: false, alwaysBottom: true, whiteSurface: true)
-                    .onChange(of: todo.messages.count) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
-                    .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+                    .softScrollEdges(top: 25, bottom: todo.approval == nil ? footerHeight + 8 : 20,
+                                     alwaysTop: true, alwaysBottom: true,
+                                     treatment: todo.approval == nil ? .underControls : .underHeader)
+                    .padding(.bottom, todo.approval == nil ? 0 : footerHeight)
+                    .onChange(of: todo.messages.count) { _, _ in updateTailConstraint(); timeline.contentChanged() }
+                    .onChange(of: store.streams[todo.id]) { _, _ in updateTailConstraint(); timeline.contentChanged() }
+                    .onChange(of: rowWindow.revision) { _, _ in updateTailConstraint(); timeline.contentChanged() }
+                    .onChange(of: rowWindow.hasLater) { _, _ in updateTailConstraint() }
+                    .onChange(of: footerHeight) { _, _ in timeline.contentChanged() }
+                    .onAppear { configureTimeline(proxy: proxy); updateTailConstraint(); timeline.contentChanged() }
                 }
                 VStack(spacing: 0) {
                 if let approval = todo.approval {
-                    ScrollView { ApprovalCard(approval: approval, onDecision: { store.decide(todo.id, approve: $0) }, onStop: { store.stop(todo.id) }) }
-                        .softScrollEdges(top: 16, bottom: 20).frame(maxHeight: min(380, geometry.size.height * 0.65)).padding(.horizontal, 16)
+                    ApprovalCard(approval: approval, onDecision: { store.decide(todo.id, approve: $0) }, onStop: { store.stop(todo.id) })
+                        .frame(height: min(230, max(150, geometry.size.height - 180))).padding(.horizontal, 16)
                 }
-                Composer(draft: ask, placeholder: "Add a comment", canSend: canSend, identifier: "askField", action: submit)
-                    .trackRect("composer", in: "messageFlight").padding(.horizontal, 16).padding(.vertical, 16)
-                }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
-            }.background(TelosTheme.surface).coordinateSpace(name: "messageFlight")
-                .onPreferenceChange(RectPreference.self) { values in
-                    // Store only the composer: lazy rows re-estimate their frames every pass, so storing them all never settles.
-                    if values["composer"] != composerRect { composerRect = values["composer"] }
-                    if let pending = pendingFlight, let dest = values[pending.0], dest.height > 0 {
-                        let target = CGRect(x: max(24, dest.maxX-min(dest.width, 263)), y: min(dest.minY, geometry.size.height-100), width: min(dest.width, 263), height: dest.height)
-                        flight = SendFlight(text: pending.1, source: pending.2, destination: target, target: pending.0); pendingFlight = nil
-                    }
+                Composer(draft: ask, placeholder: "Message", canSend: canSend, identifier: "askField",
+                         isRunning: running, stopAction: { store.stop(todo.id) }, action: submit)
+                    .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 16)
+                }.onGeometryChange(for: CGFloat.self) { proxy in
+                    PicoDiag.track("taskFooter", "\(proxy.size.width)x\(proxy.size.height)")
+                    return proxy.size.height
+                } action: { height in
+                    deferFooter(height) { if abs(footerHeight - $0) > 0.5 { footerHeight = $0 } }
                 }
-                .overlay { if let flight { FlightOverlay(flight: flight, finished: { self.flight = nil }).id(flight.id) } }
+                if rowWindow.hasLater || !nearBottom {
+                    Button { showLatest() } label: {
+                        Image(systemName: "chevron.down").font(.system(size: 10, weight: .medium))
+                            .frame(width: 31, height: 22)
+                    }.buttonStyle(HoverButtonStyle()).modifier(PicoControlGlass(shape: Capsule(), interactive: true))
+                        .disabled(latestJumpInProgress)
+                        .padding(.bottom, max(48, footerHeight - 8))
+                        .transition(.scale(scale: 0.2).combined(with: .opacity))
+                        .accessibilityLabel("Jump to latest task message").help("Jump to latest task message")
+                        .accessibilityIdentifier("taskDetail-showLatest")
+                }
+            }
         }
     }
-    @ViewBuilder func messageView(_ message: Message) -> some View {
-        if message.role == "user" {
-            HStack { Spacer(minLength: 36); MessageBubble(text: message.text).frame(maxWidth: 300, alignment: .trailing) }
-        } else if message.role == "confirmation" {
-            Label(message.text, systemImage: "checkmark.shield").font(.system(size: 12)).foregroundStyle(.secondary)
-        } else { MessageText(text: message.text).font(.system(size: 14)).lineSpacing(1).frame(maxWidth: .infinity, alignment: .leading) }
+    private func configureTimeline(proxy: ScrollViewProxy) {
+        timeline.configure { id, anchor in proxy.scrollTo(id, anchor: anchor) }
+        timeline.onEdges = { bottom, _ in DispatchQueue.main.async {
+            guard nearBottom != bottom else { return }
+            withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.72)) { nearBottom = bottom }
+        } }
+        timeline.onLatestAnimationFinished = finishLatestJump
+        timeline.onLatestAnimationCancelled = {
+            latestJumpInProgress = false; rowWindow.cancelLatestJump()
+        }
+        timeline.onUserEdge = { top, bottom in DispatchQueue.main.async {
+            guard latestJumpRows.isEmpty, !latestJumpInProgress else { return }
+            if top && rowWindow.hasEarlier { loadEarlier() }
+            else if bottom && rowWindow.hasLater { loadLater() }
+        } }
     }
-    var canSend: Bool { ask.hasContent && !["running", "awaiting_approval"].contains(todo.status) }
+    private func updateTailConstraint() { timeline.canFollowLatest = !rowWindow.hasLater }
+    private func loadEarlier() { page(earlier: true) }
+    private func loadLater() { page(earlier: false) }
+    private func page(earlier: Bool) {
+        resumeContinuousHistory()
+        timeline.canFollowLatest = false
+        let saved = timeline.prepareForChange()
+        if earlier { rowWindow.loadEarlier() } else { rowWindow.loadLater() }
+        let next = displayRows
+        let ids = Set(next.map(\.id))
+        let retained = saved.flatMap { ids.contains($0.id) ? $0 : nil }
+            ?? timeline.prepareForChange(survivingIDs: ids)
+        let fallback = (earlier ? next.last : next.first).map { PicoChatScrollController.Anchor(id: $0.id, offset: 0) }
+        updateTailConstraint()
+        timeline.restore(retained ?? fallback)
+    }
+    private func showLatest(animated: Bool = true) {
+        guard !latestJumpInProgress else { return }
+        if !animated || reduceMotion {
+            latestJumpRows = []; rowWindow.finishLatestJump()
+            timeline.canFollowLatest = true; timeline.followLatest()
+            return
+        }
+        let current = displayRows
+        let anchor = timeline.prepareForChange()
+        let needsBridge = rowWindow.hasLater || !latestJumpRows.isEmpty
+        if needsBridge { latestJumpRows = current; rowWindow.showLatest() }
+        rowWindow.beginLatestJump(); latestJumpInProgress = true
+        timeline.canFollowLatest = true
+        timeline.followLatest(animated: true, preserving: needsBridge ? anchor : nil)
+        if !timeline.isAnimatingLatest { finishLatestJump() }
+    }
+    private func finishLatestJump() {
+        guard latestJumpInProgress else { return }
+        latestJumpRows = []; latestJumpInProgress = false
+        rowWindow.finishLatestJump(); updateTailConstraint(); timeline.contentChanged()
+    }
+    private func resumeContinuousHistory() {
+        guard !latestJumpRows.isEmpty || latestJumpInProgress else { return }
+        let anchor = timeline.cancelLatestJump()
+        if let anchor { rowWindow.focus(on: anchor.id, all: allRows, scope: "history") }
+        latestJumpRows = []; latestJumpInProgress = false; rowWindow.cancelLatestJump()
+        updateTailConstraint(); timeline.restore(anchor)
+    }
+    private func openFile(_ path: String) {
+        let url = (path as NSString).isAbsolutePath ? URL(fileURLWithPath: path) : workspace.appendingPathComponent(path)
+        NSWorkspace.shared.open(url)
+    }
+    var canSend: Bool { ask.hasContent && !ask.isComposing && !["running", "awaiting_approval"].contains(todo.status) }
     func submit() {
         guard canSend else { return }
-        let text = ask.text, source = composerRect
+        resumeContinuousHistory()
+        let text = ask.text
         guard store.ask(todo.id, text: text, files: ask.files) else { return }; ask.clear()
-        if !reduceMotion, text.utf16.count <= 2000, let source, let id = store.selectedTask?.messages.last?.id { pendingFlight = (id.uuidString, text, source) }
+        showLatest(animated: false)
+        PicoSounds.messageSent()
     }
 }
 struct ApprovalCard: View {
@@ -458,15 +643,17 @@ struct ApprovalCard: View {
     let onDecision: (Bool) -> Void
     let onStop: () -> Void
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Image(systemName: "hand.raised")
-                Text(approval.risk == "plan" ? "Approve work plan" : "Your confirmation").font(serif(24))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "hand.raised").font(.system(size: 14))
+                Text(approval.risk == "plan" ? "Approve work plan" : "Your confirmation").font(.system(size: 15, weight: .semibold))
                 Spacer()
                 Button(action: onStop) { Image(systemName: "stop.circle") }.buttonStyle(HoverButtonStyle()).help("Stop task")
-            }
-            Text(approval.app).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-            Text(approval.reason).font(.system(size: 14)).textSelection(.enabled)
+            }.fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+            Text(approval.app).font(.system(size: 12, weight: .medium)).foregroundStyle(TelosTheme.secondary)
+            Text(approval.reason).font(.system(size: 13.5)).lineSpacing(2).textSelection(.enabled)
             if approval.risk == "script" {
                 Text("This script can change apps or files. Confirm only the exact action described and shown below.")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
@@ -477,18 +664,29 @@ struct ApprovalCard: View {
                 }.buttonStyle(HoverButtonStyle()).help("Open the reviewed app screenshot")
             }
             DisclosureGroup("Exact operation") {
-                ScrollView { Text(approval.details).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.softScrollEdges(top: 12, bottom: 16).frame(maxHeight: 150)
+                ScrollView { Text(approval.details).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+                    .softScrollEdges(top: 12, bottom: 16, treatment: .contentFade).frame(maxHeight: 150)
             }.font(.system(size: 12))
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            }.scrollIndicators(.hidden).softScrollEdges(top: 10, bottom: 10, treatment: .contentFade)
+                .frame(minHeight: 40)
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let expired = context.date >= approval.expiresAt
-                HStack(spacing: 16) {
-                    Button(approval.risk == "plan" ? "Approve plan" : "Approve once") { onDecision(true) }.buttonStyle(BlackButton()).disabled(expired)
-                    Button("Deny") { onDecision(false) }.buttonStyle(HoverButtonStyle())
-                    Spacer()
-                    Text(expired ? "Expired" : approval.risk == "plan" ? "Listed steps only" : "One action only").font(.system(size: 11)).foregroundStyle(.secondary)
-                }
+                HStack(spacing: 12) {
+                    Button(approval.risk == "plan" ? "Approve plan" : "Approve once") { onDecision(true) }
+                        .buttonStyle(BlackButton()).disabled(expired).fixedSize()
+                        .help(approval.risk == "plan" ? "Approve the listed steps only" : "Approve this action once")
+                    Button("Deny") { onDecision(false) }.buttonStyle(HoverButtonStyle()).fixedSize()
+                    Spacer(minLength: 0)
+                    ViewThatFits(in: .horizontal) {
+                        Text(expired ? "Expired" : approval.risk == "plan" ? "Listed steps only" : "One action only")
+                            .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize()
+                        Color.clear.frame(width: 0, height: 0)
+                    }
+                }.font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
             }
-        }.padding(20).background(TelosTheme.shade(0.97, 0.17))
+        }.padding(14).background(TelosTheme.raised, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.white.opacity(0.06), lineWidth: 0.5).allowsHitTesting(false) }
     }
 }
 struct MacAccessView: View {
@@ -513,13 +711,17 @@ struct MacAccessView: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
-                        Text("Telos Settings").font(serif(28)); Spacer()
+                        Text("Pico Settings").font(serif(28)); Spacer()
                         Button(action: onClose) { Image(systemName: "xmark").font(.system(size: 14)).frame(width: 28, height: 28) }
                             .buttonStyle(HoverButtonStyle()).accessibilityLabel("Close settings")
                     }.padding(20)
                     Divider()
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
+            PicoAppearanceSettings()
+            Divider()
+            PicoProactivitySettings(coordinator: store.proactivity)
+            Divider()
             if let notice = store.permissionResetNotice {
                 Text(notice).font(.system(size: 13)).padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -550,11 +752,17 @@ struct MacAccessView: View {
                 }
             }
             Divider()
+            PicoGeneratedFilesSettingsView(dataDirectory: store.dataDir)
+            Divider()
+            ZoomConnectionSettingsView(directory: store.dataDir)
+            Divider()
+            ConnectedAppsSettingsView(directory: store.dataDir)
+            Divider()
             Toggle("Automatic execution", isOn: $automaticExecution).font(.system(size: 14, weight: .medium))
             Text("Complete typed and spoken requests without approval clicks, including app actions, scripts and requested sends or changes. Ask only when essential information is missing. You can stop a task at any time. Changes apply to the next task or retry.").font(.system(size: 13)).foregroundStyle(.secondary)
-            Text("macOS permissions, sign-in and identity verification may still need your confirmation. Background feeds only collect and organize information.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text("macOS permissions, sign-in and identity verification may still need your confirmation.").font(.system(size: 12)).foregroundStyle(.secondary)
             Divider()
-            Text("Telos uses macOS Harness to read and operate apps for your tasks. Relevant app text and requested screenshots are sent to DeepSeek for processing.").font(.system(size: 14))
+            Text("Pico uses macOS Harness to read and operate apps for your tasks. Relevant app text and requested screenshots are sent to DeepSeek for processing.").font(.system(size: 14))
             Text("Web search, opening websites, files and skills work without Mac control permissions.").font(.system(size: 13)).foregroundStyle(.secondary)
             MeetingSettingsView(manager: store.meetingManager)
             Divider()
@@ -564,7 +772,7 @@ struct MacAccessView: View {
             Text("Hold still in an editable text field for 0.55 seconds. Speak after the tone, then release to insert. Dragging cancels; password fields are excluded. Automatic insertion does not appear in the keystroke display.").font(.system(size: 13)).foregroundStyle(.secondary)
             BailianSettingsView(settings: BailianSettings(directory: store.dataDir))
             Toggle("Bailian voice typing · Chinese + English", isOn: $bailianDictation)
-            Text("Uses your existing Bailian voice account and Qwen Audio 3.1 ASR Flash for Chinese, English and mixed speech. Held recordings are sent to Bailian and billed by usage. If Bailian is unavailable, Telos automatically recognizes on this Mac without polishing. Turn off to always recognize locally.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Text("Uses your existing Bailian voice account and Qwen Audio 3.1 ASR Flash for Chinese, English and mixed speech. Held recordings are sent to Bailian and billed by usage. If Bailian is unavailable, Pico automatically recognizes on this Mac without polishing. Turn off to always recognize locally.").font(.system(size: 12)).foregroundStyle(.secondary)
             Text(DictationBailianAccount.saved.endpoint == nil ? "Save your Bailian key and workspace above to enable cloud recognition." : "Bailian region and workspace are configured. Test below to check key access and recognition.").font(.system(size: 12)).foregroundStyle(.secondary)
             Button(dictationTestRunning ? "Testing recognition…" : "Test Bailian recognition") {
                 guard let sample = Bundle.main.url(forResource: "dictation-mixed-check", withExtension: "wav") else { return }
@@ -592,7 +800,7 @@ struct MacAccessView: View {
             Button("Record Screen") { (NSApp.delegate as? AppDelegate)?.recordScreen() }
             Button("Soul, Memory & Skills") { store.loadProfile(); showProfile = true }
             Text(store.macAccess).font(.system(size: 14)).textSelection(.enabled)
-            Text("Grant missing system access here once. Telos keeps existing grants across updates and checks again when you return from System Settings.").font(.system(size: 13)).foregroundStyle(.secondary)
+            Text("Grant missing system access here once. Pico keeps existing grants across updates and checks again when you return from System Settings.").font(.system(size: 13)).foregroundStyle(.secondary)
             HStack {
                 Button("Accessibility") {
                     let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -605,20 +813,18 @@ struct MacAccessView: View {
                 }
             }
             HStack {
-                Text(calendar.authorized ? "Calendar: Connected" : "Calendar: Not connected").font(.system(size: 14))
+                Text(calendar.authorized ? "Zoom Calendar: Connected" : "Zoom Calendar: Not connected").font(.system(size: 14))
                 Spacer()
-                Button(calendar.authorized ? "Permissions" : "Connect") {
-                    if calendar.authorized || calendar.status == .denied || calendar.status == .restricted { calendar.openSettings() }
-                    else { calendar.requestAccess() }
+                Button(calendar.requesting ? "Syncing…" : (calendar.needsSignIn ? "Sign in…" : (calendar.status == "disconnected" ? "Connect" : "Sync"))) {
+                    if calendar.needsSignIn || calendar.status == "disconnected" { calendar.requestAccess() }
+                    else { calendar.refresh(force: true) }
                 }.disabled(calendar.requesting)
             }
-            Button("Show Telos in Finder") { NSWorkspace.shared.selectFile(Bundle.main.bundlePath, inFileViewerRootedAtPath: "") }
-            Text("If the system asks you to add an app, choose this Telos.app. After granting access, restart Telos and check again.").font(.system(size: 12)).foregroundStyle(.secondary)
+            Button("Show Pico in Finder") { NSWorkspace.shared.selectFile(Bundle.main.bundlePath, inFileViewerRootedAtPath: "") }
+            Text("If the system asks you to add an app, choose this Pico.app. After granting access, restart Pico and check again.").font(.system(size: 12)).foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(20).progressiveScrollBlur()
                     }.scrollIndicators(.hidden)
                     .softScrollEdges(top: 20, bottom: 24)
-                    Divider()
-                    HStack { Button("Check again") { store.checkMacAccess(); calendar.refresh() }; Spacer(); Button("Done", action: onClose).buttonStyle(BlackButton()) }.padding(20)
                 }
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -644,7 +850,7 @@ struct ProfileView: View {
     @State private var tab = 0
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack { Text("Your Telos").font(serif(30)); Spacer(); Button("Back", action: onClose) }
+            HStack { Text("Your Pico").font(serif(30)); Spacer(); Button("Back", action: onClose) }
             Picker("Profile", selection: $tab) {
                 Text("Soul").tag(0); Text("Memory").tag(1); Text("Skills").tag(2)
             }.pickerStyle(.segmented)
@@ -653,7 +859,7 @@ struct ProfileView: View {
                 TextEditor(text: $draft).font(.system(size: 13, design: .monospaced)).border(Color.gray.opacity(0.2))
                 Button("Save Soul") { store.saveSoul(draft) }.buttonStyle(BlackButton())
             } else if tab == 1 {
-                Text("Shared across tasks. Ask Telos to remember a preference; review or forget it here.").font(.system(size: 13)).foregroundStyle(.secondary)
+                Text("Shared across tasks. Ask Pico to remember a preference; review or forget it here.").font(.system(size: 13)).foregroundStyle(.secondary)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         if store.memoryNotes.isEmpty { Text("No memories yet.").foregroundStyle(.secondary) }
@@ -718,6 +924,8 @@ struct StatusPanelOutline: Shape {
 struct StatusPanelRoot: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var presentation: PanelPresentation
+    @AppStorage(PicoAppearance.preference) private var appearance = PicoAppearance.dark.rawValue
+    @ObservedObject private var liveResize = LiveResizeState.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var panelBackground: Color {
         let detailBrightness = store.selectedTask == nil ? 1.0 : 0.4
@@ -725,10 +933,13 @@ struct StatusPanelRoot: View {
     }
     var body: some View {
         RootView(store: store)
-            .padding(.top, 12)
-            .background(StatusPanelOutline(anchorX: presentation.anchorX).fill(panelBackground))
-            .clipShape(StatusPanelOutline(anchorX: presentation.anchorX))
-
+            .preferredColorScheme(PicoAppearance.resolved(appearance).colorScheme)
+            .environment(\.isLiveResizing, liveResize.active)
+            .onChange(of: appearance) { _, value in
+                // Match AppKit editors and menus to SwiftUI. nil deliberately
+                // removes the override when the user chooses System.
+                (NSApp.delegate as? AppDelegate)?.window?.appearance = PicoAppearance.resolved(value).nativeAppearance
+            }
     }
 }
 
@@ -749,7 +960,7 @@ final class PanelHostingView: NSHostingView<StatusPanelRoot> {
         let anchor = CGPoint(x: layerPoint.x - layer.bounds.width * layer.anchorPoint.x,
                              y: layerPoint.y - layer.bounds.height * layer.anchorPoint.y)
         var collapsed = CATransform3DMakeTranslation(anchor.x, anchor.y, 0)
-        collapsed = CATransform3DScale(collapsed, shown ? 0.01 : 0, shown ? 0.01 : 0, 1)
+        collapsed = CATransform3DScale(collapsed, 0.94, 0.94, 1)
         collapsed = CATransform3DTranslate(collapsed, -anchor.x, -anchor.y, 0)
         let target = shown || reduced ? CATransform3DIdentity : collapsed
         let from = hasPresented ? (layer.presentation()?.sublayerTransform ?? layer.sublayerTransform) : collapsed
@@ -792,13 +1003,14 @@ final class PanelHostingView: NSHostingView<StatusPanelRoot> {
     private var lastMaskFlipped = false
     private var lastMaskScale: CGFloat = 0
     override func layout() {
+        PicoDiag.track("hostingLayout", "\(Int(bounds.width))x\(Int(bounds.height)) live=\(inLiveResize)")
         super.layout()
         guard let layer else { return }
         let scale = window?.backingScaleFactor ?? 2
         let anchor = rootView.presentation.anchorX
         guard lastMaskBounds != bounds || lastMaskAnchor != anchor || lastMaskFlipped != layer.isGeometryFlipped || lastMaskScale != scale else { return }
         lastMaskBounds = bounds; lastMaskAnchor = anchor; lastMaskFlipped = layer.isGeometryFlipped; lastMaskScale = scale
-        let outline = StatusPanelOutline(anchorX: rootView.presentation.anchorX).path(in: bounds).cgPath
+        let outline = RoundedRectangle(cornerRadius: 38, style: .continuous).path(in: bounds).cgPath
         CATransaction.begin(); CATransaction.setDisableActions(true)
         outlineMask.frame = bounds
         if layer.isGeometryFlipped {
@@ -812,6 +1024,12 @@ final class PanelHostingView: NSHostingView<StatusPanelRoot> {
         layer.mask = outlineMask
         layer.masksToBounds = true
         CATransaction.commit()
+        // The shadow follows the outline mask. Recomputing it from the window's
+        // alpha on every live-resize frame is wasted work; do it once at the end.
+        if window?.inLiveResize != true { window?.invalidateShadow() }
+    }
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
         window?.invalidateShadow()
     }
 }
@@ -847,14 +1065,18 @@ final class TelosWindow: NSWindow {
     private var companion: CompanionBridge?
     private var selectionTranslation: SelectionTranslationController?
     private var activityIndicator: StatusActivityIndicator?
+    private var statusButtonFeedback: StatusButtonFeedback?
+    private var chatRunning = false
     private var activitySubscriptions = Set<AnyCancellable>()
     private var outsideClickMonitor: Any?
     private var localClickMonitor: Any?
     private var deactivateObserver: NSObjectProtocol?
     var panelShown = false
+    private var hasPlacedWindow = false
     var transitionID = UUID()
     let presentation = PanelPresentation()
     func applicationDidFinishLaunching(_ notification: Notification) {
+        PicoIdentity.configureApplicationIcon(NSApp)
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "screenshot",
            let path = ProcessInfo.processInfo.environment["TELOS_SCREENSHOT_IMAGE"], let image = NSImage(contentsOfFile: path) {
             let editor = ScreenshotEditor(image: image); screenshotEditor = editor
@@ -871,17 +1093,17 @@ final class TelosWindow: NSWindow {
             DispatchQueue.main.async { KeyDisplayController.shared.start() }
         }
         let view = PanelHostingView(rootView: StatusPanelRoot(store: store, presentation: presentation))
-        window = TelosWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 732), styleMask: [.borderless], backing: .buffered, defer: false)
-        // Inherit the system appearance; the override is only for isolated previews.
-        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil,
-           let mode = ProcessInfo.processInfo.environment["TELOS_PREVIEW_APPEARANCE"] {
-            window.appearance = NSAppearance(named: mode == "dark" ? .darkAqua : .aqua)
-        }
-        window.title = "Telos"; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
+        window = TelosWindow(contentRect: NSRect(x: 0, y: 0, width: 374, height: 528), styleMask: [.borderless, .resizable], backing: .buffered, defer: false)
+        window.appearance = PicoAppearance.resolved(UserDefaults.standard.string(forKey: PicoAppearance.preference)).nativeAppearance
+        window.title = "Pico"; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
         window.backgroundColor = .clear; window.isMovableByWindowBackground = false
-        window.minSize = NSSize(width: 400, height: 732)
-        window.maxSize = window.minSize
-        window.level = .popUpMenu
+        window.minSize = NSSize(width: 220, height: 140)
+        window.maxSize = NSSize(width: 1400, height: 1600)
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil {
+            window.setFrameAutosaveName("PicoMainWindow")
+            _ = window.setFrameUsingName("PicoMainWindow")
+        }
+        window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.isReleasedWhenClosed = false
         window.titlebarSeparatorStyle = .none
@@ -889,32 +1111,39 @@ final class TelosWindow: NSWindow {
 
         window.contentView = view
         window.initialFirstResponder = view
+        LiveResizeState.shared.track(window)
         view.safeAreaRegions = []
+        view.sizingOptions = []
         view.wantsLayer = true; view.layer?.masksToBounds = true
-        window.isOpaque = false; window.hasShadow = true
+        window.isOpaque = false
+        // Keep the system's native window shadow and glass edge, with no
+        // additional application-drawn perimeter.
+        window.hasShadow = true
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            if let url = Bundle.main.url(forResource: "status-icon", withExtension: "pdf"), let icon = NSImage(contentsOf: url) {
-                icon.size = NSSize(width: 16, height: 16); icon.isTemplate = true; button.image = icon
-            } else if let url = Bundle.main.url(forResource: "telos-logo", withExtension: "png"), let icon = NSImage(contentsOf: url) {
-                icon.size = NSSize(width: 16, height: 16); icon.isTemplate = true; button.image = icon
-            }
-            button.toolTip = "Telos"; button.setAccessibilityLabel("Telos")
-            (button.cell as? NSButtonCell)?.showsStateBy = [.changeBackgroundCellMask]
+            button.toolTip = "Pico"; button.setAccessibilityLabel("Pico")
+            statusButtonFeedback = StatusButtonFeedback(button: button)
             button.target = self; button.action = #selector(togglePanel)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             activityIndicator = StatusActivityIndicator(button: button)
             store.$tasks.map(StatusActivityIndicator.runningCount).removeDuplicates()
                 .sink { [weak self] count in
-                    self?.activityIndicator?.update(count: count, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+                    self?.activityIndicator?.update(count: count + (self?.chatRunning == true ? 1 : 0), reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
                 }.store(in: &activitySubscriptions)
             NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
                 .receive(on: RunLoop.main).sink { [weak self] _ in
                     guard let self else { return }
-                    self.activityIndicator?.update(count: StatusActivityIndicator.runningCount(self.store.tasks), reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+                    self.activityIndicator?.update(count: StatusActivityIndicator.runningCount(self.store.tasks) + (self.chatRunning ? 1 : 0), reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
                 }.store(in: &activitySubscriptions)
 
         }
+        NotificationCenter.default.publisher(for: .init("PicoChatActivity"))
+            .receive(on: RunLoop.main).sink { [weak self] notification in
+                guard let self else { return }
+                self.chatRunning = notification.object as? Bool ?? false
+                self.activityIndicator?.update(count: StatusActivityIndicator.runningCount(self.store.tasks) + (self.chatRunning ? 1 : 0),
+                    reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            }.store(in: &activitySubscriptions)
         CalendarStore.shared.$events.combineLatest(CalendarStore.shared.$now)
             .receive(on: RunLoop.main).sink { [weak self] _, _ in self?.updateStatusEvent() }
             .store(in: &activitySubscriptions)
@@ -930,9 +1159,12 @@ final class TelosWindow: NSWindow {
             if let x = ProcessInfo.processInfo.environment["TELOS_PREVIEW_ANCHOR"].flatMap(Double.init) { presentation.anchorX = x }
             presentation.shown = true
         }
-        else if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil { showPanel() }
+        else { showPanel() }
         makeMenu()
         #if TELOS_DIAGNOSTICS
+        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil, let output = ProcessInfo.processInfo.environment["TELOS_PERF_OUTPUT"] {
+            Task { await PicoPerformanceDiagnostics.run(window: window, output: URL(fileURLWithPath: output)) }
+        }
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil, let output = ProcessInfo.processInfo.environment["TELOS_MEETING_DIAGNOSTICS"] {
             Task { await PicoMeetingDiagnostics.run(output: URL(fileURLWithPath: output)) }
         }
@@ -952,8 +1184,19 @@ final class TelosWindow: NSWindow {
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == "recording", ProcessInfo.processInfo.environment["TELOS_RECORDING_SNAPSHOTS"] == nil { recordings.start() }
         if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil,
            ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] == nil {
+            store.proactivity.activityIsBusy = { [weak self] in
+                self?.recordings.isBusy == true || self?.screenshots.isSelecting == true
+                    || self?.store.meetingManager.pico.active == true || self?.store.meetingManager.pico.connecting == true
+            }
+            store.proactivity.start()
             dictation.start()
-            companion = CompanionBridge(store:store,transcribe:{ [weak self] url, reply in self?.dictation.transcribeCompanion(url,reply:reply) },cancel:{ [weak self] in self?.dictation.cancelCompanion() },show:{ [weak self] id in self?.store.selected=id; self?.showPanel() })
+            companion = CompanionBridge(store:store,transcribe:{ [weak self] url, reply in self?.dictation.transcribeCompanion(url,reply:reply) },cancel:{ [weak self] in self?.dictation.cancelCompanion() },show:{ [weak self] id in
+                guard let self else { return }
+                CompanionTaskPresentation.show(id, in: self.store) { self.showPanel() }
+            },showChat:{ [weak self] in
+                guard let self else { return }
+                CompanionChatPresentation.show(in: self.store) { self.showPanel() }
+            })
             companion?.showMeeting = { [weak self] in self?.store.meetingManager.pico.show() }
             store.meetingManager.start()
             selectionTranslation = SelectionTranslationController(store: store)
@@ -973,7 +1216,7 @@ final class TelosWindow: NSWindow {
             }
             screenshots.failed = { [weak self] message in self?.store.error = message; self?.showPanel() }
             if screenshots.register() != noErr {
-                store.screenshotShortcutStatus = "Option+A is unavailable. Another app may be using it. Change that app's shortcut and restart Telos; Take Screenshot is still available in the menu."
+                store.screenshotShortcutStatus = "Option+A is unavailable. Another app may be using it. Change that app's shortcut and restart Pico; Take Screenshot is still available in the menu."
             }
             // Recording hides the panel so it is neither captured nor dismissed by the selection overlay.
             recordings.prepare = { [weak self] in self?.hidePanel() }
@@ -985,7 +1228,7 @@ final class TelosWindow: NSWindow {
         // App updates retain existing permissions. macOS requests any required
         // authorization through the normal feature-specific permission flow.
         if let path = ProcessInfo.processInfo.environment["TELOS_SNAPSHOT"] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
                 view.cacheDisplay(in: view.bounds, to: bitmap)
                 try? bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
@@ -994,7 +1237,11 @@ final class TelosWindow: NSWindow {
         }
     }
     private func updateStatusEvent() {
-        guard let indicator = activityIndicator, let screen = statusItem.button?.window?.screen ?? NSScreen.main else { return }
+        guard let indicator = activityIndicator else { return }
+        // Independent of Calendar permission and its event-fetch lifecycle. The
+        // existing common-mode timer also catches midnight, wake and time changes.
+        indicator.updateDate()
+        guard let screen = statusItem.button?.window?.screen ?? NSScreen.main else { return }
         let calendar = CalendarStore.shared
         let event = CalendarSchedule.menuText(CalendarSchedule.next(calendar.events, now: calendar.now), now: calendar.now)
         let itemFrame = statusItemFrame
@@ -1003,11 +1250,7 @@ final class TelosWindow: NSWindow {
         let width = indicator.setEvent(event, availableWidth: available)
         if statusItem.length != width { statusItem.length = width }
         indicator.layout(width: width)
-        if panelShown {
-            let frame = panelFrame()
-            if window.frame != frame { window.setFrame(frame, display: true) }
-            presentation.anchorX = ((statusButtonFrame?.midX ?? frame.midX) - frame.minX) / frame.width
-        }
+
     }
     private var statusItemFrame: NSRect? {
         guard let button = statusItem.button, let owner = button.window, owner.frame.width > 0 else { return nil }
@@ -1020,15 +1263,16 @@ final class TelosWindow: NSWindow {
     }
     var panelAnimationAnchor: NSPoint {
         guard let view = window.contentView else { return .zero }
-        let tip = StatusPanelOutline(anchorX: presentation.anchorX).arrowTip(in: view.bounds)
+        let tip = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         return NSPoint(x: tip.x, y: view.isFlipped ? tip.y : view.bounds.maxY - (tip.y - view.bounds.minY))
     }
     func panelFrame() -> NSRect {
-        let anchor = statusButtonFrame
-        let screen = statusItem.button?.window?.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        if hasPlacedWindow || window.isVisible || (ProcessInfo.processInfo.environment["TELOS_PREVIEW"] == nil && UserDefaults.standard.string(forKey: "NSWindow Frame PicoMainWindow") != nil) {
+            return window.frame
+        }
+        let screen = NSScreen.main ?? NSScreen.screens[0]
         let safe = screen.visibleFrame
-        return NSRect(x: min(max((anchor?.midX ?? safe.midX) - 200, safe.minX + 8), safe.maxX - 408),
-                      y: min(anchor?.minY ?? safe.maxY, safe.maxY) - 734, width: 400, height: 732)
+        return NSRect(x: safe.midX - 187, y: safe.midY - 264, width: 374, height: 528)
     }
     @objc func togglePanel() {
         if NSApp.currentEvent?.type == .rightMouseUp {
@@ -1040,7 +1284,7 @@ final class TelosWindow: NSWindow {
             let recording = menu.addItem(withTitle: "Record Screen — ⌥R", action: #selector(recordScreen), keyEquivalent: "")
             recording.target = self
             menu.addItem(.separator())
-            menu.addItem(withTitle: "Quit Telos", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            menu.addItem(withTitle: "Quit Pico", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             statusItem.menu = menu; statusItem.button?.performClick(nil); statusItem.menu = nil
             syncStatusHighlight()
             return
@@ -1048,28 +1292,23 @@ final class TelosWindow: NSWindow {
         panelShown ? hidePanel() : showPanel()
     }
     private func syncStatusHighlight() {
-        func apply() {
-            statusItem.button?.state = panelShown ? .on : .off
-            statusItem.button?.highlight(panelShown)
-        }
-        apply()
-        // NSStatusBarButton clears its tracking highlight after mouseUp/action.
-        // Restore the current panel state once that tracking cycle has finished.
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.statusItem.button?.state = self.panelShown ? .on : .off
-            self.statusItem.button?.highlight(self.panelShown)
-        }
+        // The independent window's visibility does not latch the menu-bar item.
+        statusButtonFeedback?.syncAfterTracking()
     }
     @objc func openSettings() { showPanel(); store.showMacAccess = true; store.checkMacAccess() }
     func showPanel() {
-        guard !panelShown else { window.makeKeyAndOrderFront(nil); return }
+        guard !panelShown else {
+            NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
+            window.invalidateShadow()
+            return
+        }
         panelShown = true; let token = UUID(); transitionID = token
         syncStatusHighlight()
         presentation.closing = false
         window.ignoresMouseEvents = false
         startOutsideDismissal()
         let target = panelFrame()
+        hasPlacedWindow = true
         presentation.anchorX = min(1, max(0, ((statusButtonFrame?.midX ?? target.midX) - target.minX) / target.width))
         window.contentView?.needsLayout = true
         let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -1086,6 +1325,12 @@ final class TelosWindow: NSWindow {
             context.duration = reduced ? 0 : 0.24
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().setFrame(target, display: true); window.animator().alphaValue = 1
+        }
+        // Recompute from the final visible outline, after the presentation's
+        // compositing transform and zero-alpha starting frame have settled.
+        DispatchQueue.main.asyncAfter(deadline: .now() + (reduced ? 0 : 0.5)) { [weak self] in
+            guard let self, self.panelShown, self.transitionID == token else { return }
+            self.window.invalidateShadow()
         }
     }
     @objc func hidePanel() {
@@ -1107,24 +1352,7 @@ final class TelosWindow: NSWindow {
         }
     }
 
-    private func startOutsideDismissal() {
-        stopOutsideDismissal()
-        if ProcessInfo.processInfo.environment["TELOS_PREVIEW"] != nil && ProcessInfo.processInfo.environment["TELOS_PREVIEW_PIN"] == "1" { return }
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-            self?.dismissFromOutside()
-        }
-        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            guard let self else { return event }
-            // Keep the status button's own toggle, sheets, menus and file picker functional.
-            if event.window == self.window || event.window == self.statusItem.button?.window { return event }
-            if let eventWindow = event.window, eventWindow.isVisible { return event }
-            self.dismissFromOutside()
-            return event
-        }
-        deactivateObserver = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: NSApp, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.dismissFromOutside() }
-        }
-    }
+    private func startOutsideDismissal() { stopOutsideDismissal() }
     private func dismissFromOutside() {
         guard !screenshots.isSelecting, !recordings.isSelecting else { return }
         // A native file chooser owns a separate window; do not hide its composer underneath it.
@@ -1145,11 +1373,11 @@ final class TelosWindow: NSWindow {
     func makeMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); let app = NSMenu(); appItem.submenu = app
-        app.addItem(withTitle: "About Telos", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-        app.addItem(.separator()); app.addItem(withTitle: "Quit Telos", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"); main.addItem(appItem)
+        app.addItem(withTitle: "About Pico", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        app.addItem(.separator()); app.addItem(withTitle: "Quit Pico", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"); main.addItem(appItem)
         let fileItem = NSMenuItem(); let file = NSMenu(title: "File"); fileItem.submenu = file
         let new = NSMenuItem(title: "New Task", action: #selector(newTask), keyEquivalent: "n"); new.target = self; file.addItem(new)
-        let close = file.addItem(withTitle: "Hide Telos", action: #selector(hidePanel), keyEquivalent: "w"); close.target = self; main.addItem(fileItem)
+        let close = file.addItem(withTitle: "Hide Pico", action: #selector(hidePanel), keyEquivalent: "w"); close.target = self; main.addItem(fileItem)
         let editItem = NSMenuItem(); let edit = NSMenu(title: "Edit"); editItem.submenu = edit
         for (name, action, key) in [("Undo", Selector(("undo:")), "z"), ("Cut", #selector(NSText.cut(_:)), "x"), ("Copy", #selector(NSText.copy(_:)), "c"), ("Paste", #selector(NSText.paste(_:)), "v"), ("Select All", #selector(NSText.selectAll(_:)), "a")] { edit.addItem(withTitle: name, action: action, keyEquivalent: key) }
         let search = NSMenuItem(title: "Search", action: #selector(searchTasks), keyEquivalent: "f"); search.target = self; edit.addItem(search)
@@ -1167,7 +1395,7 @@ final class TelosWindow: NSWindow {
         Task { await recordings.finishBeforeQuit(); await store.meetingManager.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
-    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); selectionTranslation?.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
+    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; store?.proactivity.stop(); store?.chat.stop(); statusButtonFeedback?.stop(); stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); selectionTranslation?.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 #if !TELOS_TEST
@@ -1177,7 +1405,7 @@ final class TelosWindow: NSWindow {
         setenv("PYTHONDONTWRITEBYTECODE", "1", 1)
         let app = NSApplication.shared
         let delegate = AppDelegate()
-        app.delegate = delegate; app.setActivationPolicy(.accessory); app.run()
+        app.delegate = delegate; app.setActivationPolicy(.regular); app.run()
         _ = delegate
     }
 }

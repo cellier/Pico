@@ -1,29 +1,31 @@
 import SwiftUI
-import EventKit
 
 struct CalendarList: View {
     @ObservedObject var calendar: CalendarStore
     var query: String
     var searching: Bool
     @Binding var search: String
+    var topInset: CGFloat = 72
+    var edgeTreatment: ScrollEdgeTreatment = .material
+    var headerInset: CGFloat = 0
+    var contentHorizontalInset: CGFloat = 26
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Next 7 days.").font(serif(32)).lineLimit(1).minimumScaleFactor(0.85).progressiveScrollBlur()
-                    .padding(.horizontal, 26).padding(.top, 72).padding(.bottom, 16)
-                if searching { SearchField(text: $search).padding(.horizontal, 20).padding(.bottom, 12) }
+                    .padding(.horizontal, contentHorizontalInset).padding(.top, topInset + headerInset).padding(.bottom, 16)
+                if searching { SearchField(text: $search).padding(.horizontal, max(0, contentHorizontalInset - 6)).padding(.bottom, 12) }
                 if !calendar.authorized {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Connect your Mac calendar").font(.system(size: 18, weight: .medium))
-                        Text("Show your upcoming events here and in the menu bar. Telos does not send your calendar data to AI.").font(.system(size: 14)).foregroundStyle(.secondary)
-                        if calendar.status == .denied || calendar.status == .restricted {
-                            Button("Open Calendar Permissions") { calendar.openSettings() }
+                        Text(calendar.requesting ? "Syncing Zoom events…" : "Connect your Zoom calendar").font(.system(size: 18, weight: .medium))
+                        Text("Your upcoming events sync from the calendar connected to Zoom. This view does not change them. To create or change an event, ask Pico in Chat.").font(.system(size: 14)).foregroundStyle(.secondary)
+                        if calendar.status == "disconnected" || calendar.needsSignIn {
+                            Button(calendar.needsSignIn ? "Sign in to Zoom…" : "Connect Zoom") { calendar.requestAccess() }.disabled(calendar.requesting)
                         } else {
-                            Button(calendar.requesting ? "Connecting…" : "Connect Calendar") { calendar.requestAccess() }.disabled(calendar.requesting)
+                            Button("Try again") { calendar.refresh(force: true) }.disabled(calendar.requesting)
                         }
-                        Text("macOS calls this Full Access. Telos only reads your events; it does not create or change them.").font(.system(size: 12)).foregroundStyle(.secondary)
                         if let error = calendar.error { Text(error).font(.system(size: 12)).foregroundStyle(.secondary) }
-                    }.padding(.horizontal, 28).padding(.top, 16)
+                    }.padding(.horizontal, contentHorizontalInset + 2).padding(.top, 16)
                 } else {
                     let sections = calendar.days.map { CalendarDay(date: $0.date, events: $0.events.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }) }.filter { !$0.events.isEmpty }
                     LazyVStack(alignment: .leading, spacing: 8) {
@@ -36,12 +38,21 @@ struct CalendarList: View {
                                 }.frame(minHeight: 18).progressiveScrollBlur()
                             }
                         }
-                        if sections.isEmpty { Text(query.isEmpty ? "No upcoming events in the next 7 days" : "No results").font(.system(size: 14)).foregroundStyle(.secondary).padding(.top, 16) }
-                    }.padding(.horizontal, 28).padding(.bottom, 32)
+                        if let error = calendar.error, query.isEmpty {
+                            Text(error).font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 16)
+                            if let saved = calendar.lastSuccessfulSync {
+                                Text("Showing saved events from " + saved.formatted(date: .abbreviated, time: .shortened) + ".")
+                                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                            }
+                            Button(calendar.needsSignIn ? "Sign in to Zoom…" : "Retry sync") {
+                                if calendar.needsSignIn { calendar.requestAccess() } else { calendar.refresh(force: true) }
+                            }.disabled(calendar.requesting)
+                        } else if sections.isEmpty { Text(query.isEmpty ? "No upcoming events in the next 7 days" : "No results").font(.system(size: 14)).foregroundStyle(.secondary).padding(.top, 16) }
+                    }.padding(.horizontal, contentHorizontalInset + 2).padding(.bottom, 32)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }.scrollIndicators(.hidden)
-            .softScrollEdges(top: 72, bottom: 40, alwaysTop: true)
+            .softScrollEdges(top: headerInset > 0 ? headerInset + 12 : (topInset == 72 ? 72 : 20), bottom: edgeTreatment == .contentFade ? 28 : 40, alwaysTop: headerInset > 0 || topInset == 72, treatment: headerInset > 0 ? .underHeader : edgeTreatment)
             .defaultScrollAnchor(ProcessInfo.processInfo.environment["TELOS_PREVIEW_SCROLL"] == "bottom" ? .bottom : .top)
             .onAppear { calendar.refresh() }
     }

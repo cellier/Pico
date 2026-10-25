@@ -37,7 +37,7 @@ class HermesResultTests(unittest.TestCase):
                   'turn_exit_reason': 'max_iterations_reached(50/50)', 'api_calls': 50,
                   'final_response': '消息已发送，任务全部完成。'}
         notice = turn_boundary(result, phone_used=True)
-        self.assertIn('50 轮执行上限', notice['text'])
+        self.assertIn('已经做了 50 步', notice['text'])
         self.assertIn('实际发送状态', notice['text'])
         self.assertIn('避免重复发送', notice['text'])
         self.assertNotIn('消息已发送', notice['text'])
@@ -51,7 +51,7 @@ class HermesResultTests(unittest.TestCase):
                  ({'failure_reason': 'context_overflow'}, '会话内容'),
                  ({'failure_reason': 'session_busy'}, '仍占用'),
                  ({'failure_reason': 'empty_response'}, '未返回完整回复'),
-                 ({'turn_exit_reason': 'budget_exhausted'}, '执行额度'),
+                 ({'turn_exit_reason': 'budget_exhausted'}, '执行时间已用完'),
                  ({'turn_exit_reason': 'guardrail_halt'}, '执行保护'),
                  ({'failed': False, 'partial': False}, '提前停止')]
         for flags, expected in cases:
@@ -161,7 +161,7 @@ class WorkerIncompleteIntegrationTests(unittest.TestCase):
                     events = [json.loads(line) for line in output.getvalue().splitlines()]
                     self.assertEqual(events[-1]['type'], 'done')
                     self.assertEqual(events[-1]['status'], 'needs_input')
-                    self.assertIn('50 轮执行上限', events[-1]['text'])
+                    self.assertIn('已经做了 50 步', events[-1]['text'])
                     self.assertIn('避免重复发送', events[-1]['text'])
                     self.assertNotIn('Incorrect success', events[-1]['text'])
                 path = data / 'tasks' / task_id

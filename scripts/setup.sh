@@ -11,6 +11,7 @@ uv pip install --python .runtime/venv/bin/python -e .runtime/macos-harness
 uv pip install --python .runtime/venv/bin/python -r Backend/requirements.txt
 python3 scripts/runtime-checkout.py hermes-agent --stamp
 python3 scripts/runtime-phone.py
+python3 scripts/setup-xurl.py
 .runtime/venv/bin/python -m playwright install chromium
 python3 scripts/configure.py
 python3 scripts/configure-presentations.py

@@ -94,7 +94,7 @@ class FeedRepository:
             db.execute('''INSERT INTO feeds(id,title,rules,sources,interval_minutes,enabled,updated,task_id,revision,lookback_hours,group_by_competitor) VALUES(?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET title=excluded.title,rules=excluded.rules,sources=excluded.sources,interval_minutes=excluded.interval_minutes,enabled=excluded.enabled,updated=excluded.updated,revision=excluded.revision,lookback_hours=excluded.lookback_hours,group_by_competitor=excluded.group_by_competitor''',
                 (feed_id,title,rules,json.dumps(sources),interval,int(field('enabled',True)),time.time(),task_id,revision,lookback,int(grouped)))
-        return {'feed':next(f for f in self.snapshot()['feeds'] if f['id']==feed_id),'refresh_note':'Automatic refresh runs while Telos is open. An unspecified schedule is manual.'}
+        return {'feed':next(f for f in self.snapshot()['feeds'] if f['id']==feed_id),'refresh_note':'Automatic refresh runs while Pico is open. An unspecified schedule is manual.'}
     def publish(self,args,run_id=None):
         feed_id=args['feed_id'];entries=args['items']
         if not isinstance(entries,list) or len(entries)>60:raise ValueError('Publish 0–60 items; an empty list completes a refresh with no new news')

@@ -690,6 +690,28 @@ class PhoneExecutionTests(unittest.TestCase):
                                        next_call=lambda args: original)
         self.assertIs(result, original)
 
+    def test_migrated_workspace_import_uses_physical_folder_not_legacy_alias(self):
+        from PIL import Image
+        workspace = self.data / 'PicoFiles/Tasks/fixture'
+        workspace.mkdir(parents=True)
+        bridge = self.bridge(workspace=workspace)
+        legacy = bridge.task_dir / 'files'
+        legacy.parent.mkdir(parents=True)
+        legacy.symlink_to(workspace)
+        executed = []
+        official = self.hermes.pipeline(executed)
+        def screenshot(args):
+            result = json.loads(official(args))
+            source = workspace / 'source.png'
+            Image.new('RGB', (326, 720), 'white').save(source)
+            result['screenshots'] = [str(source)]
+            return json.dumps(result)
+        result = json.loads(bridge.middleware(tool_name='phone_exec', args={'code': 'print(screenshot())'}, next_call=screenshot))
+        self.assertTrue(result['success'])
+        self.assertTrue((workspace / result['task_images'][0]['name']).is_file())
+        self.assertEqual(result['task_images'][0]['width'], 326)
+        self.assertTrue(legacy.is_symlink())
+
     def test_manual_denial_stops_execution_and_retries(self):
         executed = []
         bridge = self.bridge()

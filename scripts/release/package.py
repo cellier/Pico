@@ -4,9 +4,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
-VERSION = '0.5.1'
+VERSION = os.environ.get('PICO_RELEASE_VERSION', '0.6.0')
 DIST = ROOT / 'dist'
-APP = DIST / 'stage/Telos.app'
+APP = DIST / 'stage/Pico.app'
 RES = APP / 'Contents/Resources'
 RUNTIME = RES / 'Runtime'
 PINS = json.loads((ROOT / 'scripts/runtime-pins.json').read_text())
@@ -23,7 +23,7 @@ for name, pin in PINS.items():
 if '--skip-build' not in sys.argv: run('./scripts/build.sh')
 DIST.mkdir(exist_ok=True)
 if (DIST / 'stage').exists(): shutil.rmtree(DIST / 'stage')
-shutil.copytree(ROOT / 'build/Telos.app', APP, symlinks=True, ignore=ignore)
+shutil.copytree(ROOT / 'build/Pico.app', APP, symlinks=True, ignore=ignore)
 runtime_sites = {}
 for name, env in [('main','venv'), ('speech','speech-venv')]:
     source = ROOT / '.runtime' / env
@@ -128,9 +128,9 @@ run(sys.executable,ROOT/'scripts/release/verify.py',APP)
 run('codesign','--verify','--deep','--strict',APP)
 os.symlink('/Applications', DIST/'stage/Applications')
 shutil.copy2(ROOT/'docs/RELEASE.md',DIST/'stage/READ ME.txt')
-dmg = DIST/f'Telos-{VERSION}-macOS-arm64.dmg'
+dmg = DIST/f'Pico-{VERSION}-macOS-arm64.dmg'
 if dmg.exists(): dmg.unlink()
-run('hdiutil','create','-volname',f'Telos {VERSION}','-srcfolder',DIST/'stage','-format','UDZO',dmg)
+run('hdiutil','create','-volname',f'Pico {VERSION}','-srcfolder',DIST/'stage','-format','UDZO',dmg)
 run('hdiutil','verify',dmg)
 digest=hashlib.sha256()
 with dmg.open('rb') as f:

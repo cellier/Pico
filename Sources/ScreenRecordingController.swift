@@ -27,7 +27,7 @@ private struct RecordingFailure: LocalizedError {
 }
 
 /// Option+R: click records a whole display, Space then click records a window, dragging records an area.
-/// Escape cancels selection. The stop bar is excluded from the video; the MP4 is saved to the Desktop and copied.
+/// Escape cancels selection. The stop bar is excluded from the video; the MP4 is saved in Pico Files and copied.
 @MainActor final class ScreenRecordingController {
     private enum Phase { case idle, selecting, starting, recording, finishing }
     private var phase = Phase.idle
@@ -36,6 +36,7 @@ private struct RecordingFailure: LocalizedError {
     var prepare: () -> Void = {}
     var failed: (String) -> Void = { _ in }
     var isSelecting: Bool { phase == .selecting }
+    var isBusy: Bool { phase != .idle }
 
     fileprivate let setup = RecordingSetup()
     private var overlays: [RecordingOverlayWindow] = []
@@ -128,7 +129,7 @@ private struct RecordingFailure: LocalizedError {
         guard #available(macOS 15, *) else { failed("Screen recording requires macOS 15 or later."); return }
         guard CGPreflightScreenCaptureAccess() else {
             _ = CGRequestScreenCaptureAccess()
-            failed("Allow Screen Recording for Telos in System Settings, then press Option+R again.")
+            failed("Allow Screen Recording for Pico in System Settings, then press Option+R again.")
             return
         }
         prepare()
@@ -244,7 +245,7 @@ private struct RecordingFailure: LocalizedError {
             guard phase == .selecting, setup.camera == id else { return }
             guard allowed else {
                 setup.camera = nil
-                notice = "Allow Camera for Telos in System Settings › Privacy & Security › Camera"
+                notice = "Allow Camera for Pico in System Settings › Privacy & Security › Camera"
                 refresh(); return
             }
             let bubble = camera ?? RecordingCameraBubble()
@@ -289,10 +290,10 @@ private struct RecordingFailure: LocalizedError {
     private func launch(_ target: RecordingTarget, microphone: String?, cameraID: String?, systemAudio: Bool) async {
         do {
             if microphone != nil, !(await Self.access(.audio)) {
-                throw RecordingFailure(message: "Allow Microphone for Telos in System Settings, or record with the microphone off.")
+                throw RecordingFailure(message: "Allow Microphone for Pico in System Settings, or record with the microphone off.")
             }
             if cameraID != nil, camera == nil {
-                throw RecordingFailure(message: "The camera preview could not start. Allow Camera for Telos in System Settings, or record with the camera off.")
+                throw RecordingFailure(message: "The camera preview could not start. Allow Camera for Pico in System Settings, or record with the camera off.")
             }
             guard let screen = NSScreen.screens.first(where: { $0.recordingDisplayID == target.displayID }) else {
                 throw RecordingFailure(message: "The selected display is no longer connected.")
@@ -386,18 +387,18 @@ private struct RecordingFailure: LocalizedError {
         default: return false
         }
     }
-    /// Move the finished movie to the Desktop, named by its start time, and put the file on the clipboard.
-    static func deliver(_ temporary: URL, startedAt: Date, error: Error?) throws -> URL {
+    /// Move the finished movie into Pico Files, named by its start time, and copy its URL.
+    static func deliver(_ temporary: URL, startedAt: Date, error: Error?, to pasteboard: NSPasteboard = .general) throws -> URL {
         let size = (try? FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.intValue ?? 0
         guard size > 0 else {
             try? FileManager.default.removeItem(at: temporary)
             throw RecordingFailure(message: "The recording could not be finished\(error.map { ": \($0.localizedDescription)" } ?? ".")")
         }
-        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
-        let destination = ScreenRecordingRules.availableURL(named: ScreenRecordingRules.fileName(startedAt: startedAt), in: desktop)
+        let directory = try PicoFileStorage.exportDirectory("Recordings")
+        let destination = ScreenRecordingRules.availableURL(named: ScreenRecordingRules.fileName(startedAt: startedAt), in: directory)
         do { try FileManager.default.moveItem(at: temporary, to: destination) }
-        catch { throw RecordingFailure(message: "Could not save the recording to the Desktop. It remains at \(temporary.path).") }
-        if !copyRecording(destination) { throw RecordingFailure(message: "Saved \(destination.lastPathComponent) to the Desktop, but could not copy it.") }
+        catch { throw RecordingFailure(message: "Could not save the recording to Pico Files. It remains at \(temporary.path).") }
+        if !copyRecording(destination, to: pasteboard) { throw RecordingFailure(message: "Saved \(destination.lastPathComponent) to Pico Files, but could not copy it.") }
         return destination
     }
     @discardableResult
@@ -484,7 +485,7 @@ final class RecordingOverlayWindow: NSWindow {
         level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue - 1)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         isReleasedWhenClosed = false; animationBehavior = .none; acceptsMouseMovedEvents = true
-        title = "Telos Recording Selection"
+        title = "Pico Recording Selection"
         contentView = overlay
         overlay.addSubview(hintHost)
     }

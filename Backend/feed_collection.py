@@ -108,7 +108,7 @@ def parse_feed(text, base):
 
 def fetch_source(url,headers=None):
     from worker import validate_url, PublicRedirect
-    req=urllib.request.Request(validate_url(url),headers={'User-Agent':'Telos/0.5 Feed collector',**(headers or {})})
+    req=urllib.request.Request(validate_url(url),headers={'User-Agent':'Pico/0.6 Feed collector',**(headers or {})})
     try:
         with urllib.request.build_opener(PublicRedirect).open(req,timeout=12) as response:
             kind=response.headers.get('Content-Type','')

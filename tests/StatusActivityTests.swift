@@ -11,42 +11,45 @@ import AppKit
         precondition(StatusActivityIndicator.runningCount(tasks) == 2)
         indicator.update(count: 2, reduceMotion: false)
         let key = StatusActivityIndicator.animationKey
-        precondition(indicator.iconView.rotationLayer.animation(forKey: key) != nil)
-        precondition(button.toolTip == "Telos — 2 tasks running")
-        let turn = indicator.iconView.rotationLayer.animation(forKey: key) as! CAKeyframeAnimation
-        precondition(turn.keyPath == "transform.rotation.z" && turn.duration == 2.5)
-        let values = (turn.values as! [NSNumber]).map(\.doubleValue)
-        precondition(values.count == 3 && values[0] == 0 && values[1] == -2 * Double.pi && values[1] == values[2])
-        // Clockwise in the icon's unflipped AppKit plane, including across each pause.
+        precondition(indicator.iconView.rotationLayer.animation(forKey: key) == nil)
+        precondition(button.toolTip == "Pico — 2 tasks running")
+        // Meeting, task and Chat activity all keep the date upright.
         precondition(!indicator.iconView.isFlipped)
-        precondition(values.last == -2 * Double.pi)
-        precondition(zip(values, values.dropFirst()).allSatisfy { $1 <= $0 })
+        precondition(CATransform3DIsIdentity(indicator.iconView.rotationLayer.transform))
         precondition(button.image != nil)
         precondition(indicator.iconView.hitTest(.zero) == nil)
         indicator.iconView.layoutSubtreeIfNeeded()
         precondition(indicator.iconView.rotationLayer.anchorPoint == CGPoint(x: 0.5, y: 0.5))
-        precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 8, y: 8))
-        // AppKit layout changes the host origin, never the icon's local rotation center.
+        precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 9, y: 9))
+        precondition(indicator.iconFrame == NSRect(x: 3, y: 3, width: 18, height: 18))
+        // AppKit layout changes the host origin, never the icon's local center.
         indicator.iconView.setFrameOrigin(NSPoint(x: 37, y: 11))
         indicator.iconView.needsLayout = true; indicator.iconView.layoutSubtreeIfNeeded()
-        precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 8, y: 8))
+        precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 9, y: 9))
         precondition(indicator.iconView.layer?.animation(forKey: key) == nil)
-        indicator.update(count: 1, reduceMotion: false)
-        precondition(indicator.iconView.rotationLayer.animationKeys()?.count == 1)
-        // Layer removal must not orphan the existing timer or create a second one.
-        indicator.iconView.rotationLayer.removeAllAnimations()
-        for _ in 0..<8 { indicator.update(count: 1, reduceMotion: false) }
-        indicator.update(count: 1, reduceMotion: true)
-        precondition(indicator.iconView.rotationLayer.animation(forKey: key) == nil)
+        // A status update also clears any stale transform/animation left on the layer.
+        let oldTurn = CABasicAnimation(keyPath: "transform.rotation.z")
+        oldTurn.toValue = -2 * Double.pi; oldTurn.duration = 2.5; oldTurn.repeatCount = .infinity
+        indicator.iconView.rotationLayer.add(oldTurn, forKey: key)
+        indicator.iconView.rotationLayer.transform = CATransform3DMakeRotation(0.5, 0, 0, 1)
+        for reduceMotion in [false, true] {
+            for count in [1, 2, 12] {
+                indicator.update(count: count, reduceMotion: reduceMotion)
+                precondition(indicator.iconView.rotationLayer.animation(forKey: key) == nil)
+                precondition(CATransform3DIsIdentity(indicator.iconView.rotationLayer.transform))
+                precondition(button.toolTip == "Pico — \(count) tasks running")
+            }
+            let activeCount = indicator.renderedImageCount
+            RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+            precondition(indicator.renderedImageCount == activeCount, "Active tasks/meetings must not redraw from an animation timer")
+        }
         precondition(indicator.iconView.superview === indicator.contentView)
-        indicator.update(count: 1, reduceMotion: false)
-        precondition(indicator.iconView.rotationLayer.animation(forKey: key) != nil)
         indicator.update(count: 0, reduceMotion: false)
         precondition(indicator.iconView.rotationLayer.animation(forKey: key) == nil)
         let stoppedCount = indicator.renderedImageCount
-        RunLoop.main.run(until: Date().addingTimeInterval(0.35))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
         precondition(indicator.renderedImageCount == stoppedCount, "Idle icon must not keep rendering from an orphaned timer")
-        precondition(button.toolTip == "Telos" && button.image != nil && indicator.iconView.superview === indicator.contentView)
+        precondition(button.toolTip == "Pico" && button.image != nil && indicator.iconView.superview === indicator.contentView)
         precondition(button.subviews.isEmpty, "Status items must not snapshot custom subviews")
         let rendered = indicator.renderedImageCount
         for _ in 0..<100 { indicator.update(count: 0, reduceMotion: false) }
@@ -63,8 +66,8 @@ import AppKit
         button.setFrameSize(NSSize(width: width, height: 24)); indicator.layout()
         indicator.update(count: 1, reduceMotion: false)
         indicator.iconView.layoutSubtreeIfNeeded()
-        precondition(indicator.iconFrame.minX == 5 && indicator.iconFrame.width == 16)
-        precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 8, y: 8))
+        precondition(indicator.iconFrame.minX == 4 && indicator.iconFrame.width == 18)
+        precondition(indicator.iconView.rotationLayer.position == CGPoint(x: 9, y: 9))
         precondition(button.toolTip?.contains(sample.title) == true)
         let labels = indicator.contentView.subviews.compactMap { $0 as? NSTextField }
         let timeLabel = labels.first { $0.stringValue == sample.time }!
@@ -76,6 +79,9 @@ import AppKit
             button.setFrameSize(NSSize(width: width, height: height)); indicator.layout()
             precondition(labels.allSatisfy { $0.frame.minY >= 0 && $0.frame.maxY <= height })
             precondition(timeLabel.frame.minX == titleLabel.frame.minX)
+            precondition(indicator.iconFrame.height == 18 && indicator.iconFrame.minY == (height - 18) / 2)
+            precondition(indicator.iconFrame.minY >= 0 && indicator.iconFrame.maxY <= height)
+            precondition(indicator.iconFrame.maxX < timeLabel.frame.minX, "The larger calendar must retain a gap before event text")
         }
         button.setFrameSize(NSSize(width: width, height: 24)); indicator.layout()
         let longTitle = String(repeating: "很长的日程名称 · long event 👩🏽‍💻 ", count: 100)
@@ -87,6 +93,7 @@ import AppKit
         precondition(compact == NSStatusBar.system.thickness)
         button.setFrameSize(NSSize(width: compact, height: 24)); indicator.layout()
         precondition(indicator.iconFrame.minX >= 0 && indicator.iconFrame.maxX <= compact)
+        precondition(indicator.iconFrame.width == 18 && indicator.iconFrame.midX == compact / 2)
         precondition(indicator.contentView.subviews.compactMap { $0 as? NSTextField }.allSatisfy { $0.isHidden })
         let screen = NSRect(x: 0, y: 0, width: 1512, height: 982)
         let right = NSRect(x: 850, y: 950, width: 662, height: 32)
@@ -124,6 +131,6 @@ import AppKit
                 try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))
             }
         }
-        print("PASS: two-line time/title, compact typography, 22/24/32-point bars, width limits, icon fallback, full tooltip")
+        print("PASS: static 18-point calendar during activity, no timer redraws, two-line time/title, 22/24/32-point bars, width limits, icon fallback, full tooltip")
     }
 }

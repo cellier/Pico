@@ -5,7 +5,7 @@ app=Path(sys.argv[1]).resolve()
 plist=plistlib.loads((app/'Contents/Info.plist').read_bytes())
 assert not plist['TelosPython'].startswith('/') and not plist['TelosSpeechPython'].startswith('/')
 res=app/'Contents/Resources'
-with tempfile.TemporaryDirectory(prefix='Telos release check ') as temp:
+with tempfile.TemporaryDirectory(prefix='Pico release check ') as temp:
     home=Path(temp)/'clean-home';home.mkdir()
     env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(home),'TMPDIR':temp,'TELOS_DATA_DIR':str(home/'data'),'HF_HUB_OFFLINE':'1','PYTHONDONTWRITEBYTECODE':'1','HERMES_HOME':str(home/'hermes')}
     script='''import os,sys,json,tempfile,importlib.metadata
@@ -26,8 +26,8 @@ bundle_root = root.parents[3]
 assert all(Path(p).resolve().is_relative_to(bundle_root) for p in sys.path if p and Path(p).exists()), sys.path
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True)
-    page=browser.new_page();page.set_content('<title>Telos packaging test</title><h1>Ready</h1>')
-    assert page.title()=='Telos packaging test'
+    page=browser.new_page();page.set_content('<title>Pico packaging test</title><h1>Ready</h1>')
+    assert page.title()=='Pico packaging test'
     page.screenshot(path=os.path.join(os.environ['TMPDIR'],'browser.png'));browser.close()
 print('PASS bundled Hermes, Harness, native bridges, document libraries and Chromium')
 '''

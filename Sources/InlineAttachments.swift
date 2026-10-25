@@ -255,6 +255,7 @@ struct InlineComposerEditor: NSViewRepresentable {
         view.minSize = NSSize(width: 0, height: 20)
         view.isRichText = true; view.importsGraphics = false; view.allowsUndo = true; view.drawsBackground = false
         view.font = .systemFont(ofSize: 14); view.textColor = .labelColor; view.textContainerInset = NSSize(width: 0, height: 1)
+        view.insertionPointColor = .white
         view.textContainer?.lineFragmentPadding = 0; view.isHorizontallyResizable = false; view.isVerticallyResizable = true
         view.autoresizingMask = [.width]; view.textContainer?.widthTracksTextView = true
         view.delegate = context.coordinator; view.draft = draft; draft.editor = view
@@ -270,6 +271,7 @@ struct InlineComposerEditor: NSViewRepresentable {
             view.scheduleMeasurement()
         }
         view.typingAttributes = [.font: NSFont.systemFont(ofSize: 14), .foregroundColor: NSColor.labelColor]
+        view.insertionPointColor = .white
         view.setAccessibilityLabel(placeholder)
     }
     final class Coordinator: NSObject, NSTextViewDelegate {

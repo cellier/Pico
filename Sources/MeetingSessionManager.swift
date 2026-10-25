@@ -101,7 +101,7 @@ import Combine
             for var session in try repository.load(onError: { self.setupMessage = $0 }) {
                 if [.preparing, .recording, .finishing].contains(session.status) {
                     session.status = .interrupted; session.endTime = Date()
-                    session.notice = "Telos stopped during this meeting. Saved transcript is preserved; the missing interval was not recorded."
+                    session.notice = "Pico stopped during this meeting. Saved transcript is preserved; the missing interval was not recorded."
                     try repository.save(session)
                 }
                 for i in session.suggestions.indices {
@@ -162,11 +162,11 @@ import Combine
             repairingAccess = false
             refreshAccessState()
             if result {
-                repairMessage = "Old Accessibility permission cleared. Add this Telos app and turn it on in System Settings. If macOS asks, quit and reopen Telos."
+                repairMessage = "Old Accessibility permission cleared. Add this Pico app and turn it on in System Settings. If macOS asks, quit and reopen Pico."
                 let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
                 _ = AXIsProcessTrustedWithOptions(options)
             } else {
-                repairMessage = "macOS could not clear Accessibility. Remove Telos from the list, then add this app again and turn it on."
+                repairMessage = "macOS could not clear Accessibility. Remove Pico from the list, then add this app again and turn it on."
             }
             openPermissionSettings("Privacy_Accessibility")
         }
@@ -402,6 +402,6 @@ import Combine
         let pendingAnalysis = Array(analysisTasks.values)
         for task in pendingAnalysis { task.cancel() }
         for task in pendingAnalysis { await task.value }
-        await finish(interrupted: true, notice: "Telos closed during this meeting. Saved transcript is retained.")
+        await finish(interrupted: true, notice: "Pico closed during this meeting. Saved transcript is retained.")
     }
 }

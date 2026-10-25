@@ -87,7 +87,7 @@ struct PicoMemoryReview: View {
     @State private var error: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("用于会议的 Telos 记忆").font(.title2)
+            Text("用于会议的 Pico 记忆").font(.title2)
             Text("只检索下方勾选的记忆。相关片段会发送到百炼，Pico 可据此回答参会者。密码、家庭隐私等明显敏感条目自动排除；请再检查其他不想分享的内容。").font(.callout).foregroundStyle(.secondary)
             if let error { Text(error).foregroundStyle(.red) }
             List(notes) { note in
@@ -103,7 +103,7 @@ struct PicoMemoryReview: View {
         }.padding(20).frame(width: 660, height: 540)
             .task {
                 let loaded = await Task.detached { Result { try PicoMemoryStore.load(directory: directory) } }.value
-                switch loaded { case .success(let values): notes = values; case .failure: error = "无法读取 Telos 记忆。" }
+                switch loaded { case .success(let values): notes = values; case .failure: error = "无法读取 Pico 记忆。" }
             }
     }
 }

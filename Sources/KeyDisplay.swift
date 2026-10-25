@@ -100,7 +100,7 @@ private struct KeyDisplayHUD: View {
         if !enabled { return "Keystroke display is off." }
         if !permissionGranted { return "Input Monitoring permission is required." }
         if secureInput { return "Paused during secure input." }
-        return monitoring ? "Ready · keys appear at the bottom of your screen." : "Could not start. Check permission or restart Telos."
+        return monitoring ? "Ready · keys appear at the bottom of your screen." : "Could not start. Check permission or restart Pico."
     }
     func start() {
         guard timer == nil else { return }
@@ -202,7 +202,7 @@ private struct KeyDisplayHUD: View {
         if let existing = self.panel { panel = existing }
         else {
             panel = KeyDisplayPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            panel.title = "Telos Keystrokes"; panel.isOpaque = false; panel.backgroundColor = .clear
+            panel.title = "Pico Keystrokes"; panel.isOpaque = false; panel.backgroundColor = .clear
             panel.level = .screenSaver; panel.hasShadow = false; panel.ignoresMouseEvents = true
             panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]

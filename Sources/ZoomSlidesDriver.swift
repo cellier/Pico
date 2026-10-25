@@ -32,7 +32,7 @@ actor ZoomSlidesDriver {
             switch self {
             case .cancelled: return "幻灯片操作已取消。"
             case .busy: return "另一个幻灯片操作尚未结束。"
-            case .permissionRequired: return "需要在 macOS 中正常授予 Telos 辅助功能权限。"
+            case .permissionRequired: return "需要在 macOS 中正常授予 Pico 辅助功能权限。"
             case .zoomNotRunning: return "未找到正在运行的 Zoom。"
             case .ambiguousMeeting: return "无法唯一确认目标 Zoom 会议，未执行操作。"
             case .meetingChanged: return "目标 Zoom 会议或进程已变化，幻灯片操作已停止。"
@@ -115,12 +115,9 @@ actor ZoomSlidesDriver {
                 guard pickers.count == 1, opened else { throw Failure.unavailable("共享选择器不属于本次操作，未继续。") }
                 if submitted { try await poll(ticket, deadline); continue }
                 let picker = pickers[0]
-                let switches = picker.nodes.filter { $0.enabled && $0.named(["Switch"]) && ["AXTabGroup", "AXTabControl", "AXRadioGroup", "AXButton"].contains($0.role) }
-                guard switches.count == 1, let tab = switches.first else { throw Failure.unavailable("无法确认共享选择器标签。") }
-                let tabValue = Self.normalized(tab.value)
-                if tabValue != "files, 2 of 3" {
-                    guard tabs < 3, ["screens, 1 of 3", "more, 3 of 3"].contains(tabValue) else { throw Failure.unavailable("共享选择器标签状态不受支持。") }
-                    try perform(.key(tab.id, tabValue == "screens, 1 of 3" ? 124 : 123), ticket, deadline); tabs += 1
+                if let action = try ZoomSharePickerTabs.filesAction(in: picker) {
+                    guard tabs < 3 else { throw Failure.unavailable("共享选择器未切换到 Files，未继续共享。") }
+                    try perform(action, ticket, deadline); tabs += 1
                     try await poll(ticket, deadline); continue
                 }
                 let files = picker.nodes.filter { node in
@@ -228,8 +225,10 @@ actor ZoomSlidesDriver {
                 switch expected {
                 case .pickerOpened:
                     let pickers = state.windows.filter { Self.isSharePicker($0.title) || $0.nodes.prefix(1).flatMap(\.text).contains(where: Self.isSharePicker) }
-                    let switches = pickers.flatMap(\.nodes).filter { $0.enabled && $0.named(["Switch"]) && ["AXTabGroup", "AXTabControl", "AXRadioGroup", "AXButton"].contains($0.role) }
-                    matched = pickers.count == 1 && switches.count == 1 && ["screens, 1 of 3", "files, 2 of 3", "more, 3 of 3"].contains(Self.normalized(switches[0].value))
+                    if pickers.count == 1 {
+                        do { _ = try ZoomSharePickerTabs.filesAction(in: pickers[0]); matched = true }
+                        catch { matched = false }
+                    } else { matched = false }
                 case .permissionPaneOrTargetActive: matched = permissions != nil || status.sharing == .active
                 case .presentSelected: matched = permissions?.present == true
                 case .persistentDisabled: matched = permissions?.persistent == false
@@ -330,15 +329,29 @@ actor ZoomSlidesDriver {
         if isSharePicker(title) || isSharePicker(description) { return "share-picker" }
         return nil
     }
-    static func permitsMissingDescriptor(_ name: String, error: AXError, role: String?, windowType: String, supportedAttributes: [String]?) -> Bool {
+    static func permitsMissingDescriptor(_ name: String, error: AXError, role: String?, supportedAttributes: [String]?, childrenRead: Bool = false, identityRead: Bool = false, identifier: String? = nil, hasURL: Bool = false, presentationContent: Bool = false, windowType: String? = nil, hasNonemptyURL: Bool? = nil) -> Bool {
         guard [kAXTitleAttribute, kAXDescriptionAttribute].contains(name), [.failure, .notImplemented, .illegalArgument].contains(error) else { return false }
-        // -25200 is the SDK's generic system failure, not "unsupported". An
-        // authoritative names list can independently prove this field absent.
+        // A public names query can prove a descriptor absent, independently of
+        // the generic error. This is not an inference from a failed read alone.
         if let supportedAttributes, !supportedAttributes.contains(name) { return true }
-        // Observed Zoom picker text areas return failure for their optional
-        // description even after a public single read. This role cannot select
-        // an action or file row; absent text cannot establish presentation proof.
-        return error == .failure && name == kAXDescriptionAttribute && role == "AXTextArea" && windowType == "share-picker"
+        // Share-flow text areas and list containers are supplemental metadata, never selectable files,
+        // action controls or live slide proof. Zoom gives these text areas opaque
+        // identifiers (and sometimes fails that optional identifier read too).
+        // Neither case makes their description required. Preserve successful
+        // text/identity and every child, with document and exit proof excluded.
+        let sharingText = ["share-picker", "permission-probe", "share-permissions"].contains(windowType ?? "")
+        let identityProof = identifier == "MeetingTopBarInfoButton" || identifier == "zm.meeting.window.main"
+            || identifier?.hasPrefix("zm.meeting.window.leave") == true
+        if name == kAXDescriptionAttribute && ["AXTextArea", "AXList"].contains(role ?? "") && sharingText
+            && childrenRead && !(hasNonemptyURL ?? hasURL) && !presentationContent && !identityProof { return true }
+        // Plain text and layout objects can advertise a description yet fail
+        // its public single read. They do not identify actions or documents.
+        // Keep the node and full subtree; never infer missing text as evidence.
+        // Controls/rows/windows and all live document content stay strict: hiding
+        // a label there could make ambiguous controls or page counters unique.
+        let passiveRoles: Set<String> = ["AXTextArea", "AXStaticText", "AXUnknown", "AXGroup", "AXScrollArea", "AXSplitGroup", "AXImage"]
+        return name == kAXDescriptionAttribute && role.map(passiveRoles.contains) == true
+            && childrenRead && identityRead && (identifier ?? "").isEmpty && !hasURL && !presentationContent
     }
     static func permitsMissingAttribute(_ name: String, error: AXError) -> Bool {
         // A leaf normally has no AXChildren. AXRole, however, is required to select
@@ -521,23 +534,60 @@ enum ZoomSlidesSnapshotReader {
     }
 }
 
+/// Injectable public AX reads. Fixture tests exercise the same batch decoding,
+/// single-read recovery and window traversal without contacting another process.
+struct ZoomSlidesAXReadClient {
+    var multiple: (AXUIElement, [String]) -> (AXError, CFArray?)
+    var single: (AXUIElement, String) -> (AXError, CFTypeRef?)
+    var names: (AXUIElement) -> (AXError, CFArray?)
+    var count: (AXUIElement, String) -> (AXError, CFIndex)
+    var values: (AXUIElement, String, CFIndex) -> (AXError, CFArray?)
+    var timeout: (AXUIElement, Float) -> Void
+    static let system = ZoomSlidesAXReadClient(
+        multiple: { element, names in
+            var raw: CFArray?
+            let error = AXUIElementCopyMultipleAttributeValues(element, names as CFArray, [], &raw)
+            return (error, raw)
+        }, single: { element, name in
+            var raw: CFTypeRef?
+            let error = AXUIElementCopyAttributeValue(element, name as CFString, &raw)
+            return (error, raw)
+        }, names: { element in
+            var raw: CFArray?
+            let error = AXUIElementCopyAttributeNames(element, &raw)
+            return (error, raw)
+        }, count: { element, name in
+            var count: CFIndex = 0
+            let error = AXUIElementGetAttributeValueCount(element, name as CFString, &count)
+            return (error, count)
+        }, values: { element, name, count in
+            var raw: CFArray?
+            let error = AXUIElementCopyAttributeValues(element, name as CFString, 0, count, &raw)
+            return (error, raw)
+        }, timeout: { element, timeout in _ = AXUIElementSetMessagingTimeout(element, timeout) })
+}
+
 /// AX handles are retained only for the most recent snapshot. The driver selects semantic nodes
 /// from that snapshot; it never treats a fixed child index as a stable application control.
 final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Sendable {
     private let includeExitDialogs: Bool
-    init(includeExitDialogs: Bool = false) { self.includeExitDialogs = includeExitDialogs }
+    private let readClient: ZoomSlidesAXReadClient
+    init(includeExitDialogs: Bool = false, readClient: ZoomSlidesAXReadClient = .system) {
+        self.includeExitDialogs = includeExitDialogs; self.readClient = readClient
+    }
     private struct ReadContext {
         var windowType: String
         var node: Int
         var parentRole: String
         var deadline: Date
         var cancelled: () throws -> Void
+        var presentationContent = false
         var label: String { ZoomSlidesDriver.readContextLabel(windowType: windowType, node: node, parentRole: parentRole) }
-        func check(_ element: AXUIElement) throws {
+        func check(_ element: AXUIElement, client: ZoomSlidesAXReadClient) throws {
             try cancelled()
             let remaining = deadline.timeIntervalSinceNow
             guard remaining > 0 else { throw ZoomSlidesDriver.Failure.timedOut("读取 Zoom 状态（\(label)）") }
-            AXUIElementSetMessagingTimeout(element, Float(min(0.2, remaining)))
+            client.timeout(element, Float(min(0.2, remaining)))
         }
     }
     private var handles: [String: AXUIElement] = [:]
@@ -564,7 +614,14 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
         let root = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(root, 0.7)
         let windows = try readWindows(root, deadline: deadline, cancelled: cancelled)
+        return try collectWindows(windows, pid: app.processIdentifier, deadline: deadline, cancelled: cancelled)
+    }
+    /// Production and fixture snapshots share this complete traversal. Failed
+    /// collections discard handles so partially read nodes can never be acted on.
+    func collectWindows(_ windows: [AXUIElement], pid: pid_t, deadline: Date, cancelled: @escaping () throws -> Void) throws -> ZoomSlidesAXState {
         handles.removeAll()
+        var complete = false
+        defer { if !complete { handles.removeAll() } }
         var result: [ZoomSlidesAXWindow] = [], surviving: [(String, AXUIElement)] = []
         var uniqueNodes = identitySet()
         for (windowIndex, window) in windows.enumerated() {
@@ -572,7 +629,7 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
             guard Date() < deadline else { throw ZoomSlidesDriver.Failure.timedOut("读取 Zoom 状态") }
             let id = windowHandles.first(where: { CFEqual($0.1, window) })?.0 ?? UUID().uuidString
             surviving.append((id, window))
-            AXUIElementSetMessagingTimeout(window, Float(min(0.2, max(0.01, deadline.timeIntervalSinceNow))))
+            readClient.timeout(window, Float(min(0.2, max(0.01, deadline.timeIntervalSinceNow))))
             let header = try attributes(window, [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute, kAXIdentifierAttribute], context: .init(windowType: "window-header", node: windowIndex + 1, parentRole: "unknown", deadline: deadline, cancelled: cancelled))
             let windowTitle = header[kAXTitleAttribute] as? String ?? ""
             let windowDescription = header[kAXDescriptionAttribute] as? String ?? ""
@@ -585,21 +642,23 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
             }
             guard let windowType = kind else { continue }
             var queue = [window], parents: [String?] = [nil], cursor = 0, nodes: [ZoomSlidesAXNode] = []
-            var roles: [String: String] = [:]
+            var roles: [String: String] = [:], presentationNodes = Set<String>()
             var seen = identitySet(); _ = seen.insert(window)
             try register(window, in: &uniqueNodes, windowType: windowType, deadline: deadline, cancelled: cancelled)
             while cursor < queue.count {
                 try cancelled()
                 guard Date() < deadline else { throw ZoomSlidesDriver.Failure.timedOut("读取 Zoom 控件") }
                 let element = queue[cursor], parent = parents[cursor]; cursor += 1
-                AXUIElementSetMessagingTimeout(element, Float(min(0.2, max(0.01, deadline.timeIntervalSinceNow))))
+                readClient.timeout(element, Float(min(0.2, max(0.01, deadline.timeIntervalSinceNow))))
                 let nodeID = UUID().uuidString
                 handles[nodeID] = element
                 let values = try attributes(element, [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute, kAXValueAttribute,
                     kAXEnabledAttribute, kAXSelectedAttribute, kAXURLAttribute, kAXIdentifierAttribute, kAXChildrenAttribute],
-                    context: .init(windowType: windowType, node: cursor, parentRole: parent.flatMap { roles[$0] } ?? "unknown", deadline: deadline, cancelled: cancelled))
+                    context: .init(windowType: windowType, node: cursor, parentRole: parent.flatMap { roles[$0] } ?? "unknown", deadline: deadline, cancelled: cancelled,
+                                   presentationContent: parent.map(presentationNodes.contains) ?? false))
                 let raw = values[kAXValueAttribute], rawURL = values[kAXURLAttribute]
                 roles[nodeID] = values[kAXRoleAttribute] as? String ?? "unknown"
+                if roles[nodeID] == "AXWebArea" || parent.map(presentationNodes.contains) == true { presentationNodes.insert(nodeID) }
                 nodes.append(ZoomSlidesAXNode(id: nodeID, role: values[kAXRoleAttribute] as? String ?? "",
                     title: values[kAXTitleAttribute] as? String ?? "", description: values[kAXDescriptionAttribute] as? String ?? "",
                     help: values[kAXHelpAttribute] as? String ?? "", value: raw as? String ?? "",
@@ -617,7 +676,8 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
             result.append(.init(id: id, title: windowTitle, nodes: nodes))
         }
         windowHandles = surviving
-        return .init(pid: app.processIdentifier, windows: result, complete: true)
+        complete = true
+        return .init(pid: pid, windows: result, complete: true)
     }
     func perform(_ action: ZoomSlidesAXAction, pid: pid_t, deadline: Date, cancelled: () throws -> Void) throws {
         try cancelled()
@@ -827,73 +887,98 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
     /// One public AX IPC per node, including children; unsupported optional fields are absent.
     /// Communication errors are not treated as an empty successful accessibility tree.
     private func attributes(_ element: AXUIElement, _ names: [String], context: ReadContext) throws -> [String: Any] {
-        try context.check(element)
-        var raw: CFArray?
-        let batchError = AXUIElementCopyMultipleAttributeValues(element, names as CFArray, [], &raw)
+        try context.check(element, client: readClient)
+        let (batchError, raw) = readClient.multiple(element, names)
+        var order = ZoomSlidesDriver.singleReadOrder(names)
+        // Read required structure and semantic fields before supplemental text,
+        // consistently in both the batch and single-read fallback paths.
+        if order.contains(kAXDescriptionAttribute) {
+            order.removeAll { $0 == kAXDescriptionAttribute }; order.append(kAXDescriptionAttribute)
+        }
+        var result: [String: Any] = [:], resolved = Set<String>()
+        func readSingle(_ name: String) throws {
+            let value = try retryAttribute(element, name, known: result, resolved: resolved, context: context)
+            if let raw = value.value { result[name] = raw }
+            if value.resolved { resolved.insert(name) }
+        }
         if batchError == .cannotComplete {
-            var result: [String: Any] = [:]
-            for name in ZoomSlidesDriver.singleReadOrder(names) {
-                if let value = try retryAttribute(element, name, role: result[kAXRoleAttribute] as? String, context: context) { result[name] = value }
-            }
+            for name in order { try readSingle(name) }
             return result
         }
         guard batchError == .success, let values = raw as? [Any], values.count == names.count else {
             throw attributeFailure("AXMultipleAttributes", batchError == .success ? .failure : batchError, context: context)
         }
-        var result: [String: Any] = [:]
-        for (name, value) in zip(names, values) {
+        let fields = Dictionary(uniqueKeysWithValues: zip(names, values))
+        for name in order {
+            guard let value = fields[name] else { try readSingle(name); continue }
             if CFGetTypeID(value as CFTypeRef) == CFNullGetTypeID() {
-                if name == kAXRoleAttribute, let retried = try retryAttribute(element, name, context: context) { result[name] = retried }
+                if name == kAXRoleAttribute { try readSingle(name) }
+                else { resolved.insert(name) }
                 continue
             }
             if CFGetTypeID(value as CFTypeRef) == AXValueGetTypeID() {
                 let axValue = value as! AXValue
                 if AXValueGetType(axValue) == .axError {
-                    // Zoom can return a per-field error from a successful batch while
-                    // the same public single-attribute request succeeds. Retry once.
-                    if let retried = try retryAttribute(element, name, role: result[kAXRoleAttribute] as? String, context: context) { result[name] = retried }
+                    // A successful batch can contain a per-field AX error. Its
+                    // public single read may still succeed; retry only that field.
+                    try readSingle(name)
                     continue
                 }
             }
             if name == kAXRoleAttribute && (value as? String)?.isEmpty != false { throw attributeFailure(name, .noValue, context: context) }
             if name == kAXChildrenAttribute && !(value is [AXUIElement]) { throw attributeFailure(name, .illegalArgument, role: result[kAXRoleAttribute] as? String, context: context) }
-            result[name] = value
+            if name == kAXIdentifierAttribute && !(value is String) { throw attributeFailure(name, .illegalArgument, role: result[kAXRoleAttribute] as? String, context: context) }
+            result[name] = value; resolved.insert(name)
         }
         return result
     }
-    private func retryAttribute(_ element: AXUIElement, _ name: String, role: String? = nil, context: ReadContext) throws -> Any? {
-        try context.check(element)
-        var raw: CFTypeRef?
-        let code = AXUIElementCopyAttributeValue(element, name as CFString, &raw)
+    private struct AttributeRead {
+        var value: Any?
+        // Standard absence proves no value; a tolerated generic metadata failure
+        // does not prove that an object has no identity or child structure.
+        var resolved: Bool
+    }
+    private func retryAttribute(_ element: AXUIElement, _ name: String, known: [String: Any] = [:], resolved: Set<String> = [], context: ReadContext) throws -> AttributeRead {
+        try context.check(element, client: readClient)
+        let role = known[kAXRoleAttribute] as? String
+        let (code, raw) = readClient.single(element, name)
         let error: AXError = code == .success && raw == nil ? .noValue : code
         if error != .success {
-            if name == kAXChildrenAttribute && [.failure, .notImplemented].contains(error) { return try recoverChildren(element, singleError: error, knownRole: role, context: context) }
+            if name == kAXChildrenAttribute && [.failure, .notImplemented].contains(error) {
+                return .init(value: try recoverChildren(element, singleError: error, knownRole: role, context: context), resolved: true)
+            }
             if [kAXTitleAttribute, kAXDescriptionAttribute].contains(name), [.failure, .notImplemented, .illegalArgument].contains(error) {
                 let supported = try supportedAttributeNames(element, role: role, context: context)
-                if ZoomSlidesDriver.permitsMissingDescriptor(name, error: error, role: role, windowType: context.windowType, supportedAttributes: supported) { return nil }
+                // Both profiles can encounter unrelated share/help popovers.
+                // Only the named sharing/probe contexts permit supplemental
+                // text recovery; real exit-dialog/identity/action text stays strict.
+                if ZoomSlidesDriver.permitsMissingDescriptor(name, error: error, role: role, supportedAttributes: supported,
+                    childrenRead: resolved.contains(kAXChildrenAttribute), identityRead: resolved.contains(kAXIdentifierAttribute) && resolved.contains(kAXURLAttribute),
+                    identifier: known[kAXIdentifierAttribute] as? String, hasURL: known[kAXURLAttribute] != nil,
+                    presentationContent: context.presentationContent || role == "AXWebArea", windowType: context.windowType,
+                    hasNonemptyURL: known[kAXURLAttribute].map { ($0 as? String)?.isEmpty != true }) { return .init(value: nil, resolved: false) }
             }
             guard ZoomSlidesDriver.permitsMissingAttribute(name, error: error) else { throw attributeFailure(name, error, role: role, context: context) }
-            return nil
+            return .init(value: nil, resolved: error == .attributeUnsupported || error == .noValue)
         }
         guard let value = raw else { throw attributeFailure(name, .noValue, context: context) }
         if CFGetTypeID(value) == CFNullGetTypeID() {
             guard ZoomSlidesDriver.permitsMissingAttribute(name, error: .noValue) else { throw attributeFailure(name, .noValue, context: context) }
-            return nil
+            return .init(value: nil, resolved: true)
         }
         if name == kAXRoleAttribute && (value as? String)?.isEmpty != false { throw attributeFailure(name, .noValue, context: context) }
         if name == kAXChildrenAttribute && !(value is [AXUIElement]) { throw attributeFailure(name, .illegalArgument, role: role, context: context) }
-        return value
+        if name == kAXIdentifierAttribute && !(value is String) { throw attributeFailure(name, .illegalArgument, role: role, context: context) }
+        return .init(value: value, resolved: true)
     }
     private func supportedAttributeNames(_ element: AXUIElement, role: String?, context: ReadContext) throws -> [String]? {
-        try context.check(element)
-        var raw: CFArray?
-        let error = AXUIElementCopyAttributeNames(element, &raw)
+        try context.check(element, client: readClient)
+        let (error, raw) = readClient.names(element)
         if error == .success {
             guard let names = raw as? [String] else { throw attributeFailure("AXAttributeNames", .failure, role: role, context: context) }
             return names
         }
-        // A failed optional metadata query does not prove a descriptor absent.
-        // Keep the narrow observed role/context policy separate from that proof.
+        // A failed metadata query does not prove a primary title absent.
         if [.attributeUnsupported, .noValue, .notImplemented, .failure].contains(error) { return nil }
         throw attributeFailure("AXAttributeNames", error, role: role, context: context)
     }
@@ -901,18 +986,16 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
         let role: String
         if let knownRole { role = knownRole }
         else {
-            guard let value = try retryAttribute(element, kAXRoleAttribute, context: context) as? String, !value.isEmpty else { throw attributeFailure(kAXRoleAttribute, .noValue, context: context) }
+            guard let value = try retryAttribute(element, kAXRoleAttribute, context: context).value as? String, !value.isEmpty else { throw attributeFailure(kAXRoleAttribute, .noValue, context: context) }
             role = value
         }
-        var count: CFIndex = 0
-        try context.check(element)
-        let countError = AXUIElementGetAttributeValueCount(element, kAXChildrenAttribute as CFString, &count)
+        try context.check(element, client: readClient)
+        let (countError, count) = readClient.count(element, kAXChildrenAttribute)
         if countError == .success {
             if count == 0 { return [] }
             guard count > 0 && count <= 5000 else { throw attributeFailure(kAXChildrenAttribute, .failure, role: role, context: context) }
-            var children: CFArray?
-            try context.check(element)
-            let copyError = AXUIElementCopyAttributeValues(element, kAXChildrenAttribute as CFString, 0, count, &children)
+            try context.check(element, client: readClient)
+            let (copyError, children) = readClient.values(element, kAXChildrenAttribute, count)
             guard copyError == .success, let values = children as? [AXUIElement], values.count == count else {
                 throw attributeFailure(kAXChildrenAttribute, copyError == .success ? .failure : copyError, role: role, context: context)
             }
@@ -938,7 +1021,7 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
     }
     private func permissionPrompt(in window: AXUIElement, deadline: Date, cancelled: @escaping () throws -> Void, uniqueNodes: inout ZoomSlidesIdentitySet<AXUIElement>) throws -> Bool {
         var queue = [window], cursor = 0
-        var parentRoles = ["unknown"]
+        var parentRoles = ["unknown"], presentationNodes = [false]
         var seen = identitySet(); _ = seen.insert(window)
         try register(window, in: &uniqueNodes, windowType: "permission-probe", deadline: deadline, cancelled: cancelled)
         let probeDeadline = min(deadline, Date().addingTimeInterval(2))
@@ -946,13 +1029,14 @@ final class ZoomSlidesSystemAXTransport: ZoomSlidesAXTransport, @unchecked Senda
             try cancelled()
             guard Date() < probeDeadline else { return false }
             let element = queue[cursor], parentRole = parentRoles[cursor]; cursor += 1
-            AXUIElementSetMessagingTimeout(element, Float(min(0.2, max(0.01, probeDeadline.timeIntervalSinceNow))))
-            let values = try attributes(element, [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXChildrenAttribute], context: .init(windowType: "permission-probe", node: cursor, parentRole: parentRole, deadline: probeDeadline, cancelled: cancelled))
+            readClient.timeout(element, Float(min(0.2, max(0.01, probeDeadline.timeIntervalSinceNow))))
+            let values = try attributes(element, [kAXRoleAttribute, kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute, kAXChildrenAttribute, kAXIdentifierAttribute, kAXURLAttribute], context: .init(windowType: "permission-probe", node: cursor, parentRole: parentRole, deadline: probeDeadline, cancelled: cancelled, presentationContent: presentationNodes[cursor - 1]))
             if [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute].compactMap({ values[$0] as? String }).contains(where: { ZoomSlidesDriver.normalized($0) == "how do you want to share?" }) { return true }
             for child in values[kAXChildrenAttribute] as? [AXUIElement] ?? [] where seen.insert(child) {
                 try register(child, in: &uniqueNodes, windowType: "permission-probe", deadline: deadline, cancelled: cancelled)
                 queue.append(child)
                 parentRoles.append(values[kAXRoleAttribute] as? String ?? "unknown")
+                presentationNodes.append(presentationNodes[cursor - 1] || values[kAXRoleAttribute] as? String == "AXWebArea")
             }
         }
         return false

@@ -2,6 +2,42 @@ import Foundation
 
 enum RecognitionProtocol {
     static let model = "qwen-audio-3.1-asr-flash"
+    // Server messages may echo request content. Keep only fixed protocol labels
+    // and a validated request identifier; never retain the raw error body.
+    private static let diagnosticCodes: Set<String> = [
+        "InvalidParameter", "InvalidInput", "InvalidApiKey", "InvalidApiKeyError", "InvalidKey",
+        "InvalidRequest", "MissingParameter", "BadRequest", "Unauthorized", "Forbidden",
+        "AccessDenied", "AccessDenied.Unpurchased", "AccessDenied.AccountDisabled", "AccessDenied.Workspace",
+        "ModelNotFound", "ModelNotExist", "ModelNotReady", "UnsupportedOperation", "UnsupportedModel",
+        "DataInspectionFailed", "InternalError", "InternalError.Algo", "InternalError.Algo.InvalidParameter",
+        "ServiceUnavailable", "Throttling", "Throttling.RateQuota", "Throttling.AllocationQuota",
+        "Throttling.GlobalRateLimit", "QuotaExhausted", "QuotaExceeded", "Arrearage"
+    ]
+    private struct ServiceError: LocalizedError, CustomNSError {
+        let status: Int
+        let details: String
+        static var errorDomain: String { "PicoASR" }
+        var errorCode: Int { status }
+        var errorDescription: String? { details }
+        var errorUserInfo: [String: Any] { [NSLocalizedDescriptionKey: details] }
+    }
+    static func diagnostic(_ error: Error) -> String? {
+        (error as? ServiceError)?.details
+    }
+    static func serviceError(status: Int, data: Data?) -> Error {
+        var details = ["HTTP \(status)"]
+        if let data, data.count <= 16_384,
+           let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            if let code = object["code"] as? String, diagnosticCodes.contains(code) {
+                details.append("provider_code=\(code)")
+            }
+            if let value = object["request_id"] as? String, value.count == 36,
+               let identifier = UUID(uuidString: value) {
+                details.append("request_id=\(identifier.uuidString.lowercased())")
+            }
+        }
+        return ServiceError(status: status, details: details.joined(separator: "; "))
+    }
     static func request(audio: Data, endpoint: URL, key: String) throws -> URLRequest {
         guard audio.count > 44, audio.count < 2_000_000 else { throw URLError(.dataLengthExceedsMaximum) }
         let words = ["Pico", "Telos", "Zoom", "Zoom Slides", "PowerPoint", "Figma", "Copilot", "DeepSeek", "百炼"]
@@ -70,7 +106,7 @@ final class CloudRecognition: NSObject, URLSessionTaskDelegate {
                 let result: Result<String, Error>
                 if let error { result = .failure(error) }
                 else if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                    result = .failure(NSError(domain: "PicoASR", code: http.statusCode))
+                    result = .failure(RecognitionProtocol.serviceError(status: http.statusCode, data: data))
                 } else { result = Result { try RecognitionProtocol.text(data ?? Data()) } }
                 DispatchQueue.main.async {
                     guard let self, self.generation == token else { return }

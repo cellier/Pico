@@ -36,11 +36,11 @@ struct MeetingSettingsView: View {
             }
             if !manager.setupMessage.isEmpty { Text(manager.setupMessage).font(.system(size: 12)).foregroundStyle(.secondary) }
             if !manager.accessibilityReady {
-                Text("If System Settings shows Telos as enabled here but access is still needed, repair the old permission and add the current app again.").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("If System Settings shows Pico as enabled here but access is still needed, repair the old permission and add the current app again.").font(.system(size: 12)).foregroundStyle(.secondary)
                 HStack {
                     Button("Repair Accessibility…") { manager.repairAccessibility() }
                         .disabled(manager.preparing || manager.repairingAccess || manager.capturing)
-                    Button("Show current Telos app") { manager.revealInstalledApp() }
+                    Button("Show current Pico app") { manager.revealInstalledApp() }
                 }
             }
             if !manager.repairMessage.isEmpty { Text(manager.repairMessage).font(.system(size: 12)).foregroundStyle(.secondary) }
@@ -62,22 +62,18 @@ struct MeetingDetailView: View {
     @State private var error: String?
     @State private var follow = true
     private var running: Bool { [.preparing, .recording, .finishing].contains(session.status) }
+    private let caption = TelosTheme.secondary
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 20) {
-                    Text(session.title).font(serif(28)).textSelection(.enabled).id("meetingOverview")
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(session.provider).font(.system(size: 13, weight: .medium))
-                        if let engine = session.transcriptionEngine { Text(engine).font(.system(size: 12)).foregroundStyle(.secondary) }
-                        Text("Started · " + session.startTime.formatted(date: .abbreviated, time: .shortened))
-                        if let ended = session.endTime {
-                            Text("Ended · " + ended.formatted(date: .abbreviated, time: .shortened))
-                        }
-                        TimelineView(.periodic(from: .now, by: 15)) { context in
-                            Text("\(max(0, Int((session.endTime ?? context.date).timeIntervalSince(session.startTime) / 60))) min · \(running ? "Meeting in progress" : session.status == .interrupted ? "Recording interrupted" : "Meeting ended")")
-                        }
-                    }.font(.system(size: 13)).foregroundStyle(.secondary).textSelection(.enabled)
+                // Only the transcript is lazy. With the header in the same LazyVStack, narrowing
+                // and then widening the window left a stale height that hid the final segments.
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(session.title).font(.system(size: 20, weight: .semibold)).lineSpacing(2)
+                            .textSelection(.enabled).id("meetingOverview")
+                        overview
+                    }
                     if !running {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Summary").font(.system(size: 16, weight: .semibold))
@@ -90,7 +86,7 @@ struct MeetingDetailView: View {
                                 }
                             } else {
                                 Text(session.analysisStatus == "analyzing" ? "Summarizing your meeting…" : session.analysisStatus == "ready" ? "Not enough transcribed content to summarize." : "Summary is not available yet. Your saved transcript is below.")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(caption)
                             }
                         }
                     }
@@ -101,7 +97,7 @@ struct MeetingDetailView: View {
                             Button("Stop recording") { store.meetingManager.endByUser() }.disabled(session.status == .finishing)
                         }.font(.system(size: 13))
                     }
-                    if let notice = session.notice { Text(notice).font(.system(size: 13)).foregroundStyle(.secondary).textSelection(.enabled) }
+                    if let notice = session.notice { Text(notice).font(.system(size: 13)).foregroundStyle(caption).textSelection(.enabled) }
                     if !running {
                         if session.analysisStatus == "analyzing" { Label("Summarizing and finding next actions…", systemImage: "sparkles").font(.system(size: 13)) }
                         else if session.analysisStatus == "failed" || session.analysisStatus == "not_started" || session.summary == nil {
@@ -115,12 +111,12 @@ struct MeetingDetailView: View {
                                 do { _ = try store.createMeetingTasks(meetingID: session.id, selected: selection); selection.removeAll(); error = nil }
                                 catch { self.error = error.localizedDescription }
                             }.buttonStyle(.plain).padding(.horizontal, 16).padding(.vertical, 9)
-                                .foregroundStyle(selection.isEmpty ? Color.secondary : TelosTheme.contrast)
-                                .background(selection.isEmpty ? TelosTheme.shade(0.93, 0.23) : TelosTheme.primary, in: Capsule())
+                                .foregroundStyle(selection.isEmpty ? caption : TelosTheme.contrast)
+                                .background(selection.isEmpty ? TelosTheme.raised : TelosTheme.primary, in: Capsule())
                                 .disabled(selection.isEmpty || selection.count > 5).nativeHoverFeedback()
                             if let error { Text(error).font(.system(size: 12)).foregroundStyle(.red) }
                         } else if session.analysisStatus == "ready" {
-                            Text("No high-confidence action items found.").font(.system(size: 13)).foregroundStyle(.secondary)
+                            Text("No high-confidence action items found.").font(.system(size: 13)).foregroundStyle(caption)
                         }
                         if !session.decisions.isEmpty {
                             Text("Decisions").font(.system(size: 16, weight: .semibold))
@@ -139,36 +135,66 @@ struct MeetingDetailView: View {
                         if running { Toggle("Follow", isOn: $follow).toggleStyle(.checkbox).font(.system(size: 12)) }
                         Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(session.transcript.map { "[\(meetingTimestamp($0.startTime))] \($0.excludedFromEvidence == true ? "Uncertain switch-boundary audio" : $0.speakerSource == .me ? "Me" : "Others"): \($0.text)" }.joined(separator: "\n"), forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(HoverButtonStyle()).help("Copy full transcript")
                     }
-                    if session.transcript.isEmpty { Text(running ? "Waiting for speech…" : "No speech was transcribed.").foregroundStyle(.secondary) }
+                    if session.transcript.isEmpty { Text(running ? "Waiting for speech…" : "No speech was transcribed.").foregroundStyle(caption) }
+                    LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(session.transcript) { segment in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("\(meetingTimestamp(segment.startTime)) · \(segment.excludedFromEvidence == true ? "来源待确认 · 接管边界音频" : segment.speakerSource == .me ? "Me" : "Others")\(segment.isFinal ? "" : " · transcribing")").font(.system(size: 12)).foregroundStyle(.secondary)
-                            if segment.excludedFromEvidence == true { Text("保留原始转写，不用于摘要、决定或任务证据。").font(.system(size: 12)).foregroundStyle(.secondary) }
-                            Text(segment.text).font(.system(size: 14)).textSelection(.enabled)
-                        }.id(segment.id).progressiveScrollBlur()
+                            Text("\(meetingTimestamp(segment.startTime)) · \(segment.excludedFromEvidence == true ? "来源待确认 · 接管边界音频" : segment.speakerSource == .me ? "Me" : "Others")\(segment.isFinal ? "" : " · transcribing")").font(.system(size: 12)).foregroundStyle(caption)
+                            if segment.excludedFromEvidence == true { Text("保留原始转写，不用于摘要、决定或任务证据。").font(.system(size: 12)).foregroundStyle(caption) }
+                            Text(segment.text).font(.system(size: 14)).foregroundStyle(TelosTheme.primary).textSelection(.enabled)
+                        }.id(segment.id)
+                    }
                     }
                     if let records = session.picoRecords, !records.isEmpty {
                         Divider()
                         DisclosureGroup("Pico 活动与讲解记录") {
-                            Text("正式 transcript 由上方语音识别生成。以下保留代理的生成内容、打断与连接事件；生成内容不代表完整播出或用户承诺。").font(.system(size: 12)).foregroundStyle(.secondary)
+                            Text("正式 transcript 由上方语音识别生成。以下保留代理的生成内容、打断与连接事件；生成内容不代表完整播出或用户承诺。").font(.system(size: 12)).foregroundStyle(caption)
                             ForEach(records, id: \.id) { record in
                                 ForEach(record.turns.filter { $0.role != "other" }) { turn in
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(turn.role == "pico" ? (turn.delivery == "locally_rendered" ? "Pico · 本机已播放" : "Pico · 生成回复") : turn.role == "pico_interrupted" ? "Pico · 播放被打断" : "会话事件").font(.system(size: 12)).foregroundStyle(.secondary)
+                                        Text(turn.role == "pico" ? (turn.delivery == "locally_rendered" ? "Pico · 本机已播放" : "Pico · 生成回复") : turn.role == "pico_interrupted" ? "Pico · 播放被打断" : "会话事件").font(.system(size: 12)).foregroundStyle(caption)
                                         Text(turn.text).font(.system(size: 13)).textSelection(.enabled)
                                     }.padding(.vertical, 4)
                                 }
                             }
                         }
                     }
-                    Color.clear.frame(height: 30).id("transcriptBottom")
-                }.padding(.horizontal, 24).padding(.top, 44).padding(.bottom, 20).frame(maxWidth: .infinity, alignment: .leading)
-            }.scrollIndicators(.hidden).softScrollEdges(top: 40, bottom: 28, whiteSurface: true)
+                    Color.clear.frame(height: 12).id("transcriptBottom")
+                }.padding(.horizontal, PicoTaskDetailMetrics.horizontalContentInset).padding(.top, 12).padding(.bottom, 20).frame(maxWidth: .infinity, alignment: .leading)
+            }.scrollIndicators(.hidden).softScrollEdges(top: 20, bottom: 20, treatment: .contentFade)
                 .onChange(of: session.status) { _, status in
                     if status == .completed || status == .interrupted { proxy.scrollTo("meetingOverview", anchor: .top) }
                 }
                 .onChange(of: session.transcript.last?.text) { _, _ in if running && follow { proxy.scrollTo("transcriptBottom", anchor: .bottom) } }
-        }.background(TelosTheme.surface).font(.system(size: 14))
+        }.background(Color.clear).font(.system(size: 14)).lineSpacing(4).foregroundStyle(TelosTheme.primary)
+    }
+    private var overview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(session.provider + " · " + session.startTime.formatted(date: .abbreviated, time: .omitted))
+                .font(.system(size: 13, weight: .medium)).textSelection(.enabled)
+            TimelineView(.periodic(from: .now, by: 15)) { context in
+                let duration = max(0, Int((session.endTime ?? context.date).timeIntervalSince(session.startTime) / 60))
+                let state = running ? "Meeting in progress" : session.status == .interrupted ? "Recording interrupted" : "Meeting ended"
+                ViewThatFits(in: .horizontal) {
+                    Text(timeRange + " · \(duration) min · " + state).fixedSize(horizontal: true, vertical: false)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(timeRange)
+                        Text("\(duration) min · " + state)
+                    }
+                }.monospacedDigit().textSelection(.enabled)
+            }.font(.system(size: 13))
+            if let engine = session.transcriptionEngine {
+                DisclosureGroup("Recording details") {
+                    Text(engine).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+                }.font(.system(size: 12)).tint(caption)
+            }
+        }.foregroundStyle(caption)
+    }
+    private var timeRange: String {
+        let start = session.startTime.formatted(date: .omitted, time: .shortened)
+        guard let end = session.endTime else { return "Started " + start }
+        let includesDate = !Calendar.current.isDate(session.startTime, inSameDayAs: end)
+        return start + " – " + end.formatted(date: includesDate ? .abbreviated : .omitted, time: .shortened)
     }
     @ViewBuilder private func suggestionSection(_ title: String, owner: String) -> some View {
         let values = session.suggestions.filter { $0.owner == owner }
@@ -177,19 +203,22 @@ struct MeetingDetailView: View {
             ForEach(values) { item in
                 VStack(alignment: .leading, spacing: 8) {
                     if item.createdTaskID != nil || store.tasks.contains(where: { $0.sourceSuggestionID == item.id }) {
-                        Label(item.title, systemImage: "checkmark.circle.fill").foregroundStyle(.secondary)
+                        Label(item.title, systemImage: "checkmark.circle.fill").foregroundStyle(caption)
                     } else {
                         Toggle(item.title, isOn: Binding(get: { selection.contains(item.id) }, set: { if $0 { selection.insert(item.id) } else { selection.remove(item.id) } }))
                             .toggleStyle(.checkbox).disabled(!selection.contains(item.id) && selection.count >= 5)
                     }
                     if !item.description.isEmpty { Text(item.description).font(.system(size: 13)).textSelection(.enabled) }
-                    if let due = item.dueDate { Text("Due " + due).font(.system(size: 12)).foregroundStyle(.secondary) }
-                    Text("\(meetingTimestamp(item.evidence.startTime)) · “\(item.evidence.text)”").font(.system(size: 12)).foregroundStyle(.secondary).textSelection(.enabled)
+                    if let due = item.dueDate { Text("Due " + due).font(.system(size: 12)).foregroundStyle(caption) }
+                    Text("\(meetingTimestamp(item.evidence.startTime)) · “\(item.evidence.text)”").font(.system(size: 12)).foregroundStyle(caption).textSelection(.enabled)
                 }
             }
         }
     }
     private func evidence(_ value: TranscriptEvidence, proxy: ScrollViewProxy) -> some View {
-        Button { proxy.scrollTo(value.segmentID, anchor: .center) } label: { Text("\(meetingTimestamp(value.startTime)) · “\(value.text)”").font(.system(size: 12)).foregroundStyle(.secondary) }.buttonStyle(HoverButtonStyle())
+        Button { proxy.scrollTo(value.segmentID, anchor: .center) } label: {
+            Text("View in transcript · " + meetingTimestamp(value.startTime)).font(.system(size: 12)).foregroundStyle(caption)
+        }.buttonStyle(HoverButtonStyle()).help(value.text)
+            .accessibilityLabel("View transcript at " + meetingTimestamp(value.startTime) + ": " + value.text)
     }
 }

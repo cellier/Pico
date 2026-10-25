@@ -46,15 +46,16 @@ enum MessageTextLayout {
 struct MessageText: View {
     let text: String
     var markdown = true
+    var copyText: String? = nil
     var body: some View {
         let blocks = MessageTextCache.blocks(text, markdown: markdown)
         Group {
             if blocks.count <= 1 {
-                Text(blocks.first ?? AttributedString("")).textSelection(.enabled)
+                Text(blocks.first ?? AttributedString("")).scrollTextSelection()
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(blocks.indices, id: \.self) { index in
-                        Text(blocks[index]).textSelection(.enabled)
+                        Text(blocks[index]).scrollTextSelection()
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -63,7 +64,7 @@ struct MessageText: View {
         .contextMenu {
             Button("Copy full message") {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
+                NSPasteboard.general.setString(copyText ?? text, forType: .string)
             }
         }
     }

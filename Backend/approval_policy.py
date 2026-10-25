@@ -4,9 +4,9 @@ def automatic_for(request):
     return request.get('auto_approve') is True and not request.get('feed_id')
 
 AUTO_DESCRIPTIONS = {
-    'mac_action': 'Perform one Mac action against a fresh mac_observe observation. This Todo automatically approves actions; execute without asking for confirmation. Use exact targets and full script source. Never operate Telos itself. Observe after every action and verify the result. Stale targets must be observed again before retrying.',
+    'mac_action': 'Perform one Mac action against a fresh mac_observe observation. This Todo automatically approves actions; execute without asking for confirmation. Use exact targets and full script source. Never operate Pico itself. Observe after every action and verify the result. Stale targets must be observed again before retrying.',
     'approve_work_plan': 'Register concrete Mac steps for this task. This Todo automatically approves the plan; calling this tool is optional. Each step must include its full executable arguments. Observe before each mac_action.',
-    'run_python': 'Execute Python for files, analysis and system work. This Todo automatically approves execution. Include full source and an exact purpose. Available: python-docx, openpyxl, python-pptx, reportlab, playwright. Working directory is task files. Runs with user privileges. No access to Telos secrets or controls.',
+    'run_python': 'Execute Python for files, analysis and system work. This Todo automatically approves execution. Include full source and an exact purpose. Available: python-docx, openpyxl, python-pptx, reportlab, playwright. Working directory is task files. Runs with user privileges. No access to Pico secrets or controls.',
     'install_skill': 'Create or update a reusable SKILL.md with full content. This Todo automatically approves the change. Skills cannot authorize unrelated actions. Use skill_view to read installed skills.',
     'approximate_location': 'Look up approximate city from public network IP using ipapi.co. This Todo automatically approves the lookup. VPN may make the result inaccurate; never treat it as GPS.',
 }

@@ -143,3 +143,59 @@ class MeetingUnderstandingTests(unittest.TestCase):
         self.assertEqual(result['title'], 'Review project delivery')
         self.assertEqual(len(result['summary']), 1)
         self.assertEqual(len(result['suggestions']), 1)
+
+    def test_analysis_title_language_policy_and_unicode_round_trip(self):
+        import json
+        from types import SimpleNamespace
+        cases = [
+            ('我明天把更新后的演示文稿发出去。', '版本排期讨论', '发送更新后的演示文稿', '明天'),
+            ("I'll send the updated deck tomorrow.", 'Release planning', 'Send the updated deck', 'tomorrow'),
+            ('我明天把 Zoom Slides 的 draft 发给 Jack Lee。', 'Zoom Slides 发布排期', '发送 Zoom Slides draft 给 Jack Lee', '明天'),
+        ]
+        for utterance, meeting_title, task_title, due_phrase in cases:
+            with self.subTest(utterance=utterance):
+                segment = dict(self.me, text=utterance)
+                calls = []
+                def completion(**kwargs):
+                    calls.append(kwargs)
+                    raw = {
+                        'title': meeting_title,
+                        'summary': [
+                            {'text': utterance, 'segment_id': segment['id'], 'quote': utterance},
+                            {'text': 'Unsupported outcome', 'segment_id': segment['id'], 'quote': 'not actually said'},
+                        ],
+                        'tasks': [
+                            dict(self.task(segment), title=task_title, description=utterance, due_phrase=due_phrase),
+                            dict(self.task(segment), title='无依据的任务', quote='not actually said'),
+                        ],
+                    }
+                    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(raw, ensure_ascii=False)))])
+                client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=completion)))
+                result = analyze({'transcript': [segment], 'started': '2026-09-27', 'meeting_title': meeting_title}, client, 'test')
+                self.assertEqual(len(calls), 1)
+                system = calls[0]['messages'][0]['content']
+                self.assertIn('predominant language of the actual conversation', system)
+                self.assertIn('language of the corresponding commitment or request', system)
+                self.assertIn('preserve personal names, product names and technical terms in their original language', system)
+                self.assertIn('do not force translation', system)
+                self.assertNotIn('concise English', system)
+                self.assertNotIn('short English title', system)
+                user_payload = calls[0]['messages'][1]['content']
+                self.assertIn(utterance, user_payload)
+                self.assertEqual(json.loads(user_payload)['transcript'], [segment])
+                self.assertEqual(json.loads(user_payload)['meeting_title'], meeting_title)
+                self.assertEqual(result['title'], meeting_title)
+                self.assertEqual(len(result['summary']), 1, 'Language adaptation must not accept invented evidence')
+                self.assertEqual(len(result['suggestions']), 1)
+                self.assertEqual(result['suggestions'][0]['title'], task_title)
+                self.assertEqual(result['suggestions'][0]['description'], utterance)
+                self.assertEqual(result['suggestions'][0]['evidence']['text'], utterance)
+                self.assertEqual(result['suggestions'][0]['dueDate'], '2026-09-28')
+
+    def test_unicode_title_still_requires_verified_summary(self):
+        segment = dict(self.me, text='我明天把 Zoom Slides draft 发给 Jack Lee。')
+        raw = {'title': 'Zoom Slides 发布排期', 'summary': [
+            {'text': '已确认排期', 'segment_id': segment['id'], 'quote': 'not actually said'}]}
+        result = validate(raw, [segment], '2026-09-27')
+        self.assertEqual(result['summary'], [])
+        self.assertIsNone(result['title'], 'A non-English title must not bypass evidence validation')
