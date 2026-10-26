@@ -268,16 +268,24 @@ private struct ProgressiveScrollBlur: ViewModifier {
                 // Include the viewport's transition positions even for a very long
                 // paragraph. Sampling only the item's bounds would blur the whole
                 // paragraph instead of the few points passing beneath the header.
-                let positions = Array(Set(([CGFloat(0), height] + (0...48).map {
-                    edge.top * CGFloat($0) / 48 - y
-                } + (0...48).map {
-                    edge.height - edge.bottom * CGFloat($0) / 48 - y
-                }).map { min(height, max(0, $0)) })).sorted()
+                let positions = headerSamplePositions(y: y, height: height)
                 LinearGradient(stops: positions.map { position in
                     .init(color: .white.opacity(Double(headerWeight(level: level, position: position + y))), location: position / height)
                 }, startPoint: .top, endPoint: .bottom)
             }
         }
+    }
+    /// Spelled out step by step: as one chained expression it exceeded the
+    /// type checker's time limit on the release runner.
+    private func headerSamplePositions(y: CGFloat, height: CGFloat) -> [CGFloat] {
+        var raw: [CGFloat] = [0, height]
+        for index in 0...48 {
+            let step = CGFloat(index) / 48
+            raw.append(edge.top * step - y)
+            raw.append(edge.height - edge.bottom * step - y)
+        }
+        let clamped: [CGFloat] = raw.map { min(height, max(0, $0)) }
+        return Array(Set(clamped)).sorted()
     }
     private func intersectsHeaderTransition(y: CGFloat, height: CGFloat) -> Bool {
         // The caller includes the soft copy's 16pt padding. Rows outside these

@@ -191,9 +191,10 @@ actor ZoomMeetingExitDriver {
         window.nodes.contains { $0.identifier == "zm.meeting.window.main" }
     }
     private static func identity(_ main: ZoomSlidesAXWindow) throws -> (meetingID: String?, fingerprint: String?) {
-        let ids = Set(main.nodes.compactMap(\.url).compactMap(URL.init(string:)).filter { ZoomSlidesDriver.documentID($0) != nil }
-            .compactMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }.flatMap { $0.queryItems ?? [] }
-            .filter { $0.name == "mainMeetingID" }.compactMap(\.value).filter { !$0.isEmpty })
+        // Typed steps keep this chain well inside the release runner's type-check budget.
+        let documentURLs: [URL] = main.nodes.compactMap(\.url).compactMap(URL.init(string:)).filter { ZoomSlidesDriver.documentID($0) != nil }
+        let queryItems: [URLQueryItem] = documentURLs.compactMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }.flatMap { $0.queryItems ?? [] }
+        let ids = Set(queryItems.filter { $0.name == "mainMeetingID" }.compactMap(\.value).filter { !$0.isEmpty })
         guard ids.count <= 1 else { throw Failure.identityUnavailable }
         let info = main.nodes.filter { $0.identifier == "MeetingTopBarInfoButton" }.flatMap { [$0.title, $0.description, $0.value] }.filter { !$0.isEmpty }
         let canonical = info.map(ZoomSlidesDriver.normalized).joined(separator: "\n")
