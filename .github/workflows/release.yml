@@ -27,6 +27,9 @@ jobs:
           swiftc -parse-as-library Sources/BundledRuntime.swift tests/BundledRuntimeTests.swift -o /tmp/telos-runtime-tests
           /tmp/telos-runtime-tests
       - name: Package and verify self-contained app
+        env:
+          # The runner has no local signing keychain; package.py re-signs ad hoc.
+          TELOS_CODESIGN_IDENTITY: '-'
         run: python3 scripts/release/package.py
       - name: Publish DMG and checksum
         env:
