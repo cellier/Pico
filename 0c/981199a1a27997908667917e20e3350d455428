@@ -1,0 +1,22 @@
+Sources/NativeComponents.swift
+  s_21528640f701eb::t_0e4b60171057f7 271,278-288
+  s_21528640f701eb::t_dbe7f301cb44d2 289
+Sources/ZoomMeetingExitDriver.swift
+  s_21528640f701eb::t_6214fc7e961a5e 194-197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0c981199a1a27997908667917e20e3350d455428",
+  "prompts": {},
+  "sessions": {
+    "s_21528640f701eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea77bad6-92fe-4ff4-ab98-d894e3fcfefd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
