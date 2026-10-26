@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 60
     env:
       UV_NO_CACHE: true
+      # Bundle uv's relocatable CPython, never the runner's Homebrew Python.
+      UV_PYTHON_PREFERENCE: only-managed
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
