@@ -1,0 +1,98 @@
+Pico/README.md
+  s_02958fef471b35::t_08ed8330fc0556 3,15-17,24,32-33,54
+  s_02958fef471b35::t_00e75f7570414b 8
+README.md
+  s_02958fef471b35::t_3c554c96d1d587 24
+Sources/PicoScriptedPresentation.swift
+  s_a2b9cd6160448d::t_a9e71a724a7759 149
+  s_a2b9cd6160448d::t_ccbcd45040e064 45,142,199,337,356
+  s_a2b9cd6160448d::t_a5cac9b002ee22 47,152,158,293,364,424,426
+tests/PicoScriptedPresentationTests.swift
+  s_a2b9cd6160448d::t_a3a36e211d36a0 31,452-518
+  s_a2b9cd6160448d::t_ba28ee8fb5edce 696,703,705
+Sources/PicoDesktopCompanion.swift
+  s_02958fef471b35::t_2a276bf360d091 1-8,10-71,73-84,86-106,119-131,133,135,146-149,151,153-154,156-188,192-219
+  s_02958fef471b35::t_9c5bcaf88347ae 150
+  s_02958fef471b35::t_ee659bf3079f0c 72,107-118,132,134,136-145,152,155
+  s_02958fef471b35::t_7f8a80cf8f5bee 189-191
+  s_02958fef471b35::t_b05948a91bda27 9,85
+Sources/PicoMeetingMaterials.swift
+  s_a2b9cd6160448d::t_6c5148a694cd69 19-21,141-144
+Sources/PicoScriptPreparationView.swift
+  s_a2b9cd6160448d::t_908ff64eb36e42 96-102,104-114
+  s_a2b9cd6160448d::t_d14952a6f2c41e 16
+tests/PicoDesktopCompanionTests.swift
+  s_02958fef471b35::t_3c71fe0e0a5cce 248-260,315-320
+  s_02958fef471b35::t_c18d498787cd4e 1-178,208-247,261-314,321-327
+  s_02958fef471b35::t_aa8d78cb20415a 179-207
+Pico/main.swift
+  s_02958fef471b35::t_3bed9d171c1341 85-87,89,91-95,100,102,108,110-115,124,133,149,202,204
+  s_02958fef471b35::t_87bad31a9701c2 88,103-107,123,347
+  s_02958fef471b35::t_098872f8bf5266 109,218,223,288,294,321,336-346,348-355
+  s_02958fef471b35::t_de0c4620d5cbf9 174-176
+  s_02958fef471b35::t_16b8a583eccae4 118-120,171-173,177-185
+Sources/PicoPresentationScript.swift
+  s_a2b9cd6160448d::t_1534a9c5714791 331-332
+  s_a2b9cd6160448d::t_e45084d547eaf1 203-207,209
+  s_a2b9cd6160448d::t_00642df18b7001 7-8,12-13,15,18,24,32,66-70,73-74,77,79,91-92,110-111,123-125,190,202,208,210,265-266,281-282,298-299,327,334,336,338-344,351,372
+  s_a2b9cd6160448d::t_8fd82ca448170a 236-241,243
+tests/PicoApplicationLocatorTests.swift
+  s_02958fef471b35::t_f2e23b24ace59f 60-83
+Pico/ApplicationLocator.swift
+  s_02958fef471b35::t_e338f4ae26527f 24-25,30-42,79-108
+  s_02958fef471b35::t_97cf71e0cfeb46 109
+Sources/PicoMeetingController.swift
+  s_a2b9cd6160448d::t_9106b3e5d6f337 24
+  s_a2b9cd6160448d::t_87c543fad5c08f 576
+  s_a2b9cd6160448d::t_aeb4f77a2d9400 1306
+  s_a2b9cd6160448d::t_6c5148a694cd69 354-359,373,375,378,384,388,540
+Sources/PicoMemory.swift
+  s_a2b9cd6160448d::t_6c5148a694cd69 59,63-65,80-82
+  s_a2b9cd6160448d::t_d7d7e448548ea6 14-16
+tests/PicoMemoryTests.swift
+  s_a2b9cd6160448d::t_c0d1dbbb621131 28-45,47
+tests/PicoMeetingMemoryScopeTests.swift
+  s_a2b9cd6160448d::t_77475e6194bb7d 60-61,76-77
+  s_a2b9cd6160448d::t_6bb4fe4025041b 67-69
+  s_a2b9cd6160448d::t_dba97cd600af54 1-59,62-66,70-75,78-104
+Sources/TaskStore.swift
+  s_02958fef471b35::t_2a276bf360d091 118
+Sources/TelosApp.swift
+  s_02958fef471b35::t_2a276bf360d091 723-724,1203
+  s_02958fef471b35::t_4e8307d9d9baf4 1374,1402
+Pico/build.sh
+  s_02958fef471b35::t_47cc58a14d03ab 16-17
+scripts/build.sh
+  s_02958fef471b35::t_d7395e690fdf3b 33-35
+Pico/tests/run-offline.py
+  s_02958fef471b35::t_06f3dce9d009ef 19-22
+tests/PicoPresentationScriptTests.swift
+  s_a2b9cd6160448d::t_b29cb9cfab3665 287-288,310-311
+  s_a2b9cd6160448d::t_1bd72d4fda7cfa 35-36,173,263-286,289-309,312-350
+Sources/PicoRealtime.swift
+  s_a2b9cd6160448d::t_b9b160e141f330 27-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "450fa2bc1dbf5651da513c2a2efd4c234f1dc7e2",
+  "prompts": {},
+  "sessions": {
+    "s_02958fef471b35": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a100d5-39eb-73d2-90bb-14ec6ffe9451",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "unknown"
+    },
+    "s_a2b9cd6160448d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0fcfc-af17-7c41-b19d-8bde913739fe",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "unknown"
+    }
+  }
+}
