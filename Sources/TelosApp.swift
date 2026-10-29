@@ -720,6 +720,8 @@ struct MacAccessView: View {
                         VStack(alignment: .leading, spacing: 18) {
             PicoAppearanceSettings()
             Divider()
+            PicoDesktopCompanionSettings(companion: store.desktopCompanion)
+            Divider()
             PicoProactivitySettings(coordinator: store.proactivity)
             Divider()
             if let notice = store.permissionResetNotice {
@@ -1198,6 +1200,7 @@ final class TelosWindow: NSWindow {
                 CompanionChatPresentation.show(in: self.store) { self.showPanel() }
             })
             companion?.showMeeting = { [weak self] in self?.store.meetingManager.pico.show() }
+            store.desktopCompanion.start()
             store.meetingManager.start()
             selectionTranslation = SelectionTranslationController(store: store)
             selectionTranslation?.start()
@@ -1368,6 +1371,7 @@ final class TelosWindow: NSWindow {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // The isolated screenshot preview has no main panel or status item.
         guard window != nil else { return false }
+        store?.desktopCompanion.start()
         showPanel(); return false
     }
     func makeMenu() {
@@ -1395,7 +1399,7 @@ final class TelosWindow: NSWindow {
         Task { await recordings.finishBeforeQuit(); await store.meetingManager.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
-    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; store?.proactivity.stop(); store?.chat.stop(); statusButtonFeedback?.stop(); stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); selectionTranslation?.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
+    func applicationWillTerminate(_ notification: Notification) { screenshots.finished = {}; store?.desktopCompanion.stop(); store?.proactivity.stop(); store?.chat.stop(); statusButtonFeedback?.stop(); stopOutsideDismissal(); screenshots.stop(); recordings.shutdown(); dictation.stop(); selectionTranslation?.stop(); KeyDisplayController.shared.stop(); screenshotEditor?.cancelWork(); store?.stopAll() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 #if !TELOS_TEST

@@ -4,19 +4,24 @@ struct PicoScriptChunk: Codable, Equatable, Identifiable, Sendable {
     var id: String
     var text: String
     var waitForReply: Bool
+    /// Keep a discussion open across ordinary answers until an explicit continue.
+    var waitForExplicitContinue: Bool
     var replyTimeoutSeconds: TimeInterval?
     var replyTimeoutTransition: String?
     init(id: String = UUID().uuidString, text: String, waitForReply: Bool = false,
-         replyTimeoutSeconds: TimeInterval? = 12, replyTimeoutTransition: String? = nil) {
+         replyTimeoutSeconds: TimeInterval? = 12, replyTimeoutTransition: String? = nil,
+         waitForExplicitContinue: Bool = false) {
         self.id = id; self.text = text; self.waitForReply = waitForReply
+        self.waitForExplicitContinue = waitForExplicitContinue
         self.replyTimeoutSeconds = replyTimeoutSeconds; self.replyTimeoutTransition = replyTimeoutTransition
     }
-    private enum CodingKeys: String, CodingKey { case id, text, waitForReply, replyTimeoutSeconds, replyTimeoutTransition }
+    private enum CodingKeys: String, CodingKey { case id, text, waitForReply, replyTimeoutSeconds, replyTimeoutTransition, waitForExplicitContinue }
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
         text = try values.decode(String.self, forKey: .text)
         waitForReply = try values.decodeIfPresent(Bool.self, forKey: .waitForReply) ?? false
+        waitForExplicitContinue = try values.decodeIfPresent(Bool.self, forKey: .waitForExplicitContinue) ?? false
         replyTimeoutSeconds = values.contains(.replyTimeoutSeconds) ? try values.decodeIfPresent(TimeInterval.self, forKey: .replyTimeoutSeconds) : 12
         replyTimeoutTransition = try values.decodeIfPresent(String.self, forKey: .replyTimeoutTransition)
     }
@@ -24,6 +29,7 @@ struct PicoScriptChunk: Codable, Equatable, Identifiable, Sendable {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(id, forKey: .id); try values.encode(text, forKey: .text)
         try values.encode(waitForReply, forKey: .waitForReply)
+        try values.encode(waitForExplicitContinue, forKey: .waitForExplicitContinue)
         // Explicit null disables fallback and must survive round-tripping; omission means 12s.
         if let replyTimeoutSeconds { try values.encode(replyTimeoutSeconds, forKey: .replyTimeoutSeconds) }
         else { try values.encodeNil(forKey: .replyTimeoutSeconds) }
@@ -57,13 +63,20 @@ struct PicoPresentationScript: Codable, Equatable, Sendable {
     var shareIntro: [PicoScriptChunk]
     var slides: [PicoScriptSlide]
     var closing: [PicoScriptChunk]
+    /// The full deck can contain unpresented appendix pages available for review.
+    var deckSlideCount: Int?
+    /// An explicit conclusion starts this prepared closing section, if already sharing.
+    var closingStartSlide: Int?
+    var totalDeckSlides: Int { deckSlideCount ?? slides.count }
     init(version: Int = 1, deckURL: String, deckID: String? = nil, title: String, language: String = "zh-CN",
          opening: [PicoScriptChunk] = [], shareIntro: [PicoScriptChunk] = [],
-         slides: [PicoScriptSlide], closing: [PicoScriptChunk] = []) {
+         slides: [PicoScriptSlide], closing: [PicoScriptChunk] = [],
+         deckSlideCount: Int? = nil, closingStartSlide: Int? = nil) {
         self.version = version; self.deckURL = deckURL; self.deckID = deckID; self.title = title; self.language = language
         self.opening = opening; self.shareIntro = shareIntro; self.slides = slides; self.closing = closing
+        self.deckSlideCount = deckSlideCount; self.closingStartSlide = closingStartSlide
     }
-    private enum CodingKeys: String, CodingKey { case version, deckURL, deckID, title, language, opening, shareIntro, slides, closing }
+    private enum CodingKeys: String, CodingKey { case version, deckURL, deckID, title, language, opening, shareIntro, slides, closing, deckSlideCount, closingStartSlide }
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         version = try values.decodeIfPresent(Int.self, forKey: .version) ?? 1
@@ -75,6 +88,8 @@ struct PicoPresentationScript: Codable, Equatable, Sendable {
         shareIntro = try values.decodeIfPresent([PicoScriptChunk].self, forKey: .shareIntro) ?? []
         slides = try values.decode([PicoScriptSlide].self, forKey: .slides)
         closing = try values.decodeIfPresent([PicoScriptChunk].self, forKey: .closing) ?? []
+        deckSlideCount = try values.decodeIfPresent(Int.self, forKey: .deckSlideCount)
+        closingStartSlide = try values.decodeIfPresent(Int.self, forKey: .closingStartSlide)
     }
     static func decode(_ data: Data) throws -> Self {
         guard data.count <= 512 * 1024 else { throw PicoPresentationScriptError.invalid("演示脚本超过 512 KB，请拆分。") }
@@ -92,6 +107,8 @@ struct PicoPresentationScript: Codable, Equatable, Sendable {
         _ = try validatedDeckURL()
         if let deckID { try require(deckID.range(of: "^[A-Za-z0-9_-]{1,160}$", options: .regularExpression) != nil, "演示文档编号无效。") }
         try require((1...60).contains(slides.count), "演示需要包含 1–60 页。")
+        try require((slides.count...60).contains(totalDeckSlides), "文稿总页数不能小于讲稿页数，且最多支持 60 页。")
+        if let closingStartSlide { try require((1...slides.count).contains(closingStartSlide), "收尾起始页必须是已准备讲稿中的有效页码。") }
         try require(slides.map(\.number) == Array(1...slides.count), "幻灯片页码必须按顺序从 1 连续排列。")
         try require(opening.count <= 12 && shareIntro.count <= 8 && closing.count <= 8, "开场、共享介绍或收尾的段数过多。")
         for slide in slides {
@@ -103,6 +120,9 @@ struct PicoPresentationScript: Codable, Equatable, Sendable {
         try require(chunks.count <= 512, "演示脚本总段数超过 512 段，请拆分。")
         try require(Set(chunks.map(\.id)).count == chunks.count, "演示段落编号不能重复。")
         for chunk in chunks {
+            if chunk.waitForExplicitContinue {
+                try require(chunk.waitForReply && chunk.replyTimeoutSeconds == nil, "持续问答段落必须开启等待，并关闭静默后自动继续。")
+            }
             try require(!chunk.id.isEmpty && chunk.id.utf8.count <= 128, "段落编号为空或过长。")
             try require(!chunk.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && chunk.text.count <= 800 && chunk.text.utf8.count <= 4800, "每段需要包含 1–800 字符，请把长段落拆开。")
             try require(!chunk.text.unicodeScalars.contains(where: { $0.value == 0 }), "段落包含无效的空字符。")
@@ -167,6 +187,7 @@ struct PicoPresentationFlow: Sendable {
     private(set) var isSharing = false
     private(set) var visibleSlide: Int?
     private(set) var waitingForReply = false
+    private(set) var waitingForExplicitContinue = false
     private(set) var isPaused = false
     private(set) var isTakenOver = false
     private(set) var pending: PicoScriptSpeech?
@@ -178,6 +199,15 @@ struct PicoPresentationFlow: Sendable {
     private var waitingNoticeSent = false
     private var finishedNoticeSent = false
     private var closingPreservesVisibleSlide = false
+    private var conclusionRequested = false
+    var isConcluding: Bool {
+        guard phase != .cancelled else { return false }
+        if conclusionRequested || phase == .closing || phase == .freeChat { return true }
+        return script.closingStartSlide.map { phase == .slides && script.slides[slideIndex].number >= $0 } ?? false
+    }
+    var canConclude: Bool {
+        phase != .cancelled && !isTakenOver && !isConcluding
+    }
     var cursor: PicoScriptCursor {
         PicoScriptCursor(phase: phase, slideNumber: phase == .slides ? script.slides[slideIndex].number : nil, chunkIndex: chunkIndex)
     }
@@ -203,11 +233,14 @@ struct PicoPresentationFlow: Sendable {
             case .slides:
                 let slide = script.slides[slideIndex]
                 guard isSharing else { return nil }
+                if chunkIndex >= slide.chunks.count {
+                    chunkIndex = 0
+                    if slideIndex + 1 < script.slides.count { slideIndex += 1 }
+                    else { phase = .closing }
+                    continue
+                }
                 if visibleSlide != slide.number { requestedPage = slide.number; return .showSlide(page: slide.number) }
-                if chunkIndex < slide.chunks.count { return speech(slide.chunks[chunkIndex]) }
-                chunkIndex = 0
-                if slideIndex + 1 < script.slides.count { slideIndex += 1 }
-                else { phase = .closing }
+                return speech(slide.chunks[chunkIndex])
             case .closing:
                 let last = script.slides.last!.number
                 if !closingPreservesVisibleSlide, visibleSlide != last { requestedPage = last; return .showSlide(page: last) }
@@ -229,8 +262,8 @@ struct PicoPresentationFlow: Sendable {
     @discardableResult mutating func playbackCompleted(id: UUID, generation token: UUID) -> Bool {
         guard token == generation, !isTakenOver, !isPaused, let value = pending, value.id == id else { return false }
         if value.isReplyTimeoutTransition {
-            guard waitingForReply, replyWait != nil else { return false }
-            waitingForReply = false; waitingNoticeSent = false; replyWait = nil
+            guard waitingForReply, !waitingForExplicitContinue, replyWait != nil else { return false }
+            waitingForReply = false; waitingForExplicitContinue = false; waitingNoticeSent = false; replyWait = nil
             pending = nil; needsTransition = false
             return true
         }
@@ -245,7 +278,8 @@ struct PicoPresentationFlow: Sendable {
         guard chunkIndex < chunks.count, chunks[chunkIndex].id == value.chunkID else { return false }
         // An explicit wrap-up finishes into free conversation; it must not acquire a
         // new scripted wait or start another sharing/navigation sequence.
-        waitingForReply = chunks[chunkIndex].waitForReply && !(phase == .closing && closingPreservesVisibleSlide)
+        waitingForReply = chunks[chunkIndex].waitForReply && !conclusionRequested && !(phase == .closing && closingPreservesVisibleSlide)
+        waitingForExplicitContinue = waitingForReply && chunks[chunkIndex].waitForExplicitContinue
         replyWait = waitingForReply ? makeReplyWait(chunks[chunkIndex]) : nil
         waitingNoticeSent = false; chunkIndex += 1; pending = nil; needsTransition = false
         return true
@@ -261,8 +295,8 @@ struct PicoPresentationFlow: Sendable {
         visibleSlide = page; requestedPage = nil; return true
     }
     mutating func guestReplyReceived() {
-        guard phase != .cancelled, !isTakenOver, waitingForReply else { return }
-        waitingForReply = false; waitingNoticeSent = false; replyWait = nil
+        guard phase != .cancelled, !isTakenOver, waitingForReply, !waitingForExplicitContinue else { return }
+        waitingForReply = false; waitingForExplicitContinue = false; waitingNoticeSent = false; replyWait = nil
     }
     /// Ordinary Q&A has its own playback token and cannot commit the presentation cursor.
     @discardableResult mutating func beginAnswer() -> UUID {
@@ -290,25 +324,31 @@ struct PicoPresentationFlow: Sendable {
         generation = UUID(); pending = nil; requestedPage = nil; sharingRequested = false
         // A deliberate "continue" releases a scripted greeting/question wait. A connection
         // recovery must keep that wait until a guest actually replies or explicitly continues.
-        if continuePastReplyWait { waitingForReply = false; waitingNoticeSent = false; answerID = nil; replyWait = nil }
+        if continuePastReplyWait { waitingForReply = false; waitingForExplicitContinue = false; waitingNoticeSent = false; answerID = nil; replyWait = nil }
         isTakenOver = false; isPaused = false
         return generation
     }
-    /// Explicitly skip the remaining agenda and speak the configured closing once.
-    /// Skipped chunks are never committed as played; the current shared page is retained.
+    /// Explicitly skip to the configured closing section, or speak the legacy closing.
+    /// Skipped chunks remain unplayed; an unshared deck is never opened by wrap-up.
     @discardableResult mutating func requestConclude() -> Bool {
-        guard phase != .cancelled, phase != .closing, phase != .freeChat, !isTakenOver else { return false }
+        guard canConclude else { return false }
         generation = UUID(); pending = nil; requestedPage = nil; answerID = nil
-        sharingRequested = false; waitingForReply = false; waitingNoticeSent = false; replyWait = nil
+        sharingRequested = false; waitingForReply = false; waitingForExplicitContinue = false; waitingNoticeSent = false; replyWait = nil
         isPaused = false; needsTransition = false; closingPreservesVisibleSlide = true
-        phase = .closing; chunkIndex = 0
+        conclusionRequested = true; chunkIndex = 0
+        if isSharing, let start = script.closingStartSlide {
+            phase = .slides; slideIndex = start - 1
+        } else {
+            // An early wrap-up must never start sharing or operate an unbound deck.
+            phase = .closing
+        }
         return true
     }
     /// The caller supplies the silence clock. The transition is a separate scoped utterance;
     /// only its actual playback releases the wait, without committing another script chunk.
     @discardableResult mutating func requestReplyTimeoutTransition() -> PicoScriptSpeech? {
         guard phase != .cancelled, phase != .freeChat, !isTakenOver, !isPaused,
-              waitingForReply, let replyWait, replyWait.timeoutSeconds != nil,
+              waitingForReply, !waitingForExplicitContinue, let replyWait, replyWait.timeoutSeconds != nil,
               pending == nil, answerID == nil, requestedPage == nil else { return nil }
         let value = PicoScriptSpeech(id: UUID(), generation: generation,
             chunkID: "reply-timeout-" + replyWait.chunkID, text: replyWait.transition,
@@ -329,7 +369,7 @@ struct PicoPresentationFlow: Sendable {
     /// Guest navigation is a review request, never permission to skip unfinished main speech.
     @discardableResult mutating func jumpToSlide(_ number: Int) throws -> PicoScriptAction {
         guard phase != .cancelled, !isTakenOver, isSharing,
-              script.slides.contains(where: { $0.number == number }) else {
+              (1...script.totalDeckSlides).contains(number) else {
             throw PicoPresentationScriptError.invalid("当前无法回看这一页；请先确认共享，并选择文档中存在的页码。")
         }
         if pending != nil { needsTransition = true }

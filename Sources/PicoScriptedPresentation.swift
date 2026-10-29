@@ -42,7 +42,9 @@ import Foundation
     var running: Bool { started && !manuallyPaused && flow?.isTakenOver != true && flow?.phase != .cancelled }
     private var canNavigate: Bool { started && flow?.isTakenOver != true && flow?.phase != .cancelled }
     var isFreeChat: Bool { flow?.phase == .freeChat }
+    var isConcluding: Bool { flow?.isConcluding == true }
     var waitingForReply: Bool { flow?.waitingForReply == true }
+    var waitingForExplicitContinue: Bool { flow?.waitingForExplicitContinue == true }
     var waitingForAnswerPlayback: Bool { flow?.answerID != nil || answerPlaybackAwaitingTranscript }
     var sharing: Bool { flow?.isSharing == true }
     var script: PicoPresentationScript? { flow?.script }
@@ -137,24 +139,23 @@ import Foundation
         automaticResume = false; awaitingGuestAnswer = false; waitingForQuestion = false; lastFailure = nil
         // A restored connection/page must be read again before another line is spoken.
         verifiedAt = nil; needsResynchronization = true; nextSpeechAt = now().addingTimeInterval(0.6)
-        status = waitingForReply ? "等待对方回答" : (isFreeChat ? "自由交流，共享画面保留" : "继续演示"); publish()
+        status = waitingForExplicitContinue ? "问答交流，共享画面保留" : (waitingForReply ? "等待对方回答" : (isFreeChat ? "自由交流，共享画面保留" : "继续演示")); publish()
     }
     func cancel() {
         invalidateWork(); flow?.cancel(); started = false; manuallyPaused = true
         automaticResume = false; awaitingGuestAnswer = false; waitingForQuestion = false
         status = "演示已结束，共享画面未自动关闭"; publish()
     }
-    /// Wrap up the prepared agenda once, without ending the call or changing the shared page.
+    /// Wrap up once, using a configured closing page if present, without ending the call.
     /// Repeated requests cannot replay a closing already in progress or completed.
     @discardableResult func conclude() -> Bool {
-        guard started, flow?.isTakenOver != true, let phase = flow?.phase,
-              phase != .cancelled, phase != .closing, phase != .freeChat else { return false }
+        guard started, flow?.canConclude == true else { return false }
         invalidateWork(); onRequestInterruption?()
         guard flow?.requestConclude() == true else { return false }
         manuallyPaused = false; automaticResume = false; awaitingGuestAnswer = false
         waitingForQuestion = false; lastFailure = nil
         verifiedAt = nil; needsResynchronization = false; nextSpeechAt = now().addingTimeInterval(0.2)
-        status = "正在收尾，当前共享页面保留"; publish()
+        status = flow?.script.closingStartSlide != nil && sharing ? "正在进入已准备的收尾部分" : "正在收尾，当前共享页面保留"; publish()
         return true
     }
 
@@ -195,7 +196,7 @@ import Foundation
             speechSent = sendSpeech(speech)
         case .requestShare(let page): beginPageOperation(page: page, sharing: true)
         case .showSlide(let page): beginPageOperation(page: page, sharing: false)
-        case .waitForReply: status = "等待对方回答"
+        case .waitForReply: status = waitingForExplicitContinue ? "问答交流，等待明确继续或收尾" : "等待对方回答"
         case .finished:
             automaticResume = false; status = sharing ? "自由交流，保留当前共享页面" : "自由交流"
         }
@@ -289,7 +290,7 @@ import Foundation
     /// A review request only changes the displayed page. It never advances or restarts the
     /// prepared agenda, including after the last page has entered free conversation.
     func navigate(page: Int) async -> String {
-        guard canNavigate, sharing, let count = flow?.script.slides.count, (1...count).contains(page) else {
+        guard canNavigate, sharing, let count = flow?.script.totalDeckSlides, (1...count).contains(page) else {
             return result(false, message: "当前不能切换到这一页，请确认正在共享，且页码有效。")
         }
         guard operationID == nil || operationTask != nil else { return result(false, message: "另一次翻页尚未确认，请稍后再试。") }
@@ -333,7 +334,7 @@ import Foundation
                     lastTick: now(), counting: true)
             } else { replyWaitClock = nil }
             nextSpeechAt = now().addingTimeInterval(0.7)
-            status = flow?.waitingForReply == true ? "等待对方回答" : "继续演示"
+            status = waitingForExplicitContinue ? "问答交流，等待明确继续或收尾" : (flow?.waitingForReply == true ? "等待对方回答" : "继续演示")
         } else if let answer = item.answer {
             guard flow?.answerPlaybackCompleted(id: answer) == true else { return }
             playback = playback.filter { $0.value.answer != answer }
@@ -352,7 +353,7 @@ import Foundation
         if automaticResume && !manuallyPaused && flow?.isTakenOver != true {
             _ = flow?.resume(); automaticResume = false
             nextSpeechAt = now().addingTimeInterval(1.2)
-            status = "回答完毕，准备自然接回演示"
+            status = waitingForExplicitContinue ? "问答交流，共享画面保留" : "回答完毕，准备自然接回演示"
         } else { status = isFreeChat ? "自由交流，保留当前共享页面" : "演示已暂停，共享画面保留" }
     }
     private func beginPageOperation(page: Int, sharing shouldShare: Bool) {
@@ -360,7 +361,7 @@ import Foundation
         let token = epoch, generation = flow!.generation, identifier = UUID()
         let preceding = cancelledOperation; cancelledOperation = nil
         operationID = identifier; status = shouldShare ? "正在共享演示文稿" : "正在显示第 \(page) 页"
-        let target = ZoomSlidesDriver.Target(url: url, title: script.title, totalSlides: script.slides.count)
+        let target = ZoomSlidesDriver.Target(url: url, title: script.title, totalSlides: script.totalDeckSlides)
         operationTask = Task { [weak self] in
             guard let self else { return }
             await preceding?.value
@@ -420,9 +421,9 @@ import Foundation
     private func validate(_ snapshot: ZoomSlidesDriver.Snapshot, page: Int?) throws {
         guard snapshot.sharing == .active else { throw ZoomSlidesDriver.Failure.unavailable("无法确认 Slides 仍在共享，已暂停讲解和翻页。") }
         guard let current = snapshot.currentSlide, current >= 1,
-              current <= (flow?.script.slides.count ?? 0) else { throw ZoomSlidesDriver.Failure.unavailable("无法确认当前幻灯片页码，已暂停讲解。") }
+              current <= (flow?.script.totalDeckSlides ?? 0) else { throw ZoomSlidesDriver.Failure.unavailable("无法确认当前幻灯片页码，已暂停讲解。") }
         if let page, current != page { throw ZoomSlidesDriver.Failure.unavailable("实际页面与讲解进度不一致，已暂停，请确认后继续。") }
-        if let total = snapshot.totalSlides, total != flow?.script.slides.count { throw ZoomSlidesDriver.Failure.documentMismatch }
+        if let total = snapshot.totalSlides, total != flow?.script.totalDeckSlides { throw ZoomSlidesDriver.Failure.documentMismatch }
     }
     private func fail(_ message: String) {
         guard started else { return }

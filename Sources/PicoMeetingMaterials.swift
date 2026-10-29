@@ -16,6 +16,9 @@ struct PicoMeetingPreparation: Codable {
     var outline: String? // Optional so existing saved preparations keep decoding.
     var presentationScript: PicoPresentationScript? // Optional, independent of legacy outline mode.
     var leaveOnGoodbye: Bool? // Missing in older preparations means the default self-leave policy.
+    /// nil uses the existing approved-memory policy; [] disables long-term memory
+    /// for this meeting; otherwise only these IDs may pass the normal exclusions.
+    var memoryNoteIDs: [String]?
     var automaticallyLeavesOnGoodbye: Bool { leaveOnGoodbye ?? true }
     var sections: [String] {
         (outline ?? "").split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
@@ -135,6 +138,10 @@ struct PicoPreparationView: View {
             HStack { Text("Background · 本场会议准备").font(.headline); Spacer(); Button("新会议") { store.newMeeting() } }
             TextField("会议目标，例如：介绍方案并征求建议", text: $store.draft.goal)
             TextEditor(text: $store.draft.background).frame(height: 70).border(.quaternary).accessibilityLabel("本场会议背景")
+            if let noteIDs = store.draft.memoryNoteIDs {
+                Text(noteIDs.isEmpty ? "本场不检索长期记忆。" : "本场仅允许检索选定的 \(Set(noteIDs).count) 条长期记忆；原有排除和敏感内容规则仍生效。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Toggle("主动介绍材料，接受插话和提问", isOn: $store.draft.present)
             if store.draft.present {
                 PicoScriptPreparationView(store: store)

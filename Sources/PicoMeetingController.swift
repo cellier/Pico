@@ -21,7 +21,7 @@ struct PicoMeetingRecord: Codable {
 }
 
 @MainActor final class PicoMeetingController: ObservableObject {
-    @Published var status = "Ready for a relaxed 1-on-1"
+    @Published var status = "Ready to prepare your meeting"
     let preparation: PicoPreparationStore
     let scripted = PicoScriptedPresentation()
     private var scriptObservation: AnyCancellable?
@@ -351,7 +351,12 @@ struct PicoMeetingRecord: Codable {
             let label = $0.role == "other" ? "participant" : ($0.delivery == "locally_rendered" ? "Pico locally rendered reply" : "Pico generated or interrupted reply; playback not verified")
             return "\(label): \($0.text)"
         }.joined(separator: "\n")
-        memoryStatus = memoryEnabled ? "会按问题检索 Pico 记忆" : "本场不使用 Pico 记忆"
+        // Freeze the meeting's approved scope for this connection. Both the
+        // pre-meeting background and every later tool search use this same scope.
+        let allowedNoteIDs = preparation.draft.memoryNoteIDs.map { Set($0) }
+        let useMemory = memoryEnabled && allowedNoteIDs?.isEmpty != true
+        let scopeDescription = allowedNoteIDs.map { "本场限定 \($0.count) 条记忆；" } ?? ""
+        memoryStatus = useMemory ? scopeDescription + "会按问题检索 Pico 记忆" : "本场不使用 Pico 记忆"
         let directory = dataDir
         // The model can request only self-leave. Ending everyone is a local owner action.
         realtime.meetingFinish = exitBound && preparation.draft.automaticallyLeavesOnGoodbye ? { [weak self] audioItemID in
@@ -365,22 +370,22 @@ struct PicoMeetingRecord: Codable {
             guard let self, self.active, self.allowAgent, self.preparation.draft.present else { return "{\"applied\":false,\"reason\":\"Presentation is not active.\"}" }
             return self.applyPresentationControl(action)
         } : nil
-        realtime.memoryLookup = memoryEnabled ? { query in
+        realtime.memoryLookup = useMemory ? { query in
             let excluded = Set(UserDefaults.standard.stringArray(forKey: PicoMemoryStore.excludedPreference) ?? [])
-            return await Task.detached(priority: .userInitiated) { PicoMemoryStore.search(query: query, directory: directory, excluded: excluded) }.value
+            return await Task.detached(priority: .userInitiated) { PicoMemoryStore.search(query: query, directory: directory, excluded: excluded, allowedNoteIDs: allowedNoteIDs) }.value
         } : nil
         let prepared = preparation.draft.context, goal = preparation.draft.goal, brief = self.brief
-        let epoch = connectionEpoch, useMemory = memoryEnabled
+        let epoch = connectionEpoch
         memoryPreparation?.cancel()
         memoryPreparation = Task { [weak self] in
             let background: PicoMemoryResult
             if useMemory {
                 let excluded = Set(UserDefaults.standard.stringArray(forKey: PicoMemoryStore.excludedPreference) ?? [])
-                background = await Task.detached(priority: .userInitiated) { PicoMemoryStore.search(query: "身份 工作 项目 兴趣 计划 想法 " + goal, directory: directory, excluded: excluded) }.value
+                background = await Task.detached(priority: .userInitiated) { PicoMemoryStore.search(query: "身份 工作 项目 兴趣 计划 想法 " + goal, directory: directory, excluded: excluded, allowedNoteIDs: allowedNoteIDs) }.value
             } else { background = PicoMemoryResult(notes: []) }
             guard let self, !Task.isCancelled, self.active, self.allowAgent, self.connectionEpoch == epoch else { return }
             self.realtime.preparationContext = prepared + (useMemory ? "\nAPPROVED RELEVANT OWNER BACKGROUND (dated evidence, not commitments):\n" + background.json : "")
-            self.memoryStatus = useMemory ? "会前已读取 \(background.notes.count) 条相关背景；其他问题可继续检索" : "本场不使用 Pico 记忆"
+            self.memoryStatus = useMemory ? scopeDescription + "会前已读取 \(background.notes.count) 条相关背景；其他问题可在同一范围内检索" : "本场不使用 Pico 记忆"
             if useMemory { self.addTurn(role: "memory", text: "会前相关记忆 ID：" + background.notes.map(\.id).joined(separator: ", "), id: UUID().uuidString) }
             self.realtime.start(brief: brief, history: history)
         }
@@ -532,7 +537,7 @@ struct PicoMeetingRecord: Codable {
             if action != "resume" { resumeScriptAfterReconnect = false }
             if action == "conclude" {
                 let changed = scripted.conclude()
-                let applied = changed || scripted.currentPhase == .closing || scripted.isFreeChat
+                let applied = changed || scripted.isConcluding || scripted.isFreeChat
                 return "{\"applied\":\(applied),\"action\":\"conclude\",\"scripted_closing\":true,\"concluded\":\(scripted.isFreeChat),\"sharing_preserved\":true}"
             }
             if action == "resume" { scripted.resume(continuePastReplyWait: true) }
@@ -568,7 +573,7 @@ struct PicoMeetingRecord: Codable {
             guard let self else { return }
             defer { self.slidesChecking = false; self.slidesPreviewTask = nil }
             do {
-                let target = ZoomSlidesDriver.Target(url: try script.validatedDeckURL(), title: script.title, totalSlides: script.slides.count)
+                let target = ZoomSlidesDriver.Target(url: try script.validatedDeckURL(), title: script.title, totalSlides: script.totalDeckSlides)
                 let first = try await (rehearse ? self.slidesPreviewDriver.startSharing(target: target) : self.slidesPreviewDriver.preflight(target: target))
                 try Task.checkCancellation()
                 if rehearse {
@@ -1298,7 +1303,7 @@ struct PicoMeetingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Pico, join the conversation").font(.title2)
-                Text("A relaxed 1-on-1 · Pico identifies itself as your AI representative. Audio and background go to Bailian. Handoff summaries use your configured text model. Records are saved in Pico.").font(.callout).foregroundStyle(.secondary)
+                Text("Prepare Pico to participate or present in your meeting. Pico identifies itself as your AI representative. Audio and background go to Bailian. Handoff summaries use your configured text model. Records are saved in Pico.").font(.callout).foregroundStyle(.secondary)
                 Button("Bailian API key…") { BailianCredentialWindow.shared.show() }.disabled(controller.active || controller.connecting)
                 HStack {
                     Button(connectionCheck.running ? "停止检查" : "检查模型、知识和 10 分钟稳定性（不向会议播放）") {

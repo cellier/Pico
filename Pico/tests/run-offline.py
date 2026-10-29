@@ -16,6 +16,10 @@ run(["python3", "tests/screen-facing/run-native.py"])
 
 with tempfile.TemporaryDirectory(prefix="pico-offline-tests-") as temporary:
     folder = Path(temporary)
+    locator = folder / "application-locator"
+    run(["swiftc", "-module-cache-path", str(folder / "ModuleCache"), "-parse-as-library",
+         "ApplicationLocator.swift", "../tests/PicoApplicationLocatorTests.swift", "-framework", "Cocoa", "-o", str(locator)])
+    run([str(locator)])
     production = ["CloudSpeech.swift", "CloudRecognition.swift", "SpeechText.swift"]
     frameworks = ["-framework", "Cocoa", "-framework", "AVFoundation", "-framework", "Security"]
     for name, test, options in [

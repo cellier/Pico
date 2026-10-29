@@ -13,7 +13,7 @@ struct PicoScriptPreparationView: View {
                 Button("导入演示脚本…") { choose() }
             }
             if let script = store.draft.presentationScript {
-                Text("\(script.title) · \(script.slides.count) 页").textSelection(.enabled)
+                Text("\(script.title) · 主讲 \(script.slides.count) 页" + (script.totalDeckSlides > script.slides.count ? "，文稿共 \(script.totalDeckSlides) 页（含附录）" : "")).textSelection(.enabled)
                 Text(script.deckURL).font(.caption).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
                 Text("开场可等待回答；每页讲完才翻页。介绍结束后保持共享，继续聊天和回看。").font(.caption).foregroundStyle(.secondary)
                 HStack {
@@ -93,9 +93,25 @@ private struct PicoScriptChunksEditor: View {
                 VStack(alignment: .leading, spacing: 4) {
                     TextEditor(text: $chunks[index].text).frame(minHeight: 55).border(.quaternary)
                         .accessibilityLabel("第 \(index + 1) 段台词")
-                    Toggle("这段讲完后等待对方回答", isOn: $chunks[index].waitForReply)
+                    Toggle("这段讲完后等待对方回答", isOn: Binding(
+                        get: { chunks[index].waitForReply },
+                        set: { value in
+                            chunks[index].waitForReply = value
+                            if !value { chunks[index].waitForExplicitContinue = false }
+                        }
+                    ))
                     if chunks[index].waitForReply {
-                        if let seconds = chunks[index].replyTimeoutSeconds {
+                        Toggle("持续问答，直到明确继续或收尾", isOn: Binding(
+                            get: { chunks[index].waitForExplicitContinue },
+                            set: { value in
+                                chunks[index].waitForExplicitContinue = value
+                                if value { chunks[index].replyTimeoutSeconds = nil }
+                            }
+                        ))
+                        if chunks[index].waitForExplicitContinue {
+                            Text("回答问题和回看页面后继续等待；不会因静默或回答完一个问题就自动翻页。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else if let seconds = chunks[index].replyTimeoutSeconds {
                             Text("无人回应时，约 \(seconds.formatted()) 秒后自然继续；对方发言、等待提问、暂停和接管时不会抢话。")
                                 .font(.caption).foregroundStyle(.secondary)
                         } else {

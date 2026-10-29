@@ -13,7 +13,8 @@ if any(line.strip() == binary or line.strip().startswith(binary + " ") for line 
 PYGUARD
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 swiftc -module-cache-path build/ModuleCache -O main.swift ApplicationLocator.swift CloudSpeech.swift CloudRecognition.swift SpeechText.swift -o "$app/Contents/MacOS"/Sprout -framework Cocoa -framework WebKit -framework AVFoundation -framework Security
-cp assets/index.html assets/asr-mixed-check.wav "$app/Contents/Resources"/
+cp assets/index.html "$app/Contents/Resources/PicoDesktop.html"
+cp assets/asr-mixed-check.wav "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>local.original.sprout</string><key>CFBundleName</key><string>Pico</string><key>CFBundleDisplayName</key><string>Pico</string><key>CFBundleExecutable</key><string>Sprout</string><key>CFBundlePackageType</key><string>APPL</string><key>NSMicrophoneUsageDescription</key><string>Pico records only while you hold the character. Speech is recognized by Bailian when enabled, or locally by Pico.</string><key>LSUIElement</key><true/><key>NSHighResolutionCapable</key><true/></dict></plist>
 PLIST

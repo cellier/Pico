@@ -28,6 +28,7 @@ import Foundation
         try await discardedVADRestoresReplyTimeout()
         try await replyTimeoutCannotOverrideHumanControl()
         try await realReplyAndInterruptedTimeoutKeepPlaybackBarriers()
+        try await discussionGateAndAppendixReview()
         print("PASS: scripted presentation confirms pages/playback, rejects silent and stale replies, waits for real questions, resumes after answers, preserves final-page sharing/review, and handles configurable silence fallback without overriding VAD, Q&A, permission hold or owner control")
     }
 
@@ -448,6 +449,73 @@ import Foundation
         precondition(!coordinator.waitingForReply && speech.count == 2 && speech.last?.chunkID == "share-intro" && fake.shares == 0,
                      "explicit continue must advance to the next chunk without waiting for an ordinary model acknowledgement")
     }
+
+    private static func nextSpeech(_ coordinator: PicoScriptedPresentation, clock: ScriptedClock,
+                                   speeches: inout [PicoScriptSpeech], after count: Int) async -> PicoScriptSpeech {
+        for _ in 0..<20 {
+            tick(coordinator, &speeches); await settle()
+            if speeches.count > count { return speeches.last! }
+            clock.advance(0.8)
+        }
+        preconditionFailure("Expected a prepared script utterance after confirmed page operations")
+    }
+    private static func discussionGateAndAppendixReview() async throws {
+        for useConclude in [false, true] {
+            let fake = ScriptedSlidesFixture(), clock = ScriptedClock()
+            fake.snapshot.totalSlides = 27
+            let script = PicoPresentationScript(deckURL: "https://slides.zoom.us/p/discussion-with-appendix", title: "Fixture",
+                slides: (1...11).map { page in
+                    .init(number: page, title: "Page \(page)", chunks: [.init(id: "prepared-\(page)", text: page == 10 ? "Questions are welcome." : "Prepared point \(page).",
+                        waitForReply: page == 10, replyTimeoutSeconds: nil, waitForExplicitContinue: page == 10)])
+                }, closing: [], deckSlideCount: 27, closingStartSlide: 11)
+            let coordinator = PicoScriptedPresentation(operations: fake.operations, now: { clock.value })
+            try coordinator.configure(script); coordinator.start()
+            var speech: [PicoScriptSpeech] = []
+            await shared(coordinator, &speech)
+            precondition(fake.sharedTargets.first?.totalSlides == 27, "binding validates the complete deck, including its unpresented appendix")
+            for page in 1...10 {
+                let next = await nextSpeech(coordinator, clock: clock, speeches: &speech, after: page - 1)
+                precondition(next.slideNumber == page && next.chunkID == "prepared-\(page)")
+                played(coordinator, id: "prepared-reply-\(page)", script: next)
+            }
+            clock.advance(5); tick(coordinator, &speech); await settle(); tick(coordinator, &speech)
+            let gateCursor = coordinator.cursor
+            precondition(coordinator.waitingForReply && coordinator.waitingForExplicitContinue && speech.count == 10 && coordinator.currentSlide == 10)
+            for question in 1...2 {
+                coordinator.interrupted(); coordinator.guestTranscript(text: "A real question \(question)?")
+                played(coordinator, id: "question-answer-\(question)")
+                clock.advance(30); tick(coordinator, &speech); await settle(); tick(coordinator, &speech)
+                precondition(coordinator.waitingForExplicitContinue && speech.count == 10 && coordinator.cursor == gateCursor && coordinator.currentSlide == 10,
+                             "answering several questions must not advance from Q&A into Thanks")
+            }
+            coordinator.guestTranscript(text: "Please show the appendix page.")
+            let outcome = await coordinator.navigate(page: 20)
+            precondition(outcome.contains("true") && coordinator.currentSlide == 20 && coordinator.cursor == gateCursor)
+            played(coordinator, id: "appendix-answer")
+            clock.advance(5); tick(coordinator, &speech); await settle(); tick(coordinator, &speech)
+            precondition(coordinator.waitingForExplicitContinue && speech.count == 10 && coordinator.currentSlide == 20,
+                         "appendix review never starts an unprepared narration or changes the Q&A cursor")
+            coordinator.pause(); coordinator.resume()
+            clock.advance(5); tick(coordinator, &speech); await settle(); tick(coordinator, &speech)
+            precondition(coordinator.waitingForExplicitContinue && speech.count == 10 && coordinator.cursor == gateCursor,
+                         "ordinary resume/reconnect preserves the explicit-only discussion gate")
+            var interruptions = 0; coordinator.onRequestInterruption = { interruptions += 1 }
+            if useConclude {
+                precondition(coordinator.conclude())
+                precondition(!coordinator.conclude() && interruptions == 1,
+                             "a second conclude does not cancel the pending Thanks navigation")
+            } else { coordinator.resume(continuePastReplyWait: true) }
+            let ending = await nextSpeech(coordinator, clock: clock, speeches: &speech, after: 10)
+            precondition(ending.slideNumber == 11 && coordinator.currentSlide == 11 && fake.pages.last == 11)
+            precondition(!coordinator.conclude(), "a closing section already being spoken cannot be restarted")
+            played(coordinator, id: "thanks-final", script: ending)
+            clock.advance(5); tick(coordinator, &speech); await settle(); tick(coordinator, &speech)
+            precondition(coordinator.isFreeChat && coordinator.sharing && coordinator.currentSlide == 11 && speech.count == 11)
+            precondition(!fake.pages.contains(where: { $0 > 11 && $0 != 20 }), "appendix pages must never be automatically presented")
+            precondition(!coordinator.conclude() && interruptions == (useConclude ? 1 : 0))
+        }
+        print("PASS: 11 prepared pages bound to a 27-page deck, persistent multi-question discussion, appendix review, recovery without advance, explicit resume or configured closing once")
+    }
     private static func automaticResponseCannotBorrowScriptScope() async throws {
         let fake = ScriptedSlidesFixture(), clock = ScriptedClock()
         let coordinator = PicoScriptedPresentation(operations: fake.operations, now: { clock.value })
@@ -625,14 +693,16 @@ import Foundation
 @MainActor private final class ScriptedSlidesFixture {
     var snapshot = ZoomSlidesDriver.Snapshot(pid: 9, meetingTitle: "Controlled test", documentTitle: "Fixture", currentSlide: 1, totalSlides: 2, sharing: .active)
     var shares = 0, reads = 0, cancellations = 0, resets = 0
+    var sharedTargets: [ZoomSlidesDriver.Target] = []
     var events: [String] = []
     var pages: [Int] = []
     var deferShare = false
     var readFailures: [ZoomSlidesDriver.Failure] = []
     var shareContinuation: CheckedContinuation<ZoomSlidesDriver.Snapshot, Error>?
     var operations: PicoScriptedPresentation.Operations {
-        .init(share: { [self] _ in
+        .init(share: { [self] target in
             shares += 1
+            sharedTargets.append(target)
             if deferShare {
                 deferShare = false
                 return try await withCheckedThrowingContinuation { shareContinuation = $0 }

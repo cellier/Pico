@@ -25,7 +25,26 @@ import SQLite3
         precondition(PicoMemoryStore.search(query: "工作", directory: directory, excluded: []).notes.count == 1)
         let after = try Data(contentsOf: file)
         precondition(after == before, "search must never mutate memory")
+        let brief = "Synthetic brief: the project owner is preparing a product review."
+        let materials = "Synthetic meeting materials: an opportunity is still unsigned; it is not realized revenue."
+        let prompt = PicoMeetingPrompt.instructions(brief: brief, history: "", memory: true, preparation: materials)
+        precondition(prompt.contains(brief) && prompt.contains(materials), "enabling memory must retain the other approved evidence sources")
+        precondition(PicoMeetingPrompt.memoryInstructions.contains("complementary sources"))
+        precondition(PicoMeetingPrompt.memoryInstructions.contains("Empty, unrelated or failed memory results do not negate facts in the materials or brief"), "an irrelevant memory result cannot erase a material-backed answer to the next question")
+        precondition(PicoMeetingPrompt.memoryInstructions.contains("MUST call telos_memory_search"), "owner-background questions still require a real bounded search when the other sources do not answer them")
+        precondition(!PicoMeetingPrompt.memoryInstructions.contains("Use only facts supported by relevant returned notes"), "retrieved notes cannot become the exclusive factual source")
+        let missing = PicoMemoryResult(notes: [])
+        let encoded = try JSONSerialization.jsonObject(with: Data(missing.json.utf8)) as! [String: Any]
+        let guidance = encoded["guidance"] as! String
+        precondition(guidance.contains("supplement the owner's brief and supplied meeting materials"))
+        precondition(guidance.contains("Empty, unrelated or failed memory results do not negate facts in the materials or brief"))
+        precondition(guidance.contains("Only when none of the approved sources provides reliable support"), "absence can be claimed only after checking all approved sources")
+        precondition(guidance.contains("do not prepend a stock disclaimer to supported facts"))
+        precondition(!guidance.contains("If absent, say") && !prompt.contains("这部分资料里没有，我不能确定"), "do not force a canned absence claim after a memory search")
+        let unavailable = PicoMemoryResult(notes: [], error: "Synthetic lookup failure.")
+        precondition(unavailable.guidance == missing.guidance, "a failed lookup must preserve the same complementary-source policy")
         print("PASS: Chinese/English retrieval, explicit exclusions, sensitive notes blocked, absent evidence empty, SQLite read-only.")
+        print("PASS: memory complements meeting materials and brief; empty/failed notes cannot erase supported facts, and genuine missing evidence stays explicit.")
         if CommandLine.arguments.contains("--inspect-live") {
             let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Telos")
             let live = try PicoMemoryStore.load(directory: root)

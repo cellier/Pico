@@ -30,6 +30,9 @@ sdk="${TELOS_SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk}"
 diagnostic_flags=()
 [[ "${TELOS_DIAGNOSTICS:-0}" == "1" ]] && diagnostic_flags=(-D TELOS_DIAGNOSTICS)
 swiftc "${diagnostic_flags[@]}" -sdk "$sdk" -target arm64-apple-macos14.0 -swift-version 5 -O -parse-as-library Sources/*.swift -o "$app/Contents/MacOS/Pico" -framework SwiftUI -framework AppKit -framework CoreText -Xlinker -weak_framework -Xlinker PaperKit -Xlinker -weak_framework -Xlinker PencilKit
+# The desktop character ships inside Pico; it is never a separate user install.
+# Its existing bundle identifier preserves saved skins and voice preferences.
+PICO_APP_OUTPUT="${app:A}/Contents/Helpers/Pico Desktop.app" zsh Pico/build.sh
 python3 scripts/build-pico-avatar.py
 cp -R Resources/. "$app/Contents/Resources/"
 cp -R Backend "$app/Contents/Resources/"

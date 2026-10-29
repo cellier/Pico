@@ -82,19 +82,46 @@ class AppDelegate:NSObject,NSApplicationDelegate,NSWindowDelegate,WKScriptMessag
  var pauseMenu:NSMenuItem!,pinMenu:NSMenuItem!,stopMenu:NSMenuItem!,detailMenu:NSMenuItem!
  var skin=PetSkin.load(),skinMenu:NSMenu?
  var facingUpdate:DispatchWorkItem?,lastScreenFacing:PetScreenFacing.Direction?
+ let managedRequested=ProcessInfo.processInfo.environment[PicoManagedCompanionHost.managedKey] == "1"
+ let managedHost:PicoManagedCompanionHost?
+ var ownerTerminationObserver:NSObjectProtocol?
+ var terminationSignal:DispatchSourceSignal?
+ var shuttingDown=false
  let root:URL
- init(root:URL=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Telos/companion-v1")){self.root=root;super.init()}
+ init(root:URL?=nil){
+  let host=PicoManagedCompanionHost.load();managedHost=host
+  self.root=root ?? host?.companionRoot ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Telos/companion-v1")
+  super.init()
+ }
  var telosURL:URL?{TelosApplication.resolve()}
  func label(_ state:String)->String{switch state{case "listening":return L("Listening","正在聆听");case "transcribing":return L("Transcribing","正在转写");case "thinking":return L("Thinking","思考中");case "working":return L("Working","工作中");case "speaking":return L("Speaking","正在回复");case "completed":return L("Done","已完成");case "error":return L("Error","出错了");case "needs_input","awaiting_approval":return L("Needs input","等待确认");case "cancelled":return L("Cancelled","已取消");default:return L("Idle","闲暇")}}
  func icon()->NSImage{let image=NSImage(size:NSSize(width:18,height:18),flipped:false){rect in NSGraphicsContext.saveGraphicsState();let t=NSAffineTransform();t.scale(by:18/35);t.concat();let p=NSBezierPath(roundedRect:NSRect(x:0,y:0,width:35,height:35),xRadius:12,yRadius:12);p.append(NSBezierPath(roundedRect:NSRect(x:8.71094,y:12.25,width:6.12496,height:10.5),xRadius:2.5,yRadius:2.5));p.append(NSBezierPath(roundedRect:NSRect(x:20.96,y:12.25,width:6.125,height:10.5),xRadius:2.5,yRadius:2.5));p.windingRule = .evenOdd;NSColor.black.setFill();p.fill();NSGraphicsContext.restoreGraphicsState();return true};image.isTemplate=true;return image}
  func applicationDidFinishLaunching(_ notification:Notification){
+  guard !managedRequested || managedHost?.ownerIsRunning() == true else{NSApp.terminate(nil);return}
   NSApp.setActivationPolicy(.accessory);speech.delegate=self
+  if let host=managedHost {
+   // Process.terminate sends SIGTERM. Route it through the same AppKit cleanup
+   // as a normal quit instead of abandoning a recording or cloud request.
+   signal(SIGTERM,SIG_IGN)
+   let source=DispatchSource.makeSignalSource(signal:SIGTERM,queue:.main)
+   source.setEventHandler{NSApp.terminate(nil)};source.resume();terminationSignal=source
+   ownerTerminationObserver=NSWorkspace.shared.notificationCenter.addObserver(forName:NSWorkspace.didTerminateApplicationNotification,object:nil,queue:.main){[weak self] notification in
+    guard let self,!self.shuttingDown,let application=notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+     application.processIdentifier == host.processIdentifier else{return}
+    NSApp.terminate(nil)
+   }
+   // Subscribe before rechecking so an owner exiting during startup is not missed.
+   guard host.ownerIsRunning() else{NSApp.terminate(nil);return}
+  }
   let f=NSScreen.main!.visibleFrame
   panel=PetPanel(contentRect:NSRect(x:f.maxX-200-petWindowSide/2,y:f.minY+250-petWindowSide/2,width:petWindowSide,height:petWindowSide),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false);panel.delegate=self;panel.title="Pico";panel.isOpaque=false;panel.backgroundColor = .clear;panel.hasShadow=false;panel.level = .floating;panel.hidesOnDeactivate=false;panel.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary];panel.isReleasedWhenClosed=false
+  _=panel.setFrameUsingName("PicoDesktopCharacter")
+  panel.setContentSize(NSSize(width:petWindowSide,height:petWindowSide));keepOnScreen()
+  panel.setFrameAutosaveName("PicoDesktopCharacter")
   let config=WKWebViewConfiguration();config.userContentController.add(self,name:"native");web=WKWebView(frame:NSRect(x:0,y:0,width:petWindowSide,height:petWindowSide),configuration:config);web.setValue(false,forKey:"drawsBackground")
   let container=NSView(frame:web.frame);container.addSubview(web);touch=TouchView(frame:web.frame);touch.owner=self;touch.setAccessibilityElement(true);touch.setAccessibilityRole(.button);touch.setAccessibilityLabel(L("Pico: hold to speak, move to drag, right-click for menu","Pico：按住说话，移动拖动，右键打开菜单"));container.addSubview(touch);panel.contentView=container
-  let html=Bundle.main.url(forResource:"index",withExtension:"html")!;web.loadFileURL(html,allowingReadAccessTo:html.deletingLastPathComponent())
-  status=NSStatusBar.system.statusItem(withLength:26);status.button?.image=icon();status.button?.imagePosition = .imageOnly;status.button?.font=NSFont.systemFont(ofSize:12,weight:.medium);status.button?.wantsLayer=true;status.button?.layer?.cornerRadius=10
+  let html=Bundle.main.url(forResource:"PicoDesktop",withExtension:"html") ?? Bundle.main.url(forResource:"index",withExtension:"html")!;web.loadFileURL(html,allowingReadAccessTo:html.deletingLastPathComponent())
+  if managedHost == nil {status=NSStatusBar.system.statusItem(withLength:26);status?.button?.image=icon();status?.button?.imagePosition = .imageOnly;status?.button?.font=NSFont.systemFont(ofSize:12,weight:.medium);status?.button?.wantsLayer=true;status?.button?.layer?.cornerRadius=10}
   rebuildMenu();setState("idle");panel.orderFrontRegardless()
   timer=Timer(timeInterval:1/15,repeats:true){[weak self] _ in self?.poll()};timer.tolerance=0.012;RunLoop.main.add(timer,forMode:.common)
   NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(sleepPet),name:NSWorkspace.screensDidSleepNotification,object:nil);NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(wakePet),name:NSWorkspace.screensDidWakeNotification,object:nil)
@@ -103,7 +130,7 @@ class AppDelegate:NSObject,NSApplicationDelegate,NSWindowDelegate,WKScriptMessag
   NotificationCenter.default.addObserver(self,selector:#selector(displayLayoutChanged),name:NSApplication.didChangeScreenParametersNotification,object:nil)
   log("voice companion launched; opaque=false; key=\(panel.isKeyWindow)")
  }
- func rebuildMenu(){menu=NSMenu();menu.addItem(withTitle:label(current),action:nil,keyEquivalent:"");menu.addItem(withTitle:L("Hold still to speak · Move to drag","按住不动说话 · 移动拖动"),action:nil,keyEquivalent:"");stopMenu=menu.addItem(withTitle:L("Stop / Cancel voice conversation","停止或取消语音对话"),action:#selector(cancelVoice),keyEquivalent:".");stopMenu.target=self;detailMenu=menu.addItem(withTitle:L("Open conversation / task in Pico","在 Pico 查看对话 / 任务"),action:#selector(openTask),keyEquivalent:"");detailMenu.target=self;menu.addItem(.separator());pinMenu=menu.addItem(withTitle:L("Always on top","保持置顶"),action:#selector(togglePin),keyEquivalent:"");pinMenu.target=self;pauseMenu=menu.addItem(withTitle:L("Pause animation","暂停动画"),action:#selector(togglePause),keyEquivalent:"");pauseMenu.target=self;let reset=menu.addItem(withTitle:L("Reset position","重置位置"),action:#selector(resetPosition),keyEquivalent:"");reset.target=self;menu.addItem(.separator());let quit=menu.addItem(withTitle:L("Quit Pico","退出 Pico"),action:#selector(quitApp),keyEquivalent:"q");quit.target=self;
+ func rebuildMenu(){menu=NSMenu();menu.addItem(withTitle:label(current),action:nil,keyEquivalent:"");menu.addItem(withTitle:L("Hold still to speak · Move to drag","按住不动说话 · 移动拖动"),action:nil,keyEquivalent:"");stopMenu=menu.addItem(withTitle:L("Stop / Cancel voice conversation","停止或取消语音对话"),action:#selector(cancelVoice),keyEquivalent:".");stopMenu.target=self;detailMenu=menu.addItem(withTitle:L("Open conversation / task in Pico","在 Pico 查看对话 / 任务"),action:#selector(openTask),keyEquivalent:"");detailMenu.target=self;menu.addItem(.separator());pinMenu=menu.addItem(withTitle:L("Always on top","保持置顶"),action:#selector(togglePin),keyEquivalent:"");pinMenu.target=self;pauseMenu=menu.addItem(withTitle:L("Pause animation","暂停动画"),action:#selector(togglePause),keyEquivalent:"");pauseMenu.target=self;let reset=menu.addItem(withTitle:L("Reset position","重置位置"),action:#selector(resetPosition),keyEquivalent:"");reset.target=self;menu.addItem(.separator());let quit=menu.addItem(withTitle:managedHost == nil ? L("Quit Pico","退出 Pico") : L("Hide desktop Pico","隐藏桌面 Pico"),action:#selector(quitApp),keyEquivalent:"q");quit.target=self;
 #if VOICE_QA
 menu.addItem(.separator());for (title,selector) in [("QA: submit audio fixture",#selector(qaSend)),("QA: stop playback",#selector(qaStop)),("QA: cancel pending audio",#selector(qaCancel))]{let item=menu.addItem(withTitle:title,action:selector,keyEquivalent:"");item.target=self}
 #endif
@@ -119,7 +146,7 @@ for choice in PetSkin.allCases {
  }
  let item=NSMenuItem(title:title,action:#selector(selectSkin(_:)),keyEquivalent:"");item.target=self;item.representedObject=choice.rawValue;choices.addItem(item)
 }
-skinMenu=choices;skinItem.submenu=choices;menu.insertItem(skinItem,at:6);updateSkinMenu();status.menu=menu;updateLabels()}
+skinMenu=choices;skinItem.submenu=choices;menu.insertItem(skinItem,at:6);updateSkinMenu();status?.menu=menu;updateLabels()}
  func updateSkinMenu(){for item in skinMenu?.items ?? []{item.state=(item.representedObject as? String)==skin.rawValue ? .on:.off}}
  @objc func selectSkin(_ item:NSMenuItem){
   guard let raw=item.representedObject as? String,let selected=PetSkin(rawValue:raw),selected != skin else{return}
@@ -141,7 +168,21 @@ skinMenu=choices;skinItem.submenu=choices;menu.insertItem(skinItem,at:6);updateS
  }
  func windowDidMove(_ notification:Notification){scheduleScreenFacing()}
  func windowDidChangeScreen(_ notification:Notification){scheduleScreenFacing()}
- @objc func displayLayoutChanged(){syncScreenFacing(force:true)}
+ func keepOnScreen(){
+  guard let panel else{return}
+  let screens=NSScreen.screens.map(\.visibleFrame)
+  if !screens.contains(where:{$0.intersects(panel.frame)}),let screen=NSScreen.main?.visibleFrame {
+   panel.setFrameOrigin(NSPoint(x:max(screen.minX,screen.maxX-200-petWindowSide/2),y:min(screen.maxY-petWindowSide,screen.minY+250-petWindowSide/2)))
+  }
+  guard let visible=screens.max(by:{a,b in
+   let left=panel.frame.intersection(a),right=panel.frame.intersection(b)
+   return (left.isNull ? 0:left.width*left.height)<(right.isNull ? 0:right.width*right.height)
+  }) else{return}
+  let x=max(visible.minX,min(panel.frame.minX,max(visible.minX,visible.maxX-petWindowSide)))
+  let y=max(visible.minY,min(panel.frame.minY,max(visible.minY,visible.maxY-petWindowSide)))
+  panel.setFrameOrigin(NSPoint(x:x,y:y))
+ }
+ @objc func displayLayoutChanged(){keepOnScreen();syncScreenFacing(force:true)}
  @objc func openMeeting(){
   cancelVoice()
   guard let telosURL else{lastResponse=L("Could not find the Pico app. Open Pico and try again.","找不到 Pico 主应用，请打开 Pico 后重试。");setState("error");return}
@@ -158,8 +199,9 @@ skinMenu=choices;skinItem.submenu=choices;menu.insertItem(skinItem,at:6);updateS
    }
   }
  }
- func updateLabels(){status.button?.title="";status.button?.setAccessibilityLabel("Pico · "+label(current));menu?.item(at:0)?.title=label(current);status.button?.toolTip=label(current)+(lastResponse.isEmpty ? "":" · "+String(lastResponse.prefix(180)));status.button?.layer?.backgroundColor=NSColor.labelColor.withAlphaComponent(0.08).cgColor;pinMenu?.state=pinned ? .on:.off;pauseMenu?.title=paused ? L("Resume animation","恢复动画"):L("Pause animation","暂停动画")}
+ func updateLabels(){status?.button?.title="";status?.button?.setAccessibilityLabel("Pico · "+label(current));menu?.item(at:0)?.title=label(current);status?.button?.toolTip=label(current)+(lastResponse.isEmpty ? "":" · "+String(lastResponse.prefix(180)));status?.button?.layer?.backgroundColor=NSColor.labelColor.withAlphaComponent(0.08).cgColor;pinMenu?.state=pinned ? .on:.off;pauseMenu?.title=paused ? L("Resume animation","恢复动画"):L("Pause animation","暂停动画")}
  func setState(_ s:String){
+  guard !shuttingDown else{return}
   // Voice feedback stays on Pico and in its menu; never cover the desktop.
   if s=="error" && lastResponse.isEmpty {lastResponse=L("Voice input failed. Please try again.","语音输入失败，请重试。")}
   if current==s {updateLabels();return}
@@ -173,12 +215,12 @@ for delay in [0.0,0.07,0.20,0.5]{DispatchQueue.main.asyncAfter(deadline:.now()+d
  }
  @objc func motionPreference(){web?.evaluateJavaScript("window.setReducedMotion(\(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))",completionHandler:nil)}
  @objc func languageChanged(){rebuildMenu()}
- func userContentController(_ u:WKUserContentController,didReceive m:WKScriptMessage){guard let v=m.body as? [String:Any],let type=v["type"] as? String else{return};if type=="ready"{ready=true;motionPreference();applySkin();syncScreenFacing(force:true);syncVisualState();updateLabels();log("WebGL ready")
+ func userContentController(_ u:WKUserContentController,didReceive m:WKScriptMessage){guard !shuttingDown,let v=m.body as? [String:Any],let type=v["type"] as? String else{return};if type=="ready"{ready=true;motionPreference();applySkin();syncScreenFacing(force:true);syncVisualState();updateLabels();log("WebGL ready")
 #if VOICE_QA
 DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
 #endif
 } }
- func poll(){guard ready else{return};if !touch.dragging && !polling{polling=true;let p=NSEvent.mouseLocation,x=p.x-panel.frame.minX,y=web.bounds.height-(p.y-panel.frame.minY);web.evaluateJavaScript("window.pointerAt(\(x),\(y))"){[weak self] v,_ in self?.polling=false;self?.panel.ignoresMouseEvents = !(v as? Bool ?? false)}};ticks+=1;if touch.dragging && ticks%6==0{notifyGesture(true)};if ticks%2==0{readStatus()}}
+ func poll(){guard ready,!shuttingDown else{return};if !touch.dragging && !polling{polling=true;let p=NSEvent.mouseLocation,x=p.x-panel.frame.minX,y=web.bounds.height-(p.y-panel.frame.minY);web.evaluateJavaScript("window.pointerAt(\(x),\(y))"){[weak self] v,_ in guard let self,!self.shuttingDown else{return};self.polling=false;self.panel.ignoresMouseEvents = !(v as? Bool ?? false)}};ticks+=1;if touch.dragging && ticks%6==0{notifyGesture(true)};if ticks%2==0{readStatus()}}
 
 #if VOICE_QA
  @objc func qaSend(){submitFixture()}
@@ -243,11 +285,13 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
  }
  func shortReply(_ input:String)->String{let text=SpeechText.prepare(input);log("tts prepared source_chars=\(input.count) spoken_chars=\(text.count)");return text}
  func speak(_ text:String){
+  guard !shuttingDown else{return}
   stopSpeaking();let language=replyLanguage ?? (text.unicodeScalars.contains{(0x3400...0x9FFF).contains(Int($0.value))} ? "zh":"en")
   if cloudSpeech.speak(text,language:language,completion:{[weak self] success in guard let self else{return};if success{self.setState(self.terminal)}else{log("cloud tts unavailable; system fallback");self.speakSystem(text)}}){setState("speaking");return}
   speakSystem(text)
  }
  func speakSystem(_ text:String){
+  guard !shuttingDown else{return}
   speech.stopSpeaking();speech.rate=175
   let isChinese=text.unicodeScalars.contains{(0x3400...0x9FFF).contains(Int($0.value))}
   let language=replyLanguage ?? (isChinese ? "zh":"en")
@@ -274,7 +318,7 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
  guard let self else{return};self.stopSpeaking();self.terminal=self.current
  if self.cloudSpeech.speak(text,language:language,force:true,completion:{[weak self] success in guard let self else{return};self.voiceSettings.message.stringValue=success ? L("Cloud trial completed.","云端试听完成。") : L("Cloud trial failed. Check region, workspace, key and model access.","云端试听失败，请检查地域、业务空间、密钥与模型权限。");self.setState(self.terminal)}){self.setState("speaking");self.voiceSettings.message.stringValue=L("Cloud trial requested…","已请求云端试听…")}else{self.voiceSettings.message.stringValue=L("Save the region, workspace and new key first.","请先保存地域、业务空间和新密钥。")}
  };voiceSettings.show()}
- @objc func cancelVoice(){cloudRecognition.cancel();if let url=recognitionAudio{try? FileManager.default.removeItem(at:url)};recognitionAudio=nil;notifyGesture(false);web.evaluateJavaScript("window.setPressed(false)",completionHandler:nil);stopSpeaking();recorder?.stop();recorder=nil;recordTimer?.invalidate();meterTimer?.invalidate();if let u=audioURL{try? FileManager.default.removeItem(at:u)};audioURL=nil;if let id=requestID{try? Data().write(to:root.appendingPathComponent(id+".cancel"),options:.atomic)};requestID=nil;terminal="cancelled";setState("cancelled")}
+ @objc func cancelVoice(){cloudRecognition.cancel();if let url=recognitionAudio{try? FileManager.default.removeItem(at:url)};recognitionAudio=nil;notifyGesture(false);web?.evaluateJavaScript("window.setPressed(false)",completionHandler:nil);stopSpeaking();recorder?.stop();recorder=nil;recordTimer?.invalidate();meterTimer?.invalidate();if let u=audioURL{try? FileManager.default.removeItem(at:u)};audioURL=nil;if let id=requestID{try? Data().write(to:root.appendingPathComponent(id+".cancel"),options:.atomic)};requestID=nil;terminal="cancelled";setState("cancelled")}
  @objc func openTask(){
   guard let telosURL else{lastResponse=L("Could not find the Pico app. Open Pico and try again.","找不到 Pico 主应用，请打开 Pico 后重试。");setState("error");return}
   if let id=requestID ?? lastRouteRequestID{try? Data().write(to:root.appendingPathComponent(id+".show"),options:.atomic)}
@@ -289,6 +333,25 @@ DispatchQueue.main.asyncAfter(deadline:.now()+1){self.submitFixture()}
  @objc func resetPosition(){let f=NSScreen.main!.visibleFrame;panel.setFrameOrigin(NSPoint(x:f.maxX-200-petWindowSide/2,y:f.minY+250-petWindowSide/2));syncScreenFacing(force:true)}
  @objc func sleepPet(){web.evaluateJavaScript("window.setPressed(false)",completionHandler:nil);if recorder != nil{cancelVoice()};web.evaluateJavaScript("window.setPaused(true)",completionHandler:nil)}
  @objc func wakePet(){web.evaluateJavaScript("window.setPaused(\(paused))",completionHandler:nil);syncScreenFacing(force:true)}
- @objc func quitApp(){cancelVoice();log("quit");NSApp.terminate(nil)}
+ @objc func quitApp(){
+  if let host=managedHost {
+   DistributedNotificationCenter.default().postNotificationName(PicoManagedCompanionHost.hideNotification,
+    object:host.applicationURL.path,userInfo:["owner_pid":Int(host.processIdentifier)],deliverImmediately:true)
+  }
+  log("quit");NSApp.terminate(nil)
+ }
+ func applicationWillTerminate(_ notification:Notification){
+  guard !shuttingDown else{return}
+  shuttingDown=true;ready=false
+  timer?.invalidate();timer=nil;touch?.arm?.invalidate();touch?.arm=nil;touch?.owner=nil
+  terminationSignal?.cancel();terminationSignal=nil
+  facingUpdate?.cancel();facingUpdate=nil
+  speech.delegate=nil;cancelVoice();cloudSpeech.cancel()
+  if let observer=ownerTerminationObserver{NSWorkspace.shared.notificationCenter.removeObserver(observer);ownerTerminationObserver=nil}
+  NSWorkspace.shared.notificationCenter.removeObserver(self);NotificationCenter.default.removeObserver(self)
+  web?.stopLoading();web?.configuration.userContentController.removeScriptMessageHandler(forName:"native")
+  panel?.orderOut(nil)
+  if let status{NSStatusBar.system.removeStatusItem(status);self.status=nil}
+ }
 }
 let app=NSApplication.shared,delegate=AppDelegate();app.delegate=delegate;app.run()

@@ -57,6 +57,30 @@ import Foundation
   expect(installed.first==root.appendingPathComponent("repo/build/Pico.app"),"A companion built in the repo should find the renamed main app")
   expect(installed.contains(root.appendingPathComponent("repo/build/Telos.app")),"Installed candidates must keep the legacy name as a fallback")
 
+  let enclosing=try app("nested/Renamed Pico.app")
+  let embedded=enclosing.appendingPathComponent("Contents/Helpers/Pico Desktop.app")
+  try files.createDirectory(at:embedded,withIntermediateDirectories:true)
+  expect(TelosApplication.enclosingMainApplication(bundle:embedded)==enclosing,"A moved or renamed host must be resolved from its embedded helper")
+  expect(TelosApplication.enclosingMainApplication(bundle:enclosing.appendingPathComponent("Contents/Resources/Pico Desktop.app"))==nil,"An arbitrary resource app must not imply an enclosing host")
+  expect(TelosApplication.enclosingMainApplication(bundle:wrongID.appendingPathComponent("Contents/Helpers/Pico Desktop.app"))==nil,"An enclosing app with another identity must not be used")
+  expect(TelosApplication.enclosingMainApplication(bundle:companion)==nil,"A standalone character must retain the ordinary discovery path")
+  expect(TelosApplication.resolve(locations:.init(installed:[TelosApplication.enclosingMainApplication(bundle:embedded)!,backup]))==enclosing,"The exact embedded host must beat an installed backup")
+
+  let hostEnvironment=["PICO_MANAGED_BY_MAIN":"1","PICO_MAIN_PID":"12345","PICO_APP_PATH":enclosing.path,
+                       "PICO_COMPANION_ROOT":root.appendingPathComponent("isolated/companion-v1").path]
+  let host=PicoManagedCompanionHost.load(environment:hostEnvironment)!
+  expect(host.applicationURL==enclosing && host.companionRoot.path==hostEnvironment["PICO_COMPANION_ROOT"],"A managed launch must use its exact host and isolated IPC root")
+  expect(host.matchesOwner(processIdentifier:12345,bundleIdentifier:"com.telos.mac",bundleURL:enclosing),"The expected host process should match")
+  expect(!host.matchesOwner(processIdentifier:12346,bundleIdentifier:"com.telos.mac",bundleURL:enclosing),"A different process must not own this character")
+  expect(!host.matchesOwner(processIdentifier:12345,bundleIdentifier:"other.app",bundleURL:enclosing),"The owner bundle identifier must match")
+  expect(!host.matchesOwner(processIdentifier:12345,bundleIdentifier:"com.telos.mac",bundleURL:backup),"Another Pico checkout must not own this character")
+  expect(PicoManagedCompanionHost.load(environment:[:])==nil,"Standalone launches must not become managed implicitly")
+  for (key,value) in [("PICO_MAIN_PID","0"),("PICO_MAIN_PID","-1"),("PICO_MAIN_PID","invalid"),
+                      ("PICO_APP_PATH",wrongID.path),("PICO_COMPANION_ROOT","relative/companion-v1")]{
+   var invalid=hostEnvironment;invalid[key]=value
+   expect(PicoManagedCompanionHost.load(environment:invalid)==nil,"Invalid managed launch field must be rejected: "+key)
+  }
+
   let directoryBinary=try app("directory-binary/Pico.app",executable:false)
   try files.createDirectory(at:directoryBinary.appendingPathComponent("Contents/MacOS/Pico"),withIntermediateDirectories:true)
   expect(!TelosApplication.isMainApplication(directoryBinary),"A directory with executable access is not an executable file")

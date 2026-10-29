@@ -32,6 +32,8 @@ enum PicoPresentationScriptTests {
         let minimal = Data(#"{"deckURL":"https://slides.zoom.us/s/other-deck","title":"Synthetic","slides":[{"number":1,"title":"One","chunks":[{"text":"Synthetic fact."}]}]}"#.utf8)
         let old = try PicoPresentationScript.decode(minimal)
         precondition(old.version == 1 && old.language == "zh-CN" && old.deckID == nil)
+        precondition(old.deckSlideCount == nil && old.totalDeckSlides == 1 && old.closingStartSlide == nil)
+        precondition(!old.slides[0].chunks[0].waitForExplicitContinue)
         precondition(old.slides[0].pageID == nil && !old.slides[0].chunks[0].waitForReply && !old.slides[0].chunks[0].id.isEmpty)
         precondition(old.slides[0].chunks[0].replyTimeoutSeconds == 12,
                      "older saved scripts receive the default without reimporting")
@@ -168,6 +170,7 @@ enum PicoPresentationScriptTests {
         try earlyConclude()
         try explicitContinueReleasesReplyWait()
         try replyTimeoutTransitionRequiresPlayback()
+        try persistentDiscussionAndPreparedClosing()
         print("PASS: generic Codable validation, backward-compatible/null-disabled reply timeout, scoped silence-bridge playback without cursor skips, separate Q&A playback, share/page confirmations, interrupted transitions, free-chat retention and takeover/cancel generation fences. No UI, network, model or meeting used.")
     }
     private static func replyTimeoutTransitionRequiresPlayback() throws {
@@ -256,6 +259,94 @@ enum PicoPresentationScriptTests {
         precondition(!flow.waitingForReply && flow.answerID == nil)
         let next = speech(flow.nextAction())
         precondition(next.chunkID == "open-2", "explicit continue must release the greeting wait and proceed to the next unplayed chunk")
+    }
+    private static func discussionFixture() -> PicoPresentationScript {
+        PicoPresentationScript(deckURL: "https://slides.zoom.us/p/discussion-deck", title: "Discussion fixture",
+            slides: [
+                .init(number: 1, title: "Progress", chunks: [.init(id: "progress", text: "Prepared progress.")]),
+                .init(number: 2, title: "Questions", chunks: [.init(id: "questions", text: "Let's discuss your questions.",
+                    waitForReply: true, replyTimeoutSeconds: nil, waitForExplicitContinue: true)]),
+                .init(number: 3, title: "Thanks", chunks: [.init(id: "thanks", text: "Thank you.")])
+            ], closing: [], deckSlideCount: 5, closingStartSlide: 3)
+    }
+    private static func discussionFlow() throws -> PicoPresentationFlow {
+        var flow = try PicoPresentationFlow(script: discussionFixture())
+        precondition(flow.nextAction() == .requestShare(page: 1))
+        precondition(flow.shareConfirmed(page: 1, generation: flow.generation))
+        let progress = speech(flow.nextAction())
+        precondition(flow.playbackCompleted(id: progress.id, generation: progress.generation))
+        precondition(flow.nextAction() == .showSlide(page: 2))
+        precondition(flow.slideShown(page: 2, generation: flow.generation))
+        let questions = speech(flow.nextAction())
+        precondition(flow.playbackCompleted(id: questions.id, generation: questions.generation))
+        precondition(flow.nextAction() == .waitForReply && flow.waitingForExplicitContinue)
+        return flow
+    }
+    private static func persistentDiscussionAndPreparedClosing() throws {
+        let script = discussionFixture()
+        let decoded = try PicoPresentationScript.decode(JSONEncoder().encode(script))
+        precondition(decoded == script)
+        for count in [0, 2, 61] {
+            var invalid = script; invalid.deckSlideCount = count; rejected { try invalid.validate() }
+        }
+        for start in [0, 4] {
+            var invalid = script; invalid.closingStartSlide = start; rejected { try invalid.validate() }
+        }
+        var invalid = script; invalid.slides[1].chunks[0].waitForReply = false
+        rejected { try invalid.validate() }
+        invalid = script; invalid.slides[1].chunks[0].replyTimeoutSeconds = 12
+        rejected { try invalid.validate() }
+
+        var flow = try discussionFlow(), cursor = flow.cursor
+        for _ in 0..<3 {
+            flow.interrupt(); flow.guestReplyReceived()
+            let answer = flow.beginAnswer()
+            precondition(flow.answerPlaybackCompleted(id: answer))
+            flow.resume()
+            precondition(flow.waitingForReply && flow.waitingForExplicitContinue && flow.cursor == cursor)
+            precondition(flow.nextAction() == nil && flow.requestReplyTimeoutTransition() == nil,
+                         "ordinary questions, answer completion and reconnect must not release a discussion gate")
+        }
+        let appendixReview = try flow.jumpToSlide(5)
+        precondition(appendixReview == .showSlide(page: 5))
+        precondition(flow.slideShown(page: 5, generation: flow.generation))
+        flow.resume()
+        precondition(flow.waitingForExplicitContinue && flow.cursor == cursor && flow.visibleSlide == 5 && flow.nextAction() == nil,
+                     "appendix review must keep the prepared cursor and discussion gate intact")
+        flow.takeOver(); flow.resume()
+        precondition(flow.waitingForExplicitContinue && flow.nextAction() == nil)
+        flow.resume(continuePastReplyWait: true)
+        precondition(!flow.waitingForReply && !flow.waitingForExplicitContinue)
+        precondition(flow.nextAction() == .showSlide(page: 3))
+        precondition(flow.slideShown(page: 3, generation: flow.generation))
+        let thanks = speech(flow.nextAction())
+        precondition(thanks.chunkID == "thanks" && !flow.canConclude && !flow.requestConclude(),
+                     "a normal explicit continuation into the closing section cannot restart it")
+        precondition(flow.playbackCompleted(id: thanks.id, generation: thanks.generation))
+        precondition(flow.nextAction() == .finished && flow.phase == .freeChat && flow.visibleSlide == 3)
+        precondition(flow.nextAction() == nil, "unprepared appendix pages are never presented automatically")
+
+        flow = try discussionFlow(); cursor = flow.cursor
+        precondition(flow.canConclude && flow.requestConclude() && !flow.waitingForReply)
+        let endingGeneration = flow.generation
+        precondition(!flow.requestConclude() && flow.generation == endingGeneration,
+                     "duplicate conclusions cannot invalidate a pending page/speech operation")
+        precondition(flow.nextAction() == .showSlide(page: 3))
+        precondition(flow.slideShown(page: 3, generation: flow.generation))
+        let ending = speech(flow.nextAction())
+        precondition(ending.chunkID == "thanks" && ending.slideNumber == 3 && !flow.requestConclude())
+        precondition(flow.playbackCompleted(id: ending.id, generation: ending.generation))
+        precondition(flow.nextAction() == .finished && flow.visibleSlide == 3 && flow.isSharing)
+
+        var early = script; early.closing = [.init(id: "fallback", text: "Thank you for your time.")]
+        var beforeShare = try PicoPresentationFlow(script: early)
+        precondition(beforeShare.requestConclude())
+        let fallback = speech(beforeShare.nextAction())
+        precondition(fallback.chunkID == "fallback" && fallback.slideNumber == nil)
+        precondition(beforeShare.playbackCompleted(id: fallback.id, generation: fallback.generation))
+        precondition(beforeShare.nextAction() == .finished && !beforeShare.isSharing && beforeShare.visibleSlide == nil,
+                     "configured closing pages do not authorize starting sharing before a deck was shared")
+        print("PASS: persistent discussion across multiple answers, review, pause/reconnect and takeover; explicit-only continuation/conclusion; prepared closing-page idempotency; appendix count and review without automatic presentation")
     }
 }
 

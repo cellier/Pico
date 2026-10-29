@@ -115,6 +115,7 @@ private struct WorkerCheckpoint: Decodable {
     @Published var meetings: [UUID: MeetingSession] = [:]
     lazy var meetingManager = MeetingSessionManager(store: self)
     lazy var proactivity = PicoProactiveCoordinator(directory: dataDir, taskStore: self)
+    lazy var desktopCompanion = PicoDesktopCompanion(directory: dataDir)
     /// All typed and companion voice turns share this one durable conversation.
     lazy var chat = PicoChatStore(dataDir: dataDir, taskStore: self)
     @Published var feeds: [FeedRule] = []
